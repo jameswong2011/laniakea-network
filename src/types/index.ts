@@ -1,0 +1,112 @@
+export const ROLES = ["admin", "elite", "member"] as const;
+export type Role = (typeof ROLES)[number];
+
+export const TIERS = [
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Masters",
+] as const;
+export type Tier = (typeof TIERS)[number];
+
+export const TIER_LABELS: Record<Tier, string> = {
+  Bronze: "Bronze",
+  Silver: "Silver",
+  Gold: "Gold",
+  Platinum: "Platinum",
+  Masters: "Masters",
+};
+
+export const TIER_CODES: Record<Tier, string> = {
+  Bronze: "BRZ",
+  Silver: "SLV",
+  Gold: "GLD",
+  Platinum: "PLT",
+  Masters: "MST",
+};
+
+export const TIER_RANK: Record<Tier, number> = {
+  Bronze: 1,
+  Silver: 2,
+  Gold: 3,
+  Platinum: 4,
+  Masters: 5,
+};
+
+export function isTier(value: string): value is Tier {
+  return (TIERS as readonly string[]).includes(value);
+}
+
+export function resolveTier(value: string | null | undefined): Tier | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return TIERS.find((tier) => tier.toLowerCase() === normalized) ?? null;
+}
+
+export type Profile = {
+  id: string;
+  username: string;
+  display_name: string;
+  role: Role;
+  tier: Tier;
+  current_hp: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export const RESEARCH_POST_STATUS_LIVE = "live";
+export const RESEARCH_POST_STATUS_ARCHIVED = "archived";
+
+export type ResearchPostStatus =
+  | typeof RESEARCH_POST_STATUS_LIVE
+  | typeof RESEARCH_POST_STATUS_ARCHIVED
+  | string;
+
+export type ResearchPost = {
+  id: string;
+  author_id: string;
+  title: string;
+  body: string;
+  status: ResearchPostStatus;
+  current_health: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResearchPostAuthor = Pick<
+  Profile,
+  "id" | "username" | "display_name" | "tier"
+>;
+
+export type ResearchFeedItem = ResearchPost & {
+  author: ResearchPostAuthor | null;
+};
+
+export const HP_TRANSACTION_STAKE = "stake";
+export const HP_TRANSACTION_VOTE = "vote";
+
+export type HpTransaction = {
+  id: string;
+  user_id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  created_at: string;
+};
+
+export const VOTE_UP = 1;
+export const VOTE_DOWN = -1;
+
+export type VoteValue = typeof VOTE_UP | typeof VOTE_DOWN;
+
+export type Vote = {
+  id: string;
+  user_id: string;
+  post_id: string;
+  value: VoteValue | number;
+  created_at: string;
+};
