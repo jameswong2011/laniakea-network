@@ -57,47 +57,6 @@ export const HP_RULES = [
   { label: "Weekly drain", value: `${PASSIVE_DRAIN_HP} HP` },
 ] as const;
 
-export const LIFECYCLE = [
-  {
-    index: "01",
-    title: "Stake the note",
-    body: `You choose a stake from 1 to ${MAX_STAKE_HP} HP. The default is ${DEFAULT_STAKE_HP}. That inventory becomes the note's opening health.`,
-  },
-  {
-    index: "02",
-    title: "The bar opens",
-    body: "Health starts at the stake. The room can see the number. There is no quiet launch.",
-  },
-  {
-    index: "03",
-    title: "Votes cost inventory",
-    body: `Conviction ${VOTE_STRENGTH_MIN}–${VOTE_STRENGTH_MAX} HP, once per note. Health moves by the same amount. No daily cap.`,
-  },
-  {
-    index: "04",
-    title: "Settlement is continuous",
-    body: `Health to zero is a Hunt. Health to ${ASCENT_MULTIPLE}× stake is an Ascent. The pot is split — not taken by a single closer.`,
-  },
-  {
-    index: "05",
-    title: "Calibration",
-    body: "Each week the top 25% of a book move up one tier and the bottom 25% move down. Overall and each topic are calibrated separately.",
-  },
-] as const;
-
-export const LANDING_TIERS = [
-  { name: "Bronze", access: "The open floor. Every new desk starts here." },
-  { name: "Silver", access: "First closed room. The noise thins." },
-  { name: "Gold", access: "Named books, tighter theses, slower speech." },
-  { name: "Platinum", access: "Professional cadence. Most of the floor cannot read this far." },
-  {
-    name: "Masters",
-    access: "The top of the ladder. The only desk that can cash out HP.",
-  },
-] as const;
-
-export const TOPICS = SUB_TOPICS;
-
 export const WORKED_STAKE = 100;
 export const WORKED_CONVICTION = 5;
 export const WORKED_ASCENT_LINE = ascentLine(WORKED_STAKE);

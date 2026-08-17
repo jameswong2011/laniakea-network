@@ -53,12 +53,6 @@ export function LandingHeader({
         >
           Arena
         </a>
-        <a
-          href="#book"
-          className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
-        >
-          The book
-        </a>
       </nav>
 
       {isSignedIn ? (

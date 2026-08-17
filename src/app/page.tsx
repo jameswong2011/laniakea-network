@@ -4,14 +4,10 @@ import { LandingHeader } from "@/components/landing/header";
 import { Hero } from "@/components/landing/hero";
 import { HuntAscent } from "@/components/landing/hunt-ascent";
 import {
-  Book,
   Close,
   HpEconomy,
   Layers,
-  Lifecycle,
-  Manifesto,
   NorthStar,
-  Ranking,
 } from "@/components/landing/mechanisms";
 import { getAuthContext } from "@/lib/auth/session";
 
@@ -29,13 +25,9 @@ export default async function LandingPage() {
       <LandingHeader overHero isSignedIn={Boolean(userId)} />
       <main>
         <Hero />
-        <Manifesto />
         <Layers />
         <HpEconomy />
         <HuntAscent />
-        <Lifecycle />
-        <Ranking />
-        <Book />
         <NorthStar />
         <Close />
       </main>

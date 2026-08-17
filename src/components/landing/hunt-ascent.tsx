@@ -72,7 +72,7 @@ export function HuntAscent() {
     <section id="arena" className="border-t border-border">
       <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 md:grid-cols-12 md:gap-10 md:px-8 md:py-28">
         <div className="md:col-span-5">
-          <p className="section-kicker">04 — Hunt / Ascent</p>
+          <p className="section-kicker">03 — Hunt / Ascent</p>
           <h2 className="mt-4 font-display text-2xl leading-title text-fg">
             Settlement is continuous. Health at the vote is the multiplier.
           </h2>

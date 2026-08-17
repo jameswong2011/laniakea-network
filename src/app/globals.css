@@ -166,10 +166,19 @@
   }
 
   .landing {
-    --color-surface: #121214;
-    --color-muted: #9a9aa3;
+    /* Inline theme utilities read --muted / --accent, not --color-muted. */
+    --muted: #b4b4bc;
+    --muted-foreground: #b4b4bc;
+    --accent: #d4d6dc;
+    --accent-foreground: #0a0a0b;
+    --surface: #161618;
+    --border: color-mix(in oklab, #f2f2f4 18%, transparent);
+    --color-muted: #b4b4bc;
     --color-accent: #d4d6dc;
-    --color-border: color-mix(in oklab, var(--color-fg) 12%, transparent);
+    --color-accent-fg: #0a0a0b;
+    --color-surface: #161618;
+    --color-border: color-mix(in oklab, var(--color-fg) 18%, transparent);
+    --color-subtle: #a3a3ab;
     --font-sans: var(--font-ibm-plex-sans), "Segoe UI", system-ui, sans-serif;
     --font-mono: var(--font-ibm-plex-mono), ui-monospace, Menlo, Consolas,
       monospace;
@@ -194,8 +203,9 @@
     background: linear-gradient(
       to top,
       var(--color-bg) 0%,
-      color-mix(in oklab, var(--color-bg) 72%, transparent) 48%,
-      color-mix(in oklab, var(--color-bg) 28%, transparent) 100%
+      color-mix(in oklab, var(--color-bg) 88%, transparent) 42%,
+      color-mix(in oklab, var(--color-bg) 48%, transparent) 72%,
+      color-mix(in oklab, var(--color-bg) 22%, transparent) 100%
     );
   }
 

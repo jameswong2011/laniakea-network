@@ -19,9 +19,6 @@ export function LandingFooter() {
           <a href="#arena" className="inline-flex min-h-11 items-center hover:text-fg">
             Hunt / Ascent
           </a>
-          <a href="#book" className="inline-flex min-h-11 items-center hover:text-fg">
-            The book
-          </a>
           <Link href="/login" className="inline-flex min-h-11 items-center hover:text-fg">
             Request access
           </Link>
