@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/session";
-import { RESEARCH_POST_STATUS_LIVE, ROLES, resolveTier } from "@/types";
+import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
+import {
+  RESEARCH_POST_STATUS_LIVE,
+  ROLES,
+  isSubTopic,
+  resolveTier,
+} from "@/types";
 
 export type AdminActionState = {
   error?: string;
@@ -42,6 +48,12 @@ const seedPostSchema = z.object({
   title: z.string().trim().min(1, "Title is required.").max(200),
   body: z.string().trim().min(1, "Body is required.").max(20000),
   authorId: z.string().uuid("Select an author."),
+  subTopic: z
+    .string()
+    .trim()
+    .refine(isSubTopic, {
+      message: "Select a sub-topic.",
+    }),
   initialHpStake: z.coerce
     .number()
     .int("Stake must be a whole number.")
@@ -107,6 +119,7 @@ export async function seedResearchPost(
     title: formData.get("title"),
     body: formData.get("body"),
     authorId: formData.get("authorId"),
+    subTopic: formData.get("subTopic"),
     initialHpStake: formData.get("initialHpStake"),
   });
 
@@ -114,7 +127,7 @@ export async function seedResearchPost(
     return { error: firstIssue(parsed.error), stamp: Date.now() };
   }
 
-  const { title, body, authorId, initialHpStake } = parsed.data;
+  const { title, body, authorId, subTopic, initialHpStake } = parsed.data;
 
   const { data: author, error: authorError } = await supabase
     .from("profiles")
@@ -132,6 +145,7 @@ export async function seedResearchPost(
       author_id: authorId,
       title,
       body,
+      sub_topic: subTopic,
       status: RESEARCH_POST_STATUS_LIVE,
       current_health: initialHpStake,
     })
@@ -149,7 +163,8 @@ export async function seedResearchPost(
     user_id: authorId,
     amount: initialHpStake,
     type: "stake",
-    description: `Stake on research post ${post.id}`,
+    post_id: post.id,
+    description: `Stake on ${subTopic} research post ${post.id}`,
   });
 
   if (txError) {
@@ -159,9 +174,24 @@ export async function seedResearchPost(
     };
   }
 
+  const topic = await recordSubtopicParticipation(
+    supabase,
+    authorId,
+    subTopic,
+    initialHpStake
+  );
+
   revalidatePath("/admin");
   revalidatePath("/feed");
   revalidatePath("/ranking");
+  revalidatePath("/wallet");
+
+  if (topic.error) {
+    return {
+      error: `Post created, but topic rank failed: ${topic.error}`,
+      stamp: Date.now(),
+    };
+  }
 
   return { message: "Research post seeded.", stamp: Date.now() };
 }

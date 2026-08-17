@@ -47,6 +47,42 @@ export function resolveTier(value: string | null | undefined): Tier | null {
   return TIERS.find((tier) => tier.toLowerCase() === normalized) ?? null;
 }
 
+export const SUB_TOPICS = [
+  "Healthcare",
+  "Banks",
+  "Cybersecurity",
+  "Technology",
+  "Macro",
+  "Energy",
+] as const;
+export type SubTopic = (typeof SUB_TOPICS)[number];
+
+export const SUB_TOPIC_CODES: Record<SubTopic, string> = {
+  Healthcare: "HLTH",
+  Banks: "BANK",
+  Cybersecurity: "CYBR",
+  Technology: "TECH",
+  Macro: "MACR",
+  Energy: "ENRG",
+};
+
+export function isSubTopic(value: string): value is SubTopic {
+  return (SUB_TOPICS as readonly string[]).includes(value);
+}
+
+export function resolveSubTopic(
+  value: string | null | undefined
+): SubTopic | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return (
+    SUB_TOPICS.find((topic) => topic.toLowerCase() === normalized) ?? null
+  );
+}
+
 export type Profile = {
   id: string;
   username: string;
@@ -73,6 +109,7 @@ export type ResearchPost = {
   body: string;
   status: ResearchPostStatus;
   current_health: number;
+  sub_topic: SubTopic | string;
   created_at: string;
   updated_at: string;
 };
@@ -84,6 +121,16 @@ export type ResearchPostAuthor = Pick<
 
 export type ResearchFeedItem = ResearchPost & {
   author: ResearchPostAuthor | null;
+  authorTopicTier: Tier | null;
+};
+
+export type SubtopicRank = {
+  user_id: string;
+  sub_topic: SubTopic | string;
+  tier: Tier | string;
+  current_hp: number;
+  created_at: string;
+  updated_at: string;
 };
 
 export const HP_TRANSACTION_STAKE = "stake";
@@ -95,6 +142,7 @@ export type HpTransaction = {
   amount: number;
   type: string;
   description: string | null;
+  post_id: string | null;
   created_at: string;
 };
 

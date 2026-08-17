@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { VoteControls } from "@/components/laniakea/VoteControls";
 import { getPostHealthState } from "@/lib/research/health";
@@ -58,6 +59,9 @@ export function ResearchFeed({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
+                <div className="mb-1.5">
+                  <SubTopicBadge topic={item.sub_topic} />
+                </div>
                 <h2 className="text-[13px] font-medium tracking-tight text-foreground">
                   {item.title}
                 </h2>
@@ -69,7 +73,11 @@ export function ResearchFeed({
             </div>
             <div className="mt-2 flex items-end justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                {item.author ? <TierBadge tier={item.author.tier} /> : null}
+                {item.authorTopicTier ? (
+                  <TierBadge tier={item.authorTopicTier} />
+                ) : item.author ? (
+                  <TierBadge tier={item.author.tier} />
+                ) : null}
                 <span className="font-data text-[12px] text-foreground">
                   {item.author?.display_name ?? "Unknown"}
                 </span>

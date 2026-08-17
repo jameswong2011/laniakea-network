@@ -48,8 +48,8 @@ export default async function AdminPage() {
       <Panel>
         <PanelHeader label="Seed Research Post" />
         <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
-          Inserts a post and a matching HP transaction with type{" "}
-          <span className="font-data text-foreground">stake</span>.
+          Inserts a post in one sub-topic and a matching HP transaction with
+          type <span className="font-data text-foreground">stake</span>.
         </p>
         <SeedResearchForm authors={profiles} />
       </Panel>

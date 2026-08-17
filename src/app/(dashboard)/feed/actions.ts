@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { DEFAULT_STAKE_HP, VOTE_COST_HP, VOTE_HEALTH_DELTA } from "@/lib/research/economy";
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
+import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
@@ -12,6 +13,8 @@ import {
   RESEARCH_POST_STATUS_LIVE,
   VOTE_DOWN,
   VOTE_UP,
+  isSubTopic,
+  resolveSubTopic,
 } from "@/types";
 
 export type FeedActionState = {
@@ -23,6 +26,12 @@ export type FeedActionState = {
 const createPostSchema = z.object({
   title: z.string().trim().min(1, "Title is required.").max(200),
   body: z.string().trim().min(1, "Body is required.").max(20000),
+  subTopic: z
+    .string()
+    .trim()
+    .refine(isSubTopic, {
+      message: "Select a sub-topic.",
+    }),
   stakeHp: z.coerce
     .number()
     .int("Stake must be a whole number.")
@@ -41,6 +50,8 @@ const voteSchema = z.object({
 function refreshFeed() {
   revalidatePath("/feed");
   revalidatePath("/dashboard");
+  revalidatePath("/ranking");
+  revalidatePath("/wallet");
 }
 
 export async function createResearchPost(
@@ -51,6 +62,7 @@ export async function createResearchPost(
   const parsed = createPostSchema.safeParse({
     title: formData.get("title"),
     body: formData.get("body"),
+    subTopic: formData.get("subTopic"),
     stakeHp: formData.get("stakeHp") ?? DEFAULT_STAKE_HP,
   });
 
@@ -61,7 +73,7 @@ export async function createResearchPost(
     };
   }
 
-  const { title, body, stakeHp } = parsed.data;
+  const { title, body, subTopic, stakeHp } = parsed.data;
   const debit = await debitProfileHp(supabase, userId, stakeHp);
 
   if (!debit.ok) {
@@ -74,6 +86,7 @@ export async function createResearchPost(
       author_id: userId,
       title,
       body,
+      sub_topic: subTopic,
       status: RESEARCH_POST_STATUS_LIVE,
       current_health: stakeHp,
     })
@@ -92,7 +105,8 @@ export async function createResearchPost(
     user_id: userId,
     amount: stakeHp,
     type: HP_TRANSACTION_STAKE,
-    description: `Stake on research post ${post.id}`,
+    post_id: post.id,
+    description: `Stake on ${subTopic} research post ${post.id}`,
   });
 
   if (txError) {
@@ -103,7 +117,22 @@ export async function createResearchPost(
     };
   }
 
+  const topic = await recordSubtopicParticipation(
+    supabase,
+    userId,
+    subTopic,
+    stakeHp
+  );
+
   refreshFeed();
+
+  if (topic.error) {
+    return {
+      error: `Post published, but topic rank failed: ${topic.error}`,
+      stamp: Date.now(),
+    };
+  }
+
   return { message: "Research post published.", stamp: Date.now() };
 }
 
@@ -139,7 +168,7 @@ export async function voteOnPost(
 
   const { data: post, error: postReadError } = await supabase
     .from("research_posts")
-    .select("id, current_health, status")
+    .select("id, current_health, status, sub_topic")
     .eq("id", postId)
     .maybeSingle();
 
@@ -198,6 +227,7 @@ export async function voteOnPost(
     user_id: userId,
     amount: VOTE_COST_HP,
     type: HP_TRANSACTION_VOTE,
+    post_id: postId,
     description: `${value === VOTE_UP ? "Upvote" : "Downvote"} on research post ${postId}`,
   });
 
@@ -207,6 +237,25 @@ export async function voteOnPost(
       error: `Vote recorded, but HP transaction failed: ${txError.message}`,
       stamp: Date.now(),
     };
+  }
+
+  const subTopic = resolveSubTopic(post.sub_topic);
+
+  if (subTopic) {
+    const topic = await recordSubtopicParticipation(
+      supabase,
+      userId,
+      subTopic,
+      VOTE_COST_HP
+    );
+
+    if (topic.error) {
+      refreshFeed();
+      return {
+        error: `Vote recorded, but topic rank failed: ${topic.error}`,
+        stamp: Date.now(),
+      };
+    }
   }
 
   refreshFeed();

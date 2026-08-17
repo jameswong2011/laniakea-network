@@ -2,6 +2,7 @@
 
 import { useActionState, type ReactNode } from "react";
 import { seedResearchPost, type AdminActionState } from "@/app/admin/actions";
+import { SubTopicSelect } from "@/components/laniakea/SubTopicSelect";
 import type { Profile } from "@/types";
 
 type AuthorOption = Pick<Profile, "id" | "username" | "display_name">;
@@ -63,6 +64,11 @@ export function SeedResearchForm({ authors }: { authors: AuthorOption[] }) {
             </option>
           ))}
         </select>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <FieldLabel>Sub-topic</FieldLabel>
+        <SubTopicSelect />
       </label>
 
       <label className="flex flex-col gap-1">

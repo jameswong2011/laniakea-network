@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolveTier, TIERS, type Profile, type Tier } from "@/types";
+import { resolveTier, TIERS, type SubTopic, type Tier } from "@/types";
 
 export const CALIBRATION_BAND = 0.2;
 
@@ -29,9 +29,14 @@ export function getCalibrationBandSize(count: number) {
   return Math.max(1, Math.floor(count * CALIBRATION_BAND));
 }
 
-export function planCalibration(
-  profiles: Pick<Profile, "id" | "username" | "tier" | "current_hp">[]
-): CalibrationMove[] {
+export type Calibratable = {
+  id: string;
+  username: string;
+  tier: string;
+  current_hp: number;
+};
+
+export function planCalibration(profiles: Calibratable[]): CalibrationMove[] {
   const ranked = [...profiles].sort((a, b) => {
     if (b.current_hp !== a.current_hp) {
       return b.current_hp - a.current_hp;
@@ -110,6 +115,31 @@ export async function applyCalibration(
         updated_at: now,
       })
       .eq("id", move.id);
+
+    if (error) {
+      return { error: error.message };
+    }
+  }
+
+  return { error: null };
+}
+
+export async function applySubtopicCalibration(
+  supabase: SupabaseClient,
+  subTopic: SubTopic,
+  moves: CalibrationMove[]
+) {
+  const now = new Date().toISOString();
+
+  for (const move of moves) {
+    const { error } = await supabase
+      .from("subtopic_ranks")
+      .update({
+        tier: move.to,
+        updated_at: now,
+      })
+      .eq("user_id", move.id)
+      .eq("sub_topic", subTopic);
 
     if (error) {
       return { error: error.message };

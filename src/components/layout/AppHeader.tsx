@@ -10,6 +10,7 @@ import type { Profile } from "@/types";
 const NAV_ITEMS = [
   { href: "/feed", label: "Feed" },
   { href: "/ranking", label: "Ranking" },
+  { href: "/wallet", label: "Wallet" },
   { href: "/dashboard", label: "Account" },
 ] as const;
 
@@ -89,7 +90,9 @@ export function AppHeader({
                 —
               </span>
             )}
-            <HpReadout value={profile?.current_hp ?? null} />
+            <Link href={isAuthenticated ? "/wallet" : "/login"} className="shrink-0">
+              <HpReadout value={profile?.current_hp ?? null} />
+            </Link>
             {profile ? (
               <span className="hidden max-w-[8rem] truncate font-data text-[11px] text-muted-foreground md:inline">
                 @{profile.username}

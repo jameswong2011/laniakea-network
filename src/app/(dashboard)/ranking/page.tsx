@@ -6,17 +6,28 @@ import {
   PanelHeader,
 } from "@/components/layout/PageFrame";
 import { CalibrationButton } from "@/components/laniakea/CalibrationButton";
+import { RankingTopicNav } from "@/components/laniakea/RankingTopicNav";
+import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { requireUser } from "@/lib/auth/session";
 import { formatHp } from "@/lib/format";
 import { CALIBRATION_BAND } from "@/lib/research/calibration";
-import type { Profile } from "@/types";
+import { getSubtopicRanks } from "@/lib/research/subtopic-ranks";
+import { resolveSubTopic, type Profile } from "@/types";
 
 export const metadata: Metadata = {
   title: "Ranking",
 };
 
-export default async function RankingPage() {
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function RankingPage({
+  searchParams,
+}: PageProps<"/ranking">) {
+  const { topic: topicParam } = await searchParams;
+  const selectedTopic = resolveSubTopic(firstSearchParam(topicParam));
   const { supabase, userId, profile } = await requireUser();
   const { data, error } = await supabase
     .from("profiles")
@@ -24,31 +35,76 @@ export default async function RankingPage() {
     .order("current_hp", { ascending: false })
     .order("username", { ascending: true });
 
-  const rows = (data ?? []) as Pick<
+  const profiles = (data ?? []) as Pick<
     Profile,
     "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
   >[];
+  const profilesById = new Map(profiles.map((row) => [row.id, row]));
   const isAdmin = profile?.role === "admin";
+
+  const topicRanks = selectedTopic
+    ? await getSubtopicRanks(supabase, selectedTopic)
+    : { ranks: [], error: null };
+
+  const topicRows = topicRanks.ranks
+    .map((rank) => {
+      const identity = profilesById.get(rank.user_id);
+
+      return {
+        id: rank.user_id,
+        username: identity?.username ?? rank.user_id.slice(0, 8),
+        display_name: identity?.display_name ?? "Unknown",
+        role: identity?.role ?? "member",
+        tier: rank.tier,
+        current_hp: rank.current_hp,
+      };
+    })
+    .sort((a, b) => {
+      if (b.current_hp !== a.current_hp) {
+        return b.current_hp - a.current_hp;
+      }
+
+      return a.username.localeCompare(b.username);
+    });
+
+  const rows = selectedTopic ? topicRows : profiles;
+  const listError = selectedTopic ? topicRanks.error : error?.message ?? null;
 
   return (
     <PageFrame>
       <PageHeading
         kicker="Standings"
-        title="Ranking"
-        description={`Ordered by current HP. Calibration moves the top and bottom ${Math.round(CALIBRATION_BAND * 100)}% one tier.`}
-        meta={isAdmin ? <CalibrationButton /> : undefined}
+        title={selectedTopic ? `${selectedTopic} Ranking` : "Ranking"}
+        description={
+          selectedTopic
+            ? `Topic book ordered by ${selectedTopic} HP. Overall tier stays on Account.`
+            : `Ordered by current HP. Calibration moves the top and bottom ${Math.round(CALIBRATION_BAND * 100)}% one tier, including each sub-topic book.`
+        }
+        meta={
+          <>
+            {selectedTopic ? <SubTopicBadge topic={selectedTopic} size="md" /> : null}
+            {isAdmin ? <CalibrationButton /> : null}
+          </>
+        }
       />
 
-      <Panel>
-        <PanelHeader label="Leaderboard" meta={rows.length} />
+      <RankingTopicNav selected={selectedTopic} />
 
-        {error ? (
+      <Panel>
+        <PanelHeader
+          label={selectedTopic ? `${selectedTopic} book` : "Leaderboard"}
+          meta={rows.length}
+        />
+
+        {listError ? (
           <p className="px-2.5 py-3 font-data text-[12px] text-loss">
-            {error.message}
+            {listError}
           </p>
         ) : rows.length === 0 ? (
           <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
-            No profiles found.
+            {selectedTopic
+              ? "No participants in this sub-topic yet."
+              : "No profiles found."}
           </p>
         ) : (
           <table className="w-full text-left">
@@ -60,9 +116,11 @@ export default async function RankingPage() {
                 <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
                   Identity
                 </th>
-                <th className="w-20 px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                  Role
-                </th>
+                {selectedTopic ? null : (
+                  <th className="w-20 px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                    Role
+                  </th>
+                )}
                 <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
                   Tier
                 </th>
@@ -98,9 +156,11 @@ export default async function RankingPage() {
                         @{row.username}
                       </p>
                     </td>
-                    <td className="px-2.5 py-1.5 font-data text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
-                      {row.role}
-                    </td>
+                    {selectedTopic ? null : (
+                      <td className="px-2.5 py-1.5 font-data text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
+                        {row.role}
+                      </td>
+                    )}
                     <td className="px-2.5 py-1.5">
                       <TierBadge tier={row.tier} size="md" />
                     </td>

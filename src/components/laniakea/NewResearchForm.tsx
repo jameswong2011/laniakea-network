@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import {
   createResearchPost,
   type FeedActionState,
 } from "@/app/(dashboard)/feed/actions";
+import { SubTopicSelect } from "@/components/laniakea/SubTopicSelect";
 import { DEFAULT_STAKE_HP } from "@/lib/research/economy";
 
 const initialState: FeedActionState = {};
@@ -27,27 +29,38 @@ export function NewResearchForm({ availableHp }: { availableHp: number }) {
         <h2 className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
           New Research Post
         </h2>
-        <span className="font-data text-[11px] text-muted-foreground">
+        <Link
+          href="/wallet"
+          className="font-data text-[11px] text-muted-foreground hover:text-foreground"
+        >
           Wallet {new Intl.NumberFormat("en-US").format(availableHp)} HP
-        </span>
+        </Link>
       </div>
       <form
         key={state.stamp ?? "new-post"}
         action={action}
         className="flex flex-col gap-2.5 p-2.5"
       >
-        <label className="flex flex-col gap-1">
-          <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-            Title
-          </span>
-          <input
-            name="title"
-            required
-            maxLength={200}
-            placeholder="Research title"
-            className={fieldClassName}
-          />
-        </label>
+        <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_13rem]">
+          <label className="flex flex-col gap-1">
+            <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Title
+            </span>
+            <input
+              name="title"
+              required
+              maxLength={200}
+              placeholder="Research title"
+              className={fieldClassName}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Sub-topic
+            </span>
+            <SubTopicSelect />
+          </label>
+        </div>
         <label className="flex flex-col gap-1">
           <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
             Body
