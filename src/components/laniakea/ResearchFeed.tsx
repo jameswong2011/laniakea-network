@@ -4,7 +4,7 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { VoteControls } from "@/components/laniakea/VoteControls";
 import { getPostHealthState } from "@/lib/research/health";
-import type { ResearchFeedItem } from "@/types";
+import { TIER_LABELS, type ResearchFeedItem } from "@/types";
 
 function excerpt(body: string, max = 220) {
   const compact = body.replace(/\s+/g, " ").trim();
@@ -59,8 +59,14 @@ export function ResearchFeed({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="mb-1.5">
+                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                   <SubTopicBadge topic={item.sub_topic} />
+                  {item.access === "view_only" ? (
+                    <span className="inline-flex h-6 items-center border border-warning/40 bg-warning-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-warning uppercase">
+                      View only
+                      {item.deskTier ? ` · ${TIER_LABELS[item.deskTier]} desk` : ""}
+                    </span>
+                  ) : null}
                 </div>
                 <h2 className="text-[13px] font-medium tracking-tight text-foreground">
                   {item.title}
@@ -91,7 +97,10 @@ export function ResearchFeed({
               <VoteControls
                 postId={item.id}
                 currentVote={viewerVotes[item.id] ?? null}
-                canVote={canVote}
+                canVote={canVote && item.access === "full"}
+                lockReason={
+                  item.access === "view_only" ? "View only" : undefined
+                }
               />
             </div>
           </article>

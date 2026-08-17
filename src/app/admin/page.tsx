@@ -6,7 +6,9 @@ import {
   PanelHeader,
 } from "@/components/layout/PageFrame";
 import { AdminProfileEditor } from "@/components/laniakea/AdminProfileEditor";
+import { PassiveDrainButton } from "@/components/laniakea/PassiveDrainButton";
 import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
+import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
 import { requireAdmin } from "@/lib/auth/session";
 import type { Profile } from "@/types";
 
@@ -43,6 +45,23 @@ export default async function AdminPage() {
         ) : (
           <AdminProfileEditor profiles={profiles} />
         )}
+      </Panel>
+
+      <Panel>
+        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Passive HP Drain
+            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Deducts up to {PASSIVE_DRAIN_HP} HP from every non-admin account
+              with a positive balance and writes a{" "}
+              <span className="font-data text-foreground">drain</span> ledger
+              row.
+            </p>
+          </div>
+          <PassiveDrainButton />
+        </div>
       </Panel>
 
       <Panel>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
+import { getDeskAccess } from "@/lib/research/access";
 import { DEFAULT_STAKE_HP, VOTE_COST_HP, VOTE_HEALTH_DELTA } from "@/lib/research/economy";
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
@@ -140,7 +141,7 @@ export async function voteOnPost(
   _prevState: FeedActionState,
   formData: FormData
 ): Promise<FeedActionState> {
-  const { supabase, userId } = await requireUser();
+  const { supabase, userId, profile } = await requireUser();
   const parsed = voteSchema.safeParse({
     postId: formData.get("postId"),
     value: formData.get("value"),
@@ -168,7 +169,7 @@ export async function voteOnPost(
 
   const { data: post, error: postReadError } = await supabase
     .from("research_posts")
-    .select("id, current_health, status, sub_topic")
+    .select("id, author_id, current_health, status, sub_topic")
     .eq("id", postId)
     .maybeSingle();
 
@@ -178,6 +179,25 @@ export async function voteOnPost(
 
   if (post.status !== RESEARCH_POST_STATUS_LIVE) {
     return { error: "This post is no longer live.", stamp: Date.now() };
+  }
+
+  const { data: author } = await supabase
+    .from("profiles")
+    .select("tier")
+    .eq("id", post.author_id)
+    .maybeSingle();
+
+  const access = getDeskAccess(
+    profile?.tier,
+    author?.tier,
+    profile?.role === "admin"
+  );
+
+  if (access !== "full") {
+    return {
+      error: "Higher-tier desks are view-only.",
+      stamp: Date.now(),
+    };
   }
 
   const debit = await debitProfileHp(supabase, userId, VOTE_COST_HP);

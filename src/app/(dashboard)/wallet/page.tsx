@@ -8,9 +8,13 @@ import {
 } from "@/components/layout/PageFrame";
 import { HpReadout } from "@/components/laniakea/HpReadout";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
+import { TokenDesk } from "@/components/laniakea/TokenDesk";
+import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { requireUser } from "@/lib/auth/session";
 import { formatSignedHp } from "@/lib/format";
+import { canBuyHp, canCashOutHp } from "@/lib/research/access";
 import { getWalletLedger } from "@/lib/research/wallet";
+import { resolveTier } from "@/types";
 
 export const metadata: Metadata = {
   title: "Wallet",
@@ -19,15 +23,41 @@ export const metadata: Metadata = {
 export default async function WalletPage() {
   const { userId, profile, supabase } = await requireUser();
   const { entries, error } = await getWalletLedger(supabase, userId);
+  const tier = resolveTier(profile?.tier) ?? "Bronze";
+  const showBuy = canBuyHp(tier);
+  const showCashout = canCashOutHp(tier);
 
   return (
     <PageFrame>
       <PageHeading
         kicker="Ledger"
         title="Wallet"
-        description="Full HP transaction history for this account."
-        meta={<HpReadout value={profile?.current_hp ?? null} size="md" />}
+        description="HP ledger and mock UTL conversion. No real payments."
+        meta={
+          <>
+            <HpReadout value={profile?.current_hp ?? null} size="md" />
+            <TokenReadout value={profile?.utility_tokens ?? null} size="md" />
+          </>
+        }
       />
+
+      <Panel>
+        <PanelHeader
+          label={showCashout ? "Cash out HP" : "Buy HP"}
+          meta={showCashout ? "Masters desk" : "Below Masters"}
+        />
+        {showBuy || showCashout ? (
+          <TokenDesk
+            mode={showCashout ? "cashout" : "buy"}
+            availableHp={profile?.current_hp ?? 0}
+            availableTokens={profile?.utility_tokens ?? 0}
+          />
+        ) : (
+          <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
+            Conversion is unavailable for this account.
+          </p>
+        )}
+      </Panel>
 
       <Panel>
         <PanelHeader label="HP transactions" meta={entries.length} />

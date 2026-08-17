@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/layout/LogoutButton";
 import { HpReadout } from "@/components/laniakea/HpReadout";
 import { TierBadge } from "@/components/laniakea/TierBadge";
+import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import type { Profile } from "@/types";
 
 const NAV_ITEMS = [
@@ -92,6 +93,12 @@ export function AppHeader({
             )}
             <Link href={isAuthenticated ? "/wallet" : "/login"} className="shrink-0">
               <HpReadout value={profile?.current_hp ?? null} />
+            </Link>
+            <Link
+              href={isAuthenticated ? "/wallet" : "/login"}
+              className="hidden shrink-0 sm:inline"
+            >
+              <TokenReadout value={profile?.utility_tokens ?? null} />
             </Link>
             {profile ? (
               <span className="hidden max-w-[8rem] truncate font-data text-[11px] text-muted-foreground md:inline">

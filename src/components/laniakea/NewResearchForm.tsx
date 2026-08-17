@@ -7,14 +7,23 @@ import {
   type FeedActionState,
 } from "@/app/(dashboard)/feed/actions";
 import { SubTopicSelect } from "@/components/laniakea/SubTopicSelect";
+import { TierBadge } from "@/components/laniakea/TierBadge";
+import { nextTier } from "@/lib/research/access";
 import { DEFAULT_STAKE_HP } from "@/lib/research/economy";
+import { TIER_LABELS, type Tier } from "@/types";
 
 const initialState: FeedActionState = {};
 
 const fieldClassName =
   "h-8 w-full border border-border bg-panel-elevated px-2.5 text-[13px] text-foreground outline-none focus-visible:border-ring";
 
-export function NewResearchForm({ availableHp }: { availableHp: number }) {
+export function NewResearchForm({
+  availableHp,
+  deskTier,
+}: {
+  availableHp: number;
+  deskTier: Tier;
+}) {
   const [state, action, pending] = useActionState(
     createResearchPost,
     initialState
@@ -22,13 +31,17 @@ export function NewResearchForm({ availableHp }: { availableHp: number }) {
   const defaultStake =
     availableHp >= DEFAULT_STAKE_HP ? DEFAULT_STAKE_HP : Math.max(availableHp, 1);
   const canPost = availableHp >= 1;
+  const visibleAbove = nextTier(deskTier);
 
   return (
     <section className="border border-border bg-panel">
       <div className="flex items-center justify-between border-b border-border bg-surface px-2.5 py-1.5">
-        <h2 className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-          New Research Post
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+            New Research Post
+          </h2>
+          <TierBadge tier={deskTier} />
+        </div>
         <Link
           href="/wallet"
           className="font-data text-[11px] text-muted-foreground hover:text-foreground"
@@ -74,6 +87,12 @@ export function NewResearchForm({ availableHp }: { availableHp: number }) {
             className="min-h-24 w-full border border-border bg-panel-elevated px-2.5 py-2 text-[13px] text-foreground outline-none focus-visible:border-ring"
           />
         </label>
+        <p className="font-data text-[11px] text-muted-foreground">
+          Publishes to your {TIER_LABELS[deskTier]} desk.
+          {visibleAbove
+            ? ` ${TIER_LABELS[visibleAbove]} is view-only.`
+            : " You are on the top desk."}
+        </p>
         <label className="flex max-w-[12rem] flex-col gap-1">
           <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
             HP to stake

@@ -90,6 +90,7 @@ export type Profile = {
   role: Role;
   tier: Tier;
   current_hp: number;
+  utility_tokens: number;
   created_at: string;
   updated_at: string;
 };
@@ -119,9 +120,13 @@ export type ResearchPostAuthor = Pick<
   "id" | "username" | "display_name" | "tier"
 >;
 
+export type FeedAccess = "full" | "view_only";
+
 export type ResearchFeedItem = ResearchPost & {
   author: ResearchPostAuthor | null;
   authorTopicTier: Tier | null;
+  deskTier: Tier | null;
+  access: FeedAccess;
 };
 
 export type SubtopicRank = {
@@ -135,6 +140,9 @@ export type SubtopicRank = {
 
 export const HP_TRANSACTION_STAKE = "stake";
 export const HP_TRANSACTION_VOTE = "vote";
+export const HP_TRANSACTION_DRAIN = "drain";
+export const HP_TRANSACTION_BUY = "buy";
+export const HP_TRANSACTION_CASHOUT = "cashout";
 
 export type HpTransaction = {
   id: string;

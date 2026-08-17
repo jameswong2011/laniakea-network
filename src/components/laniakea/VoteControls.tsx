@@ -17,10 +17,12 @@ export function VoteControls({
   postId,
   currentVote,
   canVote,
+  lockReason,
 }: {
   postId: string;
   currentVote: number | null;
   canVote: boolean;
+  lockReason?: string;
 }) {
   const [state, action, pending] = useActionState(voteOnPost, initialState);
   const locked = pending || currentVote !== null || !canVote;
@@ -64,7 +66,7 @@ export function VoteControls({
           ? "Vote recorded"
           : canVote
             ? `${VOTE_COST_HP} HP`
-            : "Need 1 HP"}
+            : lockReason ?? "Need 1 HP"}
       </p>
       {state.error ? (
         <p className="font-data text-[10px] text-loss">{state.error}</p>

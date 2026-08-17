@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/session";
+import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
+import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
+  HP_TRANSACTION_DRAIN,
   RESEARCH_POST_STATUS_LIVE,
   ROLES,
   isSubTopic,
@@ -194,4 +197,64 @@ export async function seedResearchPost(
   }
 
   return { message: "Research post seeded.", stamp: Date.now() };
+}
+
+export async function applyPassiveDrain(
+  _prevState: AdminActionState,
+  _formData: FormData
+): Promise<AdminActionState> {
+  const { supabase } = await requireAdmin();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, role, current_hp")
+    .neq("role", "admin");
+
+  if (error) {
+    return { error: error.message, stamp: Date.now() };
+  }
+
+  let drained = 0;
+  let skipped = 0;
+
+  for (const profile of data ?? []) {
+    if (profile.current_hp <= 0) {
+      skipped += 1;
+      continue;
+    }
+
+    const amount = Math.min(PASSIVE_DRAIN_HP, profile.current_hp);
+    const debit = await debitProfileHp(supabase, profile.id, amount);
+
+    if (!debit.ok) {
+      skipped += 1;
+      continue;
+    }
+
+    const { error: txError } = await supabase.from("hp_transactions").insert({
+      user_id: profile.id,
+      amount,
+      type: HP_TRANSACTION_DRAIN,
+      description: `Passive drain ${amount} HP`,
+    });
+
+    if (txError) {
+      await restoreProfileHp(supabase, profile.id, debit.previousHp);
+      return { error: txError.message, stamp: Date.now() };
+    }
+
+    drained += 1;
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/wallet");
+  revalidatePath("/feed");
+  revalidatePath("/ranking");
+
+  return {
+    message: `Passive drain applied. ${drained} accounts reduced by up to ${PASSIVE_DRAIN_HP} HP${
+      skipped ? `, ${skipped} skipped` : ""
+    }.`,
+    stamp: Date.now(),
+  };
 }

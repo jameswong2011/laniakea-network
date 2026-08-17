@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types";
 
 const PROFILE_COLUMNS =
+  "id, username, display_name, role, tier, current_hp, utility_tokens, created_at, updated_at";
+
+const PROFILE_COLUMNS_LEGACY =
   "id, username, display_name, role, tier, current_hp, created_at, updated_at";
 
 export type AuthContext = {
@@ -16,6 +19,48 @@ export type AuthenticatedContext = AuthContext & {
   userId: string;
 };
 
+function asProfile(
+  row: Omit<Profile, "utility_tokens"> & { utility_tokens?: number | null }
+): Profile {
+  return {
+    ...row,
+    utility_tokens: row.utility_tokens ?? 0,
+  };
+}
+
+async function loadProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<Profile | null> {
+  const withTokens = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!withTokens.error) {
+    return withTokens.data
+      ? asProfile(withTokens.data as Omit<Profile, "utility_tokens"> & {
+          utility_tokens?: number | null;
+        })
+      : null;
+  }
+
+  if (!withTokens.error.message.includes("utility_tokens")) {
+    return null;
+  }
+
+  const legacy = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS_LEGACY)
+    .eq("id", userId)
+    .maybeSingle();
+
+  return legacy.data
+    ? asProfile(legacy.data as Omit<Profile, "utility_tokens">)
+    : null;
+}
+
 export const getAuthContext = cache(async (): Promise<AuthContext> => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -25,16 +70,10 @@ export const getAuthContext = cache(async (): Promise<AuthContext> => {
     return { supabase, userId: null, profile: null };
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(PROFILE_COLUMNS)
-    .eq("id", userId)
-    .maybeSingle();
-
   return {
     supabase,
     userId,
-    profile: profile as Profile | null,
+    profile: await loadProfile(supabase, userId),
   };
 });
 

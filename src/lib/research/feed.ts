@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getDeskAccess } from "@/lib/research/access";
 import {
   RESEARCH_POST_STATUS_LIVE,
   resolveSubTopic,
@@ -13,7 +14,8 @@ const POST_COLUMNS =
   "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at";
 
 export async function getLiveResearchFeed(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  viewer?: { tier?: string | null; isAdmin?: boolean }
 ): Promise<{ items: ResearchFeedItem[]; error: string | null }> {
   const withTopic = await supabase
     .from("research_posts")
@@ -78,20 +80,32 @@ export async function getLiveResearchFeed(
   }
 
   return {
-    items: posts.map((post) => {
+    items: posts.flatMap((post) => {
       const topic = resolveSubTopic(post.sub_topic);
       const author = authorsById.get(post.author_id) ?? null;
+      const deskTier = resolveTier(author?.tier);
+      const access = getDeskAccess(
+        viewer?.tier,
+        author?.tier,
+        viewer?.isAdmin ?? false
+      );
 
-      return {
-        ...post,
-        current_health: post.current_health ?? 0,
-        author,
-        authorTopicTier: topic
-          ? (topicTiers.get(`${post.author_id}:${topic}`) ??
-            resolveTier(author?.tier) ??
-            null)
-          : (resolveTier(author?.tier) ?? null),
-      };
+      if (access === "hidden") {
+        return [];
+      }
+
+      return [
+        {
+          ...post,
+          current_health: post.current_health ?? 0,
+          author,
+          authorTopicTier: topic
+            ? (topicTiers.get(`${post.author_id}:${topic}`) ?? deskTier)
+            : deskTier,
+          deskTier,
+          access,
+        },
+      ];
     }),
     error: null,
   };
