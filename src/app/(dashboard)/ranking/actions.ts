@@ -6,6 +6,9 @@ import {
   applyCalibration,
   applySubtopicCalibration,
   planCalibration,
+  recordCalibrationLogs,
+  summarizeCalibration,
+  type CalibrationMove,
 } from "@/lib/research/calibration";
 import { getSubtopicRanks } from "@/lib/research/subtopic-ranks";
 import { SUB_TOPICS, type Profile } from "@/types";
@@ -21,9 +24,13 @@ function refreshRanking() {
   revalidatePath("/feed");
   revalidatePath("/dashboard");
   revalidatePath("/admin");
+  revalidatePath("/wallet");
 }
 
-export async function runCalibration(): Promise<CalibrationState> {
+export async function runCalibration(
+  _prevState: CalibrationState,
+  _formData: FormData
+): Promise<CalibrationState> {
   const { supabase } = await requireAdmin();
   const { data, error } = await supabase
     .from("profiles")
@@ -40,18 +47,15 @@ export async function runCalibration(): Promise<CalibrationState> {
   const usernames = new Map(
     profiles.map((profile) => [profile.id, profile.username])
   );
-  const overallMoves = planCalibration(profiles);
+  const moves: CalibrationMove[] = planCalibration(profiles, "overall");
 
-  if (overallMoves.length > 0) {
-    const applied = await applyCalibration(supabase, overallMoves);
+  if (moves.length > 0) {
+    const applied = await applyCalibration(supabase, moves);
 
     if (applied.error) {
       return { error: applied.error, stamp: Date.now() };
     }
   }
-
-  let topicPromoted = 0;
-  let topicDemoted = 0;
 
   for (const subTopic of SUB_TOPICS) {
     const { ranks, error: rankError } = await getSubtopicRanks(
@@ -69,7 +73,8 @@ export async function runCalibration(): Promise<CalibrationState> {
         username: usernames.get(rank.user_id) ?? rank.user_id,
         tier: rank.tier,
         current_hp: rank.current_hp,
-      }))
+      })),
+      subTopic
     );
 
     if (topicMoves.length === 0) {
@@ -86,28 +91,25 @@ export async function runCalibration(): Promise<CalibrationState> {
       return { error: applied.error, stamp: Date.now() };
     }
 
-    topicPromoted += topicMoves.filter((move) => move.direction === "up").length;
-    topicDemoted += topicMoves.filter((move) => move.direction === "down").length;
+    moves.push(...topicMoves);
   }
 
-  const promoted =
-    overallMoves.filter((move) => move.direction === "up").length +
-    topicPromoted;
-  const demoted =
-    overallMoves.filter((move) => move.direction === "down").length +
-    topicDemoted;
+  await recordCalibrationLogs(supabase, moves);
+
+  const { overallUp, overallDown, topicUp, topicDown } =
+    summarizeCalibration(moves);
 
   refreshRanking();
 
-  if (promoted === 0 && demoted === 0) {
+  if (moves.length === 0) {
     return {
-      message: "Calibration complete. No tier changes.",
+      message: "Calibration complete. No quartile moves.",
       stamp: Date.now(),
     };
   }
 
   return {
-    message: `Calibration complete. Promoted ${promoted}, demoted ${demoted}.`,
+    message: `Calibration complete. Overall +${overallUp} / −${overallDown}. Topics +${topicUp} / −${topicDown}.`,
     stamp: Date.now(),
   };
 }

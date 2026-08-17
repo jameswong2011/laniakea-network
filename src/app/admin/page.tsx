@@ -7,6 +7,7 @@ import {
 } from "@/components/layout/PageFrame";
 import { AdminProfileEditor } from "@/components/laniakea/AdminProfileEditor";
 import { PassiveDrainButton } from "@/components/laniakea/PassiveDrainButton";
+import { SeedDemoDataButton } from "@/components/laniakea/SeedDemoDataButton";
 import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
 import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
 import { requireAdmin } from "@/lib/auth/session";
@@ -35,6 +36,24 @@ export default async function AdminPage() {
         title="Admin"
         description="Pilot account types and seed research for demos."
       />
+
+      <Panel>
+        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Seed Demo Data
+            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Creates 15 demo desks across all tiers, 22 research posts across
+              every sub-topic, matching HP ledger rows, and a sample of votes.
+              Re-running refreshes the demo users and skips titles that already
+              exist. Your admin role is left alone; a few of the new posts are
+              voted from this desk so Wallet is not empty.
+            </p>
+          </div>
+          <SeedDemoDataButton />
+        </div>
+      </Panel>
 
       <Panel>
         <PanelHeader label="Profiles" meta={profiles.length} />

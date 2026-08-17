@@ -1,13 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolveTier, TIERS, type SubTopic, type Tier } from "@/types";
+import {
+  HP_TRANSACTION_CALIBRATION,
+  resolveTier,
+  TIERS,
+  type SubTopic,
+  type Tier,
+} from "@/types";
 
-export const CALIBRATION_BAND = 0.2;
+export const CALIBRATION_QUARTILE = 0.25;
+export const CALIBRATION_BAND = CALIBRATION_QUARTILE;
+
+export type CalibrationScope = "overall" | SubTopic;
 
 export type CalibrationMove = {
   id: string;
   from: Tier;
   to: Tier;
   direction: "up" | "down";
+  hp: number;
+  scope: CalibrationScope;
 };
 
 export function adjacentTier(tier: Tier, delta: 1 | -1): Tier | null {
@@ -21,12 +32,16 @@ export function adjacentTier(tier: Tier, delta: 1 | -1): Tier | null {
   return next ?? null;
 }
 
-export function getCalibrationBandSize(count: number) {
+export function getQuartileSize(count: number) {
   if (count < 2) {
     return 0;
   }
 
-  return Math.max(1, Math.floor(count * CALIBRATION_BAND));
+  return Math.max(1, Math.floor(count * CALIBRATION_QUARTILE));
+}
+
+export function getCalibrationBandSize(count: number) {
+  return getQuartileSize(count);
 }
 
 export type Calibratable = {
@@ -36,64 +51,92 @@ export type Calibratable = {
   current_hp: number;
 };
 
-export function planCalibration(profiles: Calibratable[]): CalibrationMove[] {
-  const ranked = [...profiles].sort((a, b) => {
+function sortByScore(rows: Calibratable[]) {
+  return [...rows].sort((a, b) => {
     if (b.current_hp !== a.current_hp) {
       return b.current_hp - a.current_hp;
     }
 
     return a.username.localeCompare(b.username);
   });
+}
 
-  const band = getCalibrationBandSize(ranked.length);
+function topQuartile(ranked: Calibratable[], size: number) {
+  const edge = ranked[size - 1];
 
-  if (band === 0) {
+  if (!edge) {
     return [];
   }
 
-  const promote = ranked.slice(0, band);
-  const demote = ranked.slice(-band);
-  const promotedIds = new Set(promote.map((profile) => profile.id));
+  return ranked.filter((row) => row.current_hp >= edge.current_hp);
+}
+
+function bottomQuartile(ranked: Calibratable[], size: number) {
+  const edge = ranked[ranked.length - size];
+
+  if (!edge) {
+    return [];
+  }
+
+  return ranked.filter((row) => row.current_hp <= edge.current_hp);
+}
+
+export function planCalibration(
+  profiles: Calibratable[],
+  scope: CalibrationScope = "overall"
+): CalibrationMove[] {
+  const ranked = sortByScore(profiles);
+  const size = getQuartileSize(ranked.length);
+
+  if (size === 0) {
+    return [];
+  }
+
+  const promote = topQuartile(ranked, size);
+  const demote = bottomQuartile(ranked, size);
+  const promoteIds = new Set(promote.map((row) => row.id));
+  const demoteIds = new Set(demote.map((row) => row.id));
+  const contested = new Set(
+    [...promoteIds].filter((id) => demoteIds.has(id))
+  );
   const moves: CalibrationMove[] = [];
 
   for (const profile of promote) {
-    const from = resolveTier(profile.tier);
-
-    if (!from) {
+    if (contested.has(profile.id)) {
       continue;
     }
 
-    const to = adjacentTier(from, 1);
+    const from = resolveTier(profile.tier);
+    const to = from ? adjacentTier(from, 1) : null;
 
-    if (to) {
+    if (from && to) {
       moves.push({
         id: profile.id,
         from,
         to,
         direction: "up",
+        hp: profile.current_hp,
+        scope,
       });
     }
   }
 
   for (const profile of demote) {
-    if (promotedIds.has(profile.id)) {
+    if (contested.has(profile.id) || promoteIds.has(profile.id)) {
       continue;
     }
 
     const from = resolveTier(profile.tier);
+    const to = from ? adjacentTier(from, -1) : null;
 
-    if (!from) {
-      continue;
-    }
-
-    const to = adjacentTier(from, -1);
-
-    if (to) {
+    if (from && to) {
       moves.push({
         id: profile.id,
         from,
         to,
         direction: "down",
+        hp: profile.current_hp,
+        scope,
       });
     }
   }
@@ -147,4 +190,48 @@ export async function applySubtopicCalibration(
   }
 
   return { error: null };
+}
+
+export function calibrationLogDescription(move: CalibrationMove) {
+  const verb = move.direction === "up" ? "promoted" : "demoted";
+  const book = move.scope === "overall" ? "overall" : move.scope;
+
+  return `Calibration ${book}: ${verb} ${move.from} → ${move.to} (HP ${move.hp})`;
+}
+
+export async function recordCalibrationLogs(
+  supabase: SupabaseClient,
+  moves: CalibrationMove[]
+) {
+  if (moves.length === 0) {
+    return { error: null };
+  }
+
+  const { error } = await supabase.from("hp_transactions").insert(
+    moves.map((move) => ({
+      user_id: move.id,
+      amount: 0,
+      type: HP_TRANSACTION_CALIBRATION,
+      description: calibrationLogDescription(move),
+    }))
+  );
+
+  return { error: error?.message ?? null };
+}
+
+export function summarizeCalibration(moves: CalibrationMove[]) {
+  const overallUp = moves.filter(
+    (move) => move.scope === "overall" && move.direction === "up"
+  ).length;
+  const overallDown = moves.filter(
+    (move) => move.scope === "overall" && move.direction === "down"
+  ).length;
+  const topicUp = moves.filter(
+    (move) => move.scope !== "overall" && move.direction === "up"
+  ).length;
+  const topicDown = moves.filter(
+    (move) => move.scope !== "overall" && move.direction === "down"
+  ).length;
+
+  return { overallUp, overallDown, topicUp, topicDown };
 }

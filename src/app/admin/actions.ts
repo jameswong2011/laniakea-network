@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/session";
+import { seedDemoData } from "@/lib/research/demo-data";
 import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
@@ -255,6 +256,42 @@ export async function applyPassiveDrain(
     message: `Passive drain applied. ${drained} accounts reduced by up to ${PASSIVE_DRAIN_HP} HP${
       skipped ? `, ${skipped} skipped` : ""
     }.`,
+    stamp: Date.now(),
+  };
+}
+
+export async function seedDemoDataset(
+  _prevState: AdminActionState,
+  _formData: FormData
+): Promise<AdminActionState> {
+  const { supabase, userId } = await requireAdmin();
+  const result = await seedDemoData(supabase, userId);
+
+  revalidatePath("/admin");
+  revalidatePath("/feed");
+  revalidatePath("/ranking");
+  revalidatePath("/wallet");
+  revalidatePath("/dashboard");
+
+  if (
+    result.usersCreated === 0 &&
+    result.postsCreated === 0 &&
+    result.warnings.length > 0 &&
+    result.usersUpdated === 0
+  ) {
+    return {
+      error: result.warnings[0] ?? "Demo seed failed.",
+      stamp: Date.now(),
+    };
+  }
+
+  const warning =
+    result.warnings.length > 0
+      ? ` ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}: ${result.warnings[0]}`
+      : "";
+
+  return {
+    message: `Demo seed complete. Users +${result.usersCreated} / refreshed ${result.usersUpdated}. Posts +${result.postsCreated} (skipped ${result.postsSkipped}). Ledger +${result.transactionsCreated}, votes +${result.votesCreated}.${warning}`,
     stamp: Date.now(),
   };
 }

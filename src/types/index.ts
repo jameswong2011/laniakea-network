@@ -143,6 +143,7 @@ export const HP_TRANSACTION_VOTE = "vote";
 export const HP_TRANSACTION_DRAIN = "drain";
 export const HP_TRANSACTION_BUY = "buy";
 export const HP_TRANSACTION_CASHOUT = "cashout";
+export const HP_TRANSACTION_CALIBRATION = "calibration";
 
 export type HpTransaction = {
   id: string;

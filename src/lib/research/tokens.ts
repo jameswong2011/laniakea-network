@@ -52,7 +52,7 @@ do $$
 begin
   alter table public.hp_transactions
     add constraint hp_transactions_type_check
-    check (type in ('stake', 'vote', 'drain', 'buy', 'cashout'));
+    check (type in ('stake', 'vote', 'drain', 'buy', 'cashout', 'calibration'));
 exception
   when duplicate_object then null;
 end

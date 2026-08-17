@@ -136,3 +136,17 @@ export function topicStandingsForUser(
 
   return standings.sort((a, b) => b.currentHp - a.currentHp);
 }
+
+export function topicBooksByUser(
+  ranks: SubtopicRank[],
+  limit = 2
+): Map<string, TopicStanding[]> {
+  const books = new Map<string, TopicStanding[]>();
+  const userIds = new Set(ranks.map((rank) => rank.user_id));
+
+  for (const userId of userIds) {
+    books.set(userId, topicStandingsForUser(ranks, userId).slice(0, limit));
+  }
+
+  return books;
+}
