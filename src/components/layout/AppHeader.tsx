@@ -63,7 +63,14 @@ export function AppHeader({
                   href={item.href}
                   className={navClassName(isActivePath(pathname, item.href))}
                 >
-                  {item.label}
+                  {item.href === "/feed" ? (
+                    <>
+                      <span className="sm:hidden">Feed</span>
+                      <span className="hidden sm:inline">Enter the floor</span>
+                    </>
+                  ) : (
+                    item.label
+                  )}
                 </Link>
               ))}
             </nav>

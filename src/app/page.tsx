@@ -1,30 +1,45 @@
-import { redirect } from "next/navigation";
-import { AppShell } from "@/components/layout/AppShell";
-import { PageFrame, PageHeading, Panel } from "@/components/layout/PageFrame";
+import type { Metadata } from "next";
+import { LandingFooter } from "@/components/landing/footer";
+import { LandingHeader } from "@/components/landing/header";
+import { Hero } from "@/components/landing/hero";
+import { HuntAscent } from "@/components/landing/hunt-ascent";
+import {
+  Book,
+  Close,
+  HpEconomy,
+  Layers,
+  Lifecycle,
+  Manifesto,
+  NorthStar,
+  Ranking,
+} from "@/components/landing/mechanisms";
 import { getAuthContext } from "@/lib/auth/session";
 
-export default async function Home() {
+export const metadata: Metadata = {
+  title: "The ranked arena for investment research",
+  description:
+    "Quality has a cost. Conviction has a score. The crowd settles the thesis.",
+};
+
+export default async function LandingPage() {
   const { userId } = await getAuthContext();
 
-  if (userId) {
-    redirect("/feed");
-  }
-
   return (
-    <AppShell>
-      <PageFrame width="narrow">
-        <PageHeading
-          kicker="Ranked Investment Research"
-          title="Laniakea Network"
-          description="Publish research, vote on signal, and move through Bronze, Silver, Gold, Platinum, and Masters as Health Points rise or fall."
-        />
-        <Panel className="px-2.5 py-3">
-          <p className="text-[12px] leading-relaxed text-muted-foreground">
-            A professional research terminal. Sign in to open the feed, ranking
-            book, and account desk.
-          </p>
-        </Panel>
-      </PageFrame>
-    </AppShell>
+    <div className="landing min-h-dvh overflow-x-clip bg-bg text-fg">
+      <LandingHeader overHero isSignedIn={Boolean(userId)} />
+      <main>
+        <Hero />
+        <Manifesto />
+        <Layers />
+        <HpEconomy />
+        <HuntAscent />
+        <Lifecycle />
+        <Ranking />
+        <Book />
+        <NorthStar />
+        <Close />
+      </main>
+      <LandingFooter />
+    </div>
   );
 }

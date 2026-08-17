@@ -331,11 +331,32 @@ begin
 
   foreach topic in array array[
     'Healthcare',
+    'Biotech',
     'Banks',
-    'Cybersecurity',
+    'Insurance',
+    'Payments',
     'Technology',
+    'Software',
+    'Semiconductors',
+    'Cybersecurity',
+    'Consumer',
+    'Autos',
+    'Industrials',
+    'Defense',
+    'Telecom',
+    'Real Estate',
+    'Utilities',
+    'Energy',
+    'Mining',
     'Macro',
-    'Energy'
+    'FX',
+    'Credit',
+    'Emerging Markets',
+    'China',
+    'Commodities',
+    'Crypto',
+    'Quant',
+    'Private Markets'
   ]
   loop
     begin

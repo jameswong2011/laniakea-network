@@ -58,6 +58,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --radius-xs: 0.125rem;
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -65,6 +66,24 @@
   --radius-2xl: calc(var(--radius) * 1.4);
   --radius-3xl: calc(var(--radius) * 1.6);
   --radius-4xl: calc(var(--radius) * 1.8);
+
+  --color-bg: #0a0a0b;
+  --color-fg: #f2f2f4;
+  --color-elevated: #1a1a1e;
+  --color-subtle: #6e6e76;
+  --color-live: #7d9a86;
+  --color-dying: #b07a6a;
+  --color-accent-fg: #0a0a0b;
+  --color-border-strong: color-mix(in oklab, var(--color-fg) 22%, transparent);
+  --font-display: var(--font-instrument-serif), "Times New Roman", serif;
+  --tracking-mark: 0.18em;
+  --tracking-kicker: 0.14em;
+  --tracking-fine: 0.08em;
+  --leading-display: 0.95;
+  --leading-title: 1.05;
+  --shadow-border: 0 0 0 1px color-mix(in oklab, var(--color-fg) 8%, transparent);
+  --shadow-border-hover: 0 0 0 1px
+    color-mix(in oklab, var(--color-fg) 16%, transparent);
 }
 
 :root,
@@ -144,5 +163,89 @@
     font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .landing {
+    --color-surface: #121214;
+    --color-muted: #9a9aa3;
+    --color-accent: #d4d6dc;
+    --color-border: color-mix(in oklab, var(--color-fg) 12%, transparent);
+    --font-sans: var(--font-ibm-plex-sans), "Segoe UI", system-ui, sans-serif;
+    --font-mono: var(--font-ibm-plex-mono), ui-monospace, Menlo, Consolas,
+      monospace;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+}
+
+@layer components {
+  .section-kicker {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: var(--tracking-kicker);
+    text-transform: uppercase;
+    color: var(--color-subtle);
+  }
+
+  .hero-wash {
+    background: linear-gradient(
+      to top,
+      var(--color-bg) 0%,
+      color-mix(in oklab, var(--color-bg) 72%, transparent) 48%,
+      color-mix(in oklab, var(--color-bg) 28%, transparent) 100%
+    );
+  }
+
+  .hero-grain {
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    opacity: 0.09;
+    mix-blend-mode: overlay;
+  }
+
+  .tap-scale {
+    transition-property: scale, background-color, color, box-shadow, border-color;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .tap-scale:active:not(:disabled) {
+    scale: 0.96;
+  }
+
+  input[type="range"].desk-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 44px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type="range"].desk-range::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--color-border-strong);
+  }
+  input[type="range"].desk-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -7px;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--color-accent);
+    box-shadow: 0 0 0 4px var(--color-bg);
+  }
+  input[type="range"].desk-range::-moz-range-track {
+    height: 2px;
+    background: var(--color-border-strong);
+  }
+  input[type="range"].desk-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-accent);
   }
 }

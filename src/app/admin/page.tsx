@@ -22,10 +22,11 @@ import {
   COMMENTS_SQL_TABLES,
 } from "@/lib/research/comments-sql";
 import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
+import { EXPAND_SUBTOPICS_SQL } from "@/lib/research/subtopics-sql";
 import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
 import { getLatestWeeklyRun } from "@/lib/research/weekly";
 import { requireAdmin } from "@/lib/auth/session";
-import { resolveTier, type Profile } from "@/types";
+import { SUB_TOPICS, resolveTier, type Profile } from "@/types";
 import { format } from "date-fns";
 
 export const metadata: Metadata = {
@@ -165,6 +166,19 @@ export default async function AdminPage() {
             {weeklyMaintenanceSql()}
           </pre>
         ) : null}
+      </Panel>
+
+      <Panel>
+        <PanelHeader label="Topic book" meta={`${SUB_TOPICS.length} desks`} />
+        <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
+          Database checks still list the old six desks until you run this.
+          Publishing to a new topic will fail until it lands. Safe to re-run.
+          If weekly cron is already installed, re-apply the weekly SQL after
+          this so pg_cron calibrates the new books.
+        </p>
+        <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+          {EXPAND_SUBTOPICS_SQL}
+        </pre>
       </Panel>
 
       {settlementReady ? null : (
