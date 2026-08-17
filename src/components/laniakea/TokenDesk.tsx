@@ -20,10 +20,12 @@ export function TokenDesk({
   mode,
   availableHp,
   availableTokens,
+  schemaReady,
 }: {
   mode: "buy" | "cashout";
   availableHp: number;
   availableTokens: number;
+  schemaReady: boolean;
 }) {
   const action = mode === "buy" ? buyHp : cashOutHp;
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -32,9 +34,20 @@ export function TokenDesk({
     Math.floor((availableHp - MASTERS_CASHOUT_RESERVE_HP) / HP_PER_UTILITY_TOKEN) *
       HP_PER_UTILITY_TOKEN
   );
+  const blockedReason = !schemaReady
+    ? "Token column is missing. Run the SQL above, then refresh."
+    : mode === "buy" && availableTokens < 1
+      ? "Need at least 1 UTL."
+      : mode === "cashout" && maxCashout < HP_PER_UTILITY_TOKEN
+        ? `Need ${HP_PER_UTILITY_TOKEN + MASTERS_CASHOUT_RESERVE_HP} HP to cash out.`
+        : null;
 
   return (
-    <form action={formAction} className="flex flex-col gap-2 p-2.5">
+    <form
+      key={state.stamp ?? "token-desk"}
+      action={formAction}
+      className="flex flex-col gap-2 p-2.5"
+    >
       {mode === "buy" ? (
         <>
           <p className="text-[12px] text-muted-foreground">
@@ -73,16 +86,15 @@ export function TokenDesk({
               max={Math.max(maxCashout, HP_PER_UTILITY_TOKEN)}
               step={HP_PER_UTILITY_TOKEN}
               required
-              defaultValue={
-                maxCashout >= HP_PER_UTILITY_TOKEN
-                  ? HP_PER_UTILITY_TOKEN
-                  : HP_PER_UTILITY_TOKEN
-              }
+              defaultValue={HP_PER_UTILITY_TOKEN}
               className={fieldClassName}
             />
           </label>
         </>
       )}
+      {blockedReason ? (
+        <p className="font-data text-[11px] text-warning">{blockedReason}</p>
+      ) : null}
       {state.error ? (
         <p className="font-data text-[11px] text-loss">{state.error}</p>
       ) : null}
@@ -91,10 +103,7 @@ export function TokenDesk({
       ) : null}
       <button
         type="submit"
-        disabled={
-          pending ||
-          (mode === "buy" ? availableTokens < 1 : maxCashout < HP_PER_UTILITY_TOKEN)
-        }
+        disabled={pending || Boolean(blockedReason)}
         className="h-8 w-fit border border-border bg-secondary px-3 text-[12px] font-medium tracking-wide text-foreground hover:bg-muted disabled:opacity-50"
       >
         {pending

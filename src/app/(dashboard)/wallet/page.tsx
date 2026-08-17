@@ -13,6 +13,7 @@ import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { requireUser } from "@/lib/auth/session";
 import { formatSignedHp } from "@/lib/format";
 import { canBuyHp, canCashOutHp } from "@/lib/research/access";
+import { probeUtilityTokenColumn, UTILITY_TOKEN_SQL } from "@/lib/research/tokens";
 import { getWalletLedger } from "@/lib/research/wallet";
 import { resolveTier } from "@/types";
 
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
 export default async function WalletPage() {
   const { userId, profile, supabase } = await requireUser();
   const { entries, error } = await getWalletLedger(supabase, userId);
+  const tokenSchema = await probeUtilityTokenColumn(supabase);
   const tier = resolveTier(profile?.tier) ?? "Bronze";
   const showBuy = canBuyHp(tier);
   const showCashout = canCashOutHp(tier);
@@ -36,10 +38,32 @@ export default async function WalletPage() {
         meta={
           <>
             <HpReadout value={profile?.current_hp ?? null} size="md" />
-            <TokenReadout value={profile?.utility_tokens ?? null} size="md" />
+            <TokenReadout
+              value={tokenSchema.ready ? (profile?.utility_tokens ?? 0) : null}
+              size="md"
+            />
           </>
         }
       />
+
+      {tokenSchema.ready ? null : (
+        <Panel>
+          <PanelHeader label="Schema required" meta="utility_tokens" />
+          <div className="flex flex-col gap-2 p-2.5">
+            <p className="text-[12px] text-warning">
+              {tokenSchema.error ??
+                "profiles.utility_tokens is missing, so Buy HP and Cash out cannot run."}
+            </p>
+            <p className="text-[12px] text-muted-foreground">
+              Paste this into the Supabase SQL editor, run it once, then refresh
+              Wallet.
+            </p>
+            <pre className="overflow-x-auto border border-border bg-surface p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+              {UTILITY_TOKEN_SQL}
+            </pre>
+          </div>
+        </Panel>
+      )}
 
       <Panel>
         <PanelHeader
@@ -50,7 +74,8 @@ export default async function WalletPage() {
           <TokenDesk
             mode={showCashout ? "cashout" : "buy"}
             availableHp={profile?.current_hp ?? 0}
-            availableTokens={profile?.utility_tokens ?? 0}
+            availableTokens={tokenSchema.ready ? (profile?.utility_tokens ?? 0) : 0}
+            schemaReady={tokenSchema.ready}
           />
         ) : (
           <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">

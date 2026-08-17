@@ -9,6 +9,7 @@ import {
   MASTERS_CASHOUT_RESERVE_HP,
 } from "@/lib/research/economy";
 import { applyWalletMove } from "@/lib/research/hp";
+import { isMissingUtilityTokenColumn, missingUtilityTokenMessage } from "@/lib/research/tokens";
 import { HP_TRANSACTION_BUY, HP_TRANSACTION_CASHOUT, resolveTier } from "@/types";
 
 export type WalletActionState = {
@@ -79,17 +80,21 @@ export async function buyHp(
     description: `Bought ${hp} HP with ${tokens} UTL`,
   });
 
-  refreshWallet();
-
   if (txError) {
+    await applyWalletMove(supabase, userId, {
+      hpDelta: -hp,
+      tokenDelta: tokens,
+    });
+    refreshWallet();
     return {
-      error: `HP credited, but ledger failed: ${txError.message}`,
+      error: ledgerError(txError.message),
       stamp: Date.now(),
     };
   }
 
+  refreshWallet();
   return {
-    message: `Bought ${hp} HP for ${tokens} UTL.`,
+    message: `Bought ${hp} HP for ${tokens} UTL. Balance ${move.currentHp} HP / ${move.utilityTokens} UTL.`,
     stamp: Date.now(),
   };
 }
@@ -152,17 +157,36 @@ export async function cashOutHp(
     description: `Cashed out ${hp} HP for ${tokens} UTL`,
   });
 
-  refreshWallet();
-
   if (txError) {
+    await applyWalletMove(supabase, userId, {
+      hpDelta: hp,
+      tokenDelta: -tokens,
+    });
+    refreshWallet();
     return {
-      error: `Tokens credited, but ledger failed: ${txError.message}`,
+      error: ledgerError(txError.message),
       stamp: Date.now(),
     };
   }
 
+  refreshWallet();
   return {
-    message: `Cashed out ${hp} HP for ${tokens} UTL.`,
+    message: `Cashed out ${hp} HP for ${tokens} UTL. Balance ${move.currentHp} HP / ${move.utilityTokens} UTL.`,
     stamp: Date.now(),
   };
+}
+
+function ledgerError(message: string) {
+  if (isMissingUtilityTokenColumn(message)) {
+    return missingUtilityTokenMessage();
+  }
+
+  if (
+    message.includes("hp_transactions_type_check") ||
+    message.includes("violates check constraint")
+  ) {
+    return `Ledger rejected type buy/cashout. Run the Wallet SQL to widen hp_transactions.type. ${message}`;
+  }
+
+  return `Wallet move was reversed because the ledger write failed: ${message}`;
 }

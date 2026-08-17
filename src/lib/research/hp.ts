@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  isMissingUtilityTokenColumn,
+  missingUtilityTokenMessage,
+} from "@/lib/research/tokens";
 
 type DebitResult =
   | { ok: true; previousHp: number; currentHp: number }
@@ -87,7 +91,12 @@ export async function applyWalletMove(
     .maybeSingle();
 
   if (readError) {
-    return { ok: false, error: readError.message };
+    return {
+      ok: false,
+      error: isMissingUtilityTokenColumn(readError.message)
+        ? missingUtilityTokenMessage()
+        : readError.message,
+    };
   }
 
   if (!profile) {
@@ -119,7 +128,12 @@ export async function applyWalletMove(
     .maybeSingle();
 
   if (writeError) {
-    return { ok: false, error: writeError.message };
+    return {
+      ok: false,
+      error: isMissingUtilityTokenColumn(writeError.message)
+        ? missingUtilityTokenMessage()
+        : writeError.message,
+    };
   }
 
   if (!updated) {
