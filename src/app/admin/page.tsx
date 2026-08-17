@@ -17,6 +17,7 @@ import {
   WEEKLY_CRON_LABEL,
 } from "@/lib/research/economy";
 import {
+  COMMENT_CASCADE_SQL,
   COMMENTS_SQL_POLICIES,
   COMMENTS_SQL_TABLES,
 } from "@/lib/research/comments-sql";
@@ -194,6 +195,19 @@ export default async function AdminPage() {
           </pre>
         </Panel>
       )}
+
+      {commentsReady ? (
+        <Panel>
+          <PanelHeader label="Comment hunt cascade" meta="run once" />
+          <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
+            Needed so a hunted post can hunt losing comments and refund winning
+            ones. Safe to re-run.
+          </p>
+          <pre className="max-h-40 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {COMMENT_CASCADE_SQL}
+          </pre>
+        </Panel>
+      ) : null}
 
       <Panel>
         <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">

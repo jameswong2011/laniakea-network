@@ -98,6 +98,7 @@ export type Profile = {
 export const RESEARCH_POST_STATUS_LIVE = "live";
 export const RESEARCH_POST_STATUS_ARCHIVED = "archived";
 export const RESEARCH_POST_STATUS_ASCENDED = "ascended";
+export const RESEARCH_POST_STATUS_REFUNDED = "refunded";
 
 export type ResearchPostStatus =
   | typeof RESEARCH_POST_STATUS_LIVE
@@ -184,6 +185,7 @@ export const HP_TRANSACTION_CASHOUT = "cashout";
 export const HP_TRANSACTION_CALIBRATION = "calibration";
 export const HP_TRANSACTION_HUNT = "hunt";
 export const HP_TRANSACTION_ASCENT = "ascent";
+export const HP_TRANSACTION_REFUND = "refund";
 
 export type HpTransaction = {
   id: string;

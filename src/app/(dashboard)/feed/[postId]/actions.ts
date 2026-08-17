@@ -168,6 +168,13 @@ export async function createComment(
     return { error: "Higher-tier desks are view-only.", stamp: Date.now() };
   }
 
+  if (visible.post.status === RESEARCH_POST_STATUS_ARCHIVED) {
+    return {
+      error: "This post has been hunted. Comments are closed.",
+      stamp: Date.now(),
+    };
+  }
+
   const debit = await debitProfileHp(supabase, userId, stakeHp);
 
   if (!debit.ok) {
@@ -267,6 +274,13 @@ export async function voteOnComment(
 
   if (visible.access !== "full") {
     return { error: "Higher-tier desks are view-only.", stamp: Date.now() };
+  }
+
+  if (visible.post.status === RESEARCH_POST_STATUS_ARCHIVED) {
+    return {
+      error: "This post has been hunted. Comment votes are closed.",
+      stamp: Date.now(),
+    };
   }
 
   const { data: existingVote } = await supabase

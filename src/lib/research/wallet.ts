@@ -6,6 +6,7 @@ import {
   HP_TRANSACTION_CASHOUT,
   HP_TRANSACTION_DRAIN,
   HP_TRANSACTION_HUNT,
+  HP_TRANSACTION_REFUND,
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
   type HpTransaction,
@@ -42,7 +43,8 @@ export function signedLedgerAmount(type: string, amount: number) {
   if (
     type === HP_TRANSACTION_BUY ||
     type === HP_TRANSACTION_HUNT ||
-    type === HP_TRANSACTION_ASCENT
+    type === HP_TRANSACTION_ASCENT ||
+    type === HP_TRANSACTION_REFUND
   ) {
     return Math.abs(amount);
   }

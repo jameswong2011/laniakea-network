@@ -9,6 +9,7 @@ import {
   getPostHealthState,
   isAscendedStatus,
   isHuntedStatus,
+  isRefundedStatus,
 } from "@/lib/research/health";
 import {
   COMMENTS_SQL_POLICIES,
@@ -39,6 +40,7 @@ export function CommentThread({
   access,
   availableHp,
   canVote,
+  postHunted,
   missingTable,
   error,
 }: {
@@ -48,6 +50,7 @@ export function CommentThread({
   access: FeedAccess;
   availableHp: number;
   canVote: boolean;
+  postHunted?: boolean;
   missingTable: boolean;
   error: string | null;
 }) {
@@ -79,7 +82,12 @@ export function CommentThread({
         <CommentComposer
           postId={postId}
           availableHp={availableHp}
-          canStake={access === "full"}
+          canStake={access === "full" && !postHunted}
+          closedReason={
+            postHunted
+              ? "This post has been hunted. Comments are closed."
+              : undefined
+          }
         />
       )}
 
@@ -136,6 +144,11 @@ export function CommentThread({
                     Hunted
                   </span>
                 ) : null}
+                {isRefundedStatus(comment.status) ? (
+                  <span className="font-data text-[9px] tracking-[0.12em] text-muted-foreground uppercase">
+                    Refunded
+                  </span>
+                ) : null}
               </div>
               <VoteControls
                 postId={postId}
@@ -144,6 +157,7 @@ export function CommentThread({
                 canVote={
                   canVote &&
                   access === "full" &&
+                  !postHunted &&
                   comment.status === RESEARCH_POST_STATUS_LIVE
                 }
                 availableHp={availableHp}
@@ -152,7 +166,9 @@ export function CommentThread({
                     ? "Ascended"
                     : isHuntedStatus(comment.status)
                       ? "Hunted"
-                      : access === "view_only"
+                      : isRefundedStatus(comment.status)
+                        ? "Refunded"
+                        : access === "view_only"
                         ? "View only"
                         : undefined
                 }

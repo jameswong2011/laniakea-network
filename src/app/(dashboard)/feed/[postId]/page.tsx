@@ -171,6 +171,7 @@ export default async function ResearchPostPage({
         access={item.access}
         availableHp={availableHp}
         canVote={availableHp >= VOTE_COST_HP}
+        postHunted={isHuntedStatus(item.status)}
         missingTable={thread.missingTable}
         error={thread.error}
       />

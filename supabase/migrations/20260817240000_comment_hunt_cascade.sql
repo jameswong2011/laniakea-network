@@ -1,15 +1,5 @@
-export const SETTLEMENT_SQL = `-- Post economics: original stake, ascended status, health_at_vote, hunt/ascent ledger.
--- Continuous settlement: no discrete claim tiers. Run once in the Supabase SQL editor.
-
-alter table public.research_posts
-  add column if not exists original_stake integer;
-
-update public.research_posts
-set original_stake = current_health
-where original_stake is null;
-
-alter table public.research_posts
-  alter column original_stake set default 0;
+-- Parent-hunt cascade: refunded comment status + refund ledger type.
+-- Mirrors COMMENT_CASCADE_SQL in src/lib/research/comments-sql.ts
 
 do $$
 declare
@@ -18,12 +8,12 @@ begin
   for constraint_name in
     select c.conname
     from pg_constraint c
-    where c.conrelid = 'public.research_posts'::regclass
+    where c.conrelid = 'public.research_comments'::regclass
       and c.contype = 'c'
       and pg_get_constraintdef(c.oid) ilike '%status%'
   loop
     execute format(
-      'alter table public.research_posts drop constraint %I',
+      'alter table public.research_comments drop constraint %I',
       constraint_name
     );
   end loop;
@@ -32,25 +22,13 @@ $$;
 
 do $$
 begin
-  alter table public.research_posts
-    add constraint research_posts_status_check
-    check (status in ('live', 'archived', 'ascended'));
+  alter table public.research_comments
+    add constraint research_comments_status_check
+    check (status in ('live', 'archived', 'ascended', 'refunded'));
 exception
   when duplicate_object then null;
 end
 $$;
-
-alter table public.votes
-  add column if not exists health_at_vote integer;
-
-alter table public.votes
-  drop constraint if exists votes_claim_tier_check;
-
-alter table public.votes
-  drop column if exists claim_tier;
-
-alter table public.profiles
-  alter column current_hp set default 1000;
 
 do $$
 declare
@@ -92,4 +70,3 @@ exception
   when duplicate_object then null;
 end
 $$;
-`;

@@ -20,10 +20,12 @@ export function CommentComposer({
   postId,
   availableHp,
   canStake,
+  closedReason,
 }: {
   postId: string;
   availableHp: number;
   canStake: boolean;
+  closedReason?: string;
 }) {
   const [state, action, pending] = useActionState(createComment, initialState);
   const defaultStake =
@@ -51,7 +53,8 @@ export function CommentComposer({
           placeholder={
             canStake
               ? "Thesis, objection, or addendum. Stake HP to post."
-              : "View-only desk. Comments require a matching or lower-tier book."
+              : (closedReason ??
+                "View-only desk. Comments require a matching or lower-tier book.")
           }
           className={`${fieldClassName} min-h-16 py-2 disabled:opacity-50`}
         />

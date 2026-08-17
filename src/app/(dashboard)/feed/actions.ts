@@ -14,6 +14,7 @@ import {
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
 import {
   settleAscendedPost,
+  settleCommentsOnHuntedPost,
   settleHuntedPost,
 } from "@/lib/research/settlement-apply";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
@@ -387,9 +388,20 @@ export async function voteOnPost(
       };
     }
 
+    const comments = await settleCommentsOnHuntedPost(supabase, postId);
+
+    if (comments.error) {
+      refreshFeed();
+      return {
+        error: `Note hunted, but comment cascade failed: ${comments.error}`,
+        stamp: Date.now(),
+      };
+    }
+
     refreshFeed();
     return {
-      message: "Note hunted. Stake and ups paid to downvoters by timing.",
+      message:
+        "Note hunted. Losing comments settled; winning comments refunded vote HP.",
       stamp: Date.now(),
     };
   }

@@ -12,7 +12,7 @@ create table if not exists public.research_comments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint research_comments_status_check
-    check (status in ('live', 'archived', 'ascended')),
+    check (status in ('live', 'archived', 'ascended', 'refunded')),
   constraint research_comments_body_check
     check (char_length(body) between 1 and 8000),
   constraint research_comments_stake_check
@@ -276,3 +276,77 @@ grant select, insert, delete on table public.comment_reply_likes to authenticate
 export const COMMENTS_SQL = `${COMMENTS_SQL_TABLES}
 
 ${COMMENTS_SQL_POLICIES}`;
+
+export const COMMENT_CASCADE_SQL = `-- Parent-hunt cascade: refunded comment status + refund ledger type.
+-- Run once after the comments tables exist. Safe to re-run.
+
+do $$
+declare
+  constraint_name text;
+begin
+  for constraint_name in
+    select c.conname
+    from pg_constraint c
+    where c.conrelid = 'public.research_comments'::regclass
+      and c.contype = 'c'
+      and pg_get_constraintdef(c.oid) ilike '%status%'
+  loop
+    execute format(
+      'alter table public.research_comments drop constraint %I',
+      constraint_name
+    );
+  end loop;
+end
+$$;
+
+do $$
+begin
+  alter table public.research_comments
+    add constraint research_comments_status_check
+    check (status in ('live', 'archived', 'ascended', 'refunded'));
+exception
+  when duplicate_object then null;
+end
+$$;
+
+do $$
+declare
+  constraint_name text;
+begin
+  for constraint_name in
+    select c.conname
+    from pg_constraint c
+    where c.conrelid = 'public.hp_transactions'::regclass
+      and c.contype = 'c'
+      and pg_get_constraintdef(c.oid) ilike '%type%'
+  loop
+    execute format(
+      'alter table public.hp_transactions drop constraint %I',
+      constraint_name
+    );
+  end loop;
+end
+$$;
+
+do $$
+begin
+  alter table public.hp_transactions
+    add constraint hp_transactions_type_check
+    check (
+      type in (
+        'stake',
+        'vote',
+        'drain',
+        'buy',
+        'cashout',
+        'calibration',
+        'hunt',
+        'ascent',
+        'refund'
+      )
+    );
+exception
+  when duplicate_object then null;
+end
+$$;
+`;
