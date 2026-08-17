@@ -9,6 +9,7 @@ import { AdminProfileEditor } from "@/components/laniakea/AdminProfileEditor";
 import { PassiveDrainButton } from "@/components/laniakea/PassiveDrainButton";
 import { SeedDemoDataButton } from "@/components/laniakea/SeedDemoDataButton";
 import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
+import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
 import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
 import { requireAdmin } from "@/lib/auth/session";
 import type { Profile } from "@/types";
@@ -34,7 +35,7 @@ export default async function AdminPage() {
       <PageHeading
         kicker="Control"
         title="Admin"
-        description="Pilot account types and seed research for demos."
+        description="Seed a full demo book, then adjust desks and single posts if needed."
       />
 
       <Panel>
@@ -44,11 +45,12 @@ export default async function AdminPage() {
               Seed Demo Data
             </p>
             <p className="mt-1 text-[12px] text-muted-foreground">
-              Creates 15 demo desks across all tiers, 22 research posts across
-              every sub-topic, matching HP ledger rows, and a sample of votes.
-              Re-running refreshes the demo users and skips titles that already
-              exist. Your admin role is left alone; a few of the new posts are
-              voted from this desk so Wallet is not empty.
+              Inserts {DEMO_USERS.length} demo desks (4 per tier) and{" "}
+              {DEMO_POSTS.length} hard-coded research notes across every
+              sub-topic, plus matching HP ledger rows and sample votes. No
+              manual posting and no external model calls. Re-running refreshes
+              demo users and skips titles that already exist. Your admin role
+              is left alone; this desk votes on a subset so Wallet is not empty.
             </p>
           </div>
           <SeedDemoDataButton />

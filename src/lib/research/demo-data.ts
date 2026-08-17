@@ -1,338 +1,25 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { VOTE_COST_HP } from "@/lib/research/economy";
+import {
+  DEMO_POSTS,
+  DEMO_USERS,
+  type DemoPostSeed,
+  type DemoUserSeed,
+} from "@/lib/research/demo-catalog";
+import { PASSIVE_DRAIN_HP, VOTE_COST_HP } from "@/lib/research/economy";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
+  HP_TRANSACTION_BUY,
+  HP_TRANSACTION_DRAIN,
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
   RESEARCH_POST_STATUS_LIVE,
   VOTE_DOWN,
   VOTE_UP,
-  type Role,
   type SubTopic,
-  type Tier,
 } from "@/types";
 
 export const DEMO_PASSWORD = "LaniakeaDemo!26";
-
-export type DemoUserSeed = {
-  username: string;
-  display_name: string;
-  tier: Tier;
-  role: Exclude<Role, "admin">;
-  current_hp: number;
-  utility_tokens: number;
-};
-
-export type DemoPostSeed = {
-  title: string;
-  body: string;
-  sub_topic: SubTopic;
-  current_health: number;
-  authorUsername: string;
-  hoursAgo: number;
-};
-
-export const DEMO_USERS: DemoUserSeed[] = [
-  {
-    username: "demo_vale_hart",
-    display_name: "Vale Hart",
-    tier: "Bronze",
-    role: "member",
-    current_hp: 52,
-    utility_tokens: 70,
-  },
-  {
-    username: "demo_nara_quinn",
-    display_name: "Nara Quinn",
-    tier: "Bronze",
-    role: "member",
-    current_hp: 74,
-    utility_tokens: 85,
-  },
-  {
-    username: "demo_elio_voss",
-    display_name: "Elio Voss",
-    tier: "Bronze",
-    role: "elite",
-    current_hp: 91,
-    utility_tokens: 60,
-  },
-  {
-    username: "demo_mira_chen",
-    display_name: "Mira Chen",
-    tier: "Silver",
-    role: "member",
-    current_hp: 124,
-    utility_tokens: 90,
-  },
-  {
-    username: "demo_jonas_reed",
-    display_name: "Jonas Reed",
-    tier: "Silver",
-    role: "member",
-    current_hp: 158,
-    utility_tokens: 110,
-  },
-  {
-    username: "demo_priya_shah",
-    display_name: "Priya Shah",
-    tier: "Silver",
-    role: "elite",
-    current_hp: 181,
-    utility_tokens: 95,
-  },
-  {
-    username: "demo_owen_blake",
-    display_name: "Owen Blake",
-    tier: "Gold",
-    role: "member",
-    current_hp: 236,
-    utility_tokens: 100,
-  },
-  {
-    username: "demo_sasha_kline",
-    display_name: "Sasha Kline",
-    tier: "Gold",
-    role: "member",
-    current_hp: 279,
-    utility_tokens: 120,
-  },
-  {
-    username: "demo_helen_ortiz",
-    display_name: "Helen Ortiz",
-    tier: "Gold",
-    role: "elite",
-    current_hp: 318,
-    utility_tokens: 80,
-  },
-  {
-    username: "demo_marcus_dale",
-    display_name: "Marcus Dale",
-    tier: "Platinum",
-    role: "member",
-    current_hp: 372,
-    utility_tokens: 130,
-  },
-  {
-    username: "demo_yuna_park",
-    display_name: "Yuna Park",
-    tier: "Platinum",
-    role: "member",
-    current_hp: 448,
-    utility_tokens: 140,
-  },
-  {
-    username: "demo_theo_nilsen",
-    display_name: "Theo Nilsen",
-    tier: "Platinum",
-    role: "elite",
-    current_hp: 511,
-    utility_tokens: 105,
-  },
-  {
-    username: "demo_irene_wahl",
-    display_name: "Irene Wahl",
-    tier: "Masters",
-    role: "member",
-    current_hp: 646,
-    utility_tokens: 160,
-  },
-  {
-    username: "demo_cyrus_ade",
-    display_name: "Cyrus Ade",
-    tier: "Masters",
-    role: "member",
-    current_hp: 762,
-    utility_tokens: 175,
-  },
-  {
-    username: "demo_lina_moreau",
-    display_name: "Lina Moreau",
-    tier: "Masters",
-    role: "elite",
-    current_hp: 891,
-    utility_tokens: 150,
-  },
-];
-
-export const DEMO_POSTS: DemoPostSeed[] = [
-  {
-    title: "UnitedHealth utilization reset: the multiple is the risk, not membership",
-    body: "Membership trends remain intact. The debate is medical-cost trend and how long the Street will pay a premium multiple while utilization normalizes. We would rather own the name on a 5–7% drawdown than chase the first print that looks clean. Watch Medicare Advantage risk scores and outpatient intensity; if both stabilize together, the earnings trough is closer than the tape implies. Position as a quality compounder, not a momentum health-care trade.",
-    sub_topic: "Healthcare",
-    current_health: 118,
-    authorUsername: "demo_lina_moreau",
-    hoursAgo: 4,
-  },
-  {
-    title: "Eli Lilly obesity franchise: capacity, net price, and the 2027 cliff",
-    body: "Demand is not the question. Manufacturing scale and net pricing are. The bull case needs another step-up in incretin capacity without a disorderly price war in the next cohort of oral competitors. We model a slower volume ramp and still get an attractive free-cash-yield by 2027 if the franchise holds share in the high-value indication. The risk is not a demand air-pocket; it is a two-year period where capex stays elevated and the multiple compresses anyway.",
-    sub_topic: "Healthcare",
-    current_health: 44,
-    authorUsername: "demo_helen_ortiz",
-    hoursAgo: 11,
-  },
-  {
-    title: "Hospital labor has peaked; regional systems are the cleaner expression",
-    body: "Contract labor and wage inflation look rolled over in the better-run regional systems. National chains still carry integration and payer-mix noise. We prefer operators with a single-state density story and a credible ambulatory shift. If admissions stay flattish, margin recovery comes from mix and agency-spend reversal, not top-line heroics. This is a 12-month operating-leverage tape, not a volume-recovery tape.",
-    sub_topic: "Healthcare",
-    current_health: 76,
-    authorUsername: "demo_mira_chen",
-    hoursAgo: 20,
-  },
-  {
-    title: "Novo Nordisk: the compounding risk is manufacturing, not prescriptions",
-    body: "Prescription momentum remains exceptional. The constraint is still fill rates and the pace at which new capacity is qualified. We would fade narrative spikes around any single-quarter beat and accumulate on manufacturing slippage. The franchise can absorb a slower script trend; it cannot absorb a loss of confidence in supply. Treat this as an industrial-scale problem wearing a health-care multiple.",
-    sub_topic: "Healthcare",
-    current_health: 22,
-    authorUsername: "demo_nara_quinn",
-    hoursAgo: 31,
-  },
-  {
-    title: "JPMorgan NII: deposit beta is the only number that matters from here",
-    body: "Loan growth is fine. Fee income is fine. The stock will trade the path of deposit costs versus the implied forward curve. If beta stays contained as cuts arrive, NII is more resilient than a simple peak-rate fade suggests. We are not paying for a re-acceleration in dealmaking; we are paying for a balance sheet that can defend the dividend and still grow tangible book. Prefer this over a basket of regionals until the deposit story is cleaner.",
-    sub_topic: "Banks",
-    current_health: 132,
-    authorUsername: "demo_cyrus_ade",
-    hoursAgo: 6,
-  },
-  {
-    title: "European bank capital return is real; the risk is political, not credit",
-    body: "CET1 is excess, not theoretical. Buybacks and special dividends are the equity story. Credit quality is not the near-term break. The break is a political intervention on distributions or a sudden change in the sovereign-bank loop. We would own the surplus-capital names with already-announced return programs and avoid the ones that still need a regulatory blessing every quarter. This is a cash-return book with a policy tail.",
-    sub_topic: "Banks",
-    current_health: 58,
-    authorUsername: "demo_theo_nilsen",
-    hoursAgo: 15,
-  },
-  {
-    title: "US regionals: CRE is in the price; fee income is not",
-    body: "Office CRE has been marked in the better disclosures. The next distinction is who can grow treasury-management and wealth fees while the securities book still rolls. We want cheap deposits, a contained office book, and a fee line that is not just mortgage. The cheap names that are only cheap on a tangible-book print are value traps if they cannot generate capital internally. Underwrite the operating account, not the office footnote.",
-    sub_topic: "Banks",
-    current_health: 36,
-    authorUsername: "demo_jonas_reed",
-    hoursAgo: 27,
-  },
-  {
-    title: "CrowdStrike: platform attach is the bull case, not endpoint share",
-    body: "Endpoint share is already in the multiple. The next 24 months are about module attach, net retention, and whether the platform can keep displacing point products after a noisy incident year. We would own it as a platform-expansion story with a higher bar for execution, not as a clean-growth multiple. If attach stalls, the stock becomes a high-quality compounder at a lower number. That is still interesting. Chasing a re-rating on logos alone is not.",
-    sub_topic: "Cybersecurity",
-    current_health: 101,
-    authorUsername: "demo_irene_wahl",
-    hoursAgo: 8,
-  },
-  {
-    title: "Palo Alto: SASE mix versus a crowded network-security tape",
-    body: "The strategic case is the mix shift into SASE and a tighter software attachment story. The tactical case is that every large-cap network-security name is selling a version of the same consolidation pitch. We want evidence of deal size expansion, not just billings optics. Prefer this on a pullback when the market treats it as a hardware leftover. Do not pay a software multiple for a transition that still has to be proven in the next two prints.",
-    sub_topic: "Cybersecurity",
-    current_health: 47,
-    authorUsername: "demo_sasha_kline",
-    hoursAgo: 18,
-  },
-  {
-    title: "Cyber budgets are not discretionary this cycle; buy seat-expansion vendors",
-    body: "Boards are not cutting the cyber line the way they cut marketing. The better vendors are still expanding seats and modules inside existing accounts. That is a different underwriting problem than a new-logo land-grab. We would rather own the names with demonstrated net-retention and a path to platform pricing than the ones that need a new category to justify the print. This is a maintenance-capex industry wearing a growth multiple. Underwrite it that way.",
-    sub_topic: "Cybersecurity",
-    current_health: 83,
-    authorUsername: "demo_priya_shah",
-    hoursAgo: 22,
-  },
-  {
-    title: "Cyber insurance pricing is the leading indicator for vendor spend",
-    body: "When insurance pricing tightens, control requirements follow, and that shows up in vendor attach with a lag. We are watching primary cyber-insurance rates and claims frequency as a cleaner tell than CIO surveys. If pricing stays firm, the spending cycle has another year. If it breaks, the first cut is not the platform vendor; it is the long tail of point tools. Position accordingly: own the control plane, not the catalog.",
-    sub_topic: "Cybersecurity",
-    current_health: 19,
-    authorUsername: "demo_elio_voss",
-    hoursAgo: 40,
-  },
-  {
-    title: "Microsoft Azure: inference is a margin story before it is a revenue story",
-    body: "The Azure print will keep looking noisy while training clusters and inference workloads move around. The investment question is whether incremental AI revenue drops through at a better margin than the last wave of consumption. We think it does, with a lag. That supports the multiple if capex discipline holds. It does not support paying any price for a single-quarter acceleration. Own it as the default enterprise distribution layer, not as a pure-play AI beta.",
-    sub_topic: "Technology",
-    current_health: 141,
-    authorUsername: "demo_lina_moreau",
-    hoursAgo: 3,
-  },
-  {
-    title: "TSMC is the bottleneck equity; everything else is a derivative",
-    body: "If you need one clean expression of the AI hardware cycle, it is still the foundry that can actually deliver leading-edge wafers. Downstream names are claims on the same scarce capacity with more customer and product risk. We would rather hold the bottleneck and finance the rest around it. The bear case is a sharper capex pause from the largest customers. Even then, the utilization math is better here than in most of the equipment tape.",
-    sub_topic: "Technology",
-    current_health: 88,
-    authorUsername: "demo_yuna_park",
-    hoursAgo: 13,
-  },
-  {
-    title: "Apple services: the multiple needs net adds, not just installed base",
-    body: "Services growth that is only price and mix will not hold this multiple if hardware units stay soft. We need to see net adds in the higher-value subscriptions, not just ARPU on a flat base. The stock can work as a cash-return vehicle either way. It cannot work as a growth compounder without a cleaner services unit story. We are patient, not reflexive buyers, until the next couple of prints separate price from participation.",
-    sub_topic: "Technology",
-    current_health: 41,
-    authorUsername: "demo_owen_blake",
-    hoursAgo: 25,
-  },
-  {
-    title: "NVIDIA CUDA lock-in versus custom silicon: a 24-month debate, not a quarter",
-    body: "Custom silicon will take share at the margin. That is not the same as breaking the software lock. The next two years are about how much inference moves off the general-purpose GPU and at what price. We would not run a binary short on that headline. We would also not treat every pullback as a gift if the largest customers start signaling a longer interpolation cycle. Size the position as a cycle, not as a religion.",
-    sub_topic: "Technology",
-    current_health: 29,
-    authorUsername: "demo_vale_hart",
-    hoursAgo: 38,
-  },
-  {
-    title: "The last mile of disinflation is a labor story, not a goods story",
-    body: "Goods deflation has done the easy work. The remaining CPI gap is housing and services, which means wages, quits, and the unemployment rate, not container rates. We would fade the first clean goods print that the market treats as mission accomplished. Duration can still work, but the path is choppier than a simple 'cuts are here' slogan. Position for a labor-market glide path, not a goods-led victory lap.",
-    sub_topic: "Macro",
-    current_health: 96,
-    authorUsername: "demo_irene_wahl",
-    hoursAgo: 9,
-  },
-  {
-    title: "Treasury term premium: fade the first 25bp, not the cycle",
-    body: "A single cut does not dissolve term premium if issuance stays heavy and the front end is already priced. We would sell the first celebratory rally in long duration and keep dry powder for a proper growth scare. The curve can steepen for the wrong reasons. That is not a reason to be structurally short duration; it is a reason to be tactical. The better expression is intermediates until the labor data forces the long end to do real work.",
-    sub_topic: "Macro",
-    current_health: 53,
-    authorUsername: "demo_marcus_dale",
-    hoursAgo: 16,
-  },
-  {
-    title: "Dollar tightness and EM: fund the surplus names only",
-    body: "A sticky dollar is not a blanket EM short. It is a screen. We want current-account surplus, credible local policy, and an export mix that is not just China-beta. The rest of the complex is a funding trade dressed up as a growth story. If the dollar breaks, those names will work too — later, and with worse risk/reward. Until then, be paid to wait in the surplus set.",
-    sub_topic: "Macro",
-    current_health: 67,
-    authorUsername: "demo_sasha_kline",
-    hoursAgo: 29,
-  },
-  {
-    title: "Saudi spare capacity is the ceiling; US shale is the floor",
-    body: "The oil tape is a corridor, not a trend, until one of those two constraints moves. We would fade both the $100 spike narrative and the structural-demand-death narrative. The tradable range is defined by OPEC+ reaction function on the way up and US shale response on the way down. Equities that only work outside that corridor are options, not core holdings. Prefer balance-sheet strength and buyback coverage inside the range.",
-    sub_topic: "Energy",
-    current_health: 109,
-    authorUsername: "demo_cyrus_ade",
-    hoursAgo: 7,
-  },
-  {
-    title: "European gas storage is a weather option, not a structural short",
-    body: "Storage looks comfortable until a late-winter draw or a supply interruption reopens the risk premium. We would not run a structural short on European gas-linked equities from a full-storage headline. We would also not pay a crisis multiple for a weather option. The cleaner book is the midstream and utility names that get paid to move and store molecules either way. Leave the directional gas bet to the curve.",
-    sub_topic: "Energy",
-    current_health: 38,
-    authorUsername: "demo_owen_blake",
-    hoursAgo: 21,
-  },
-  {
-    title: "US power: interconnection queues are the constraint, not generation tech",
-    body: "The bottleneck is not whether solar, gas, or nuclear can be built in theory. It is whether projects can get a queue position, a transformer, and a wire. That supports the owners of scarce interconnect and the equipment names tied to grid hardware. It is a slower, more political capex cycle than a simple data-center megawatt headline. Underwrite permitting and copper, not the press release.",
-    sub_topic: "Energy",
-    current_health: 72,
-    authorUsername: "demo_yuna_park",
-    hoursAgo: 14,
-  },
-  {
-    title: "Oil majors' buybacks survive $70; the cut is in growth capex",
-    body: "The integrated majors have already told the market what they will protect: the dividend and a base buyback. Growth projects slip first. That is not bearish for the equity if the market is still underwriting a growth-capex renaissance. We would own the names that can hold distributions at $70 and treat $90 as surplus, not as a new baseline. This is a cash-return sector again. Trade it that way.",
-    sub_topic: "Energy",
-    current_health: 16,
-    authorUsername: "demo_elio_voss",
-    hoursAgo: 44,
-  },
-];
+export { DEMO_POSTS, DEMO_USERS, type DemoPostSeed, type DemoUserSeed };
 
 export type DemoSeedResult = {
   usersCreated: number;
@@ -670,6 +357,58 @@ async function insertLedger(
   return { error: lastError };
 }
 
+async function insertOptionalLedger(
+  supabase: SupabaseClient,
+  row: Parameters<typeof insertLedger>[1],
+  result: DemoSeedResult
+) {
+  const ledger = await insertLedger(supabase, row);
+
+  if (!ledger.error) {
+    result.transactionsCreated += 1;
+    return;
+  }
+
+  if (
+    ledger.error.includes("hp_transactions_type_check") ||
+    ledger.error.includes("type")
+  ) {
+    return;
+  }
+
+  result.warnings.push(ledger.error);
+}
+
+async function seedOpeningLedger(
+  supabase: SupabaseClient,
+  userId: string,
+  result: DemoSeedResult
+) {
+  await insertOptionalLedger(
+    supabase,
+    {
+      user_id: userId,
+      amount: 20,
+      type: HP_TRANSACTION_BUY,
+      created_at: hoursAgoIso(96),
+      description: "Demo seed: token desk buy",
+    },
+    result
+  );
+
+  await insertOptionalLedger(
+    supabase,
+    {
+      user_id: userId,
+      amount: PASSIVE_DRAIN_HP,
+      type: HP_TRANSACTION_DRAIN,
+      created_at: hoursAgoIso(72),
+      description: "Demo seed: passive drain",
+    },
+    result
+  );
+}
+
 async function recordTopicQuietly(
   supabase: SupabaseClient,
   userId: string,
@@ -723,6 +462,7 @@ export async function seedDemoData(
 
     if (ensured.created) {
       result.usersCreated += 1;
+      await seedOpeningLedger(supabase, ensured.user.id, result);
     } else {
       result.usersUpdated += 1;
     }
@@ -824,38 +564,22 @@ export async function seedDemoData(
     }
   }
 
-  const voteTargets = createdPostIds.map((post, index) => {
-    const peer = seededUsers[(index * 3 + 1) % seededUsers.length];
-    const adminVote = index % 3 === 0;
+  for (const [index, post] of createdPostIds.entries()) {
+    const voterIds = [
+      seededUsers[(index * 3 + 1) % seededUsers.length]?.id,
+      seededUsers[(index * 5 + 2) % seededUsers.length]?.id,
+      index % 2 === 0 ? adminUserId : null,
+    ].filter((id): id is string => Boolean(id) && id !== post.authorId);
 
-    return {
-      post,
-      voterId:
-        peer && peer.id !== post.authorId ? peer.id : seededUsers.find((user) => user.id !== post.authorId)?.id,
-      includeAdmin: adminVote && post.authorId !== adminUserId,
-    };
-  });
+    const uniqueVoters = [...new Set(voterIds)];
 
-  for (const target of voteTargets) {
-    if (target.voterId) {
+    for (const [voteIndex, voterId] of uniqueVoters.entries()) {
       await insertDemoVote(
         supabase,
         {
-          voterId: target.voterId,
-          post: target.post,
-          hoursAgo: Math.max(target.post.hoursAgo * 0.45, 0.5),
-        },
-        result
-      );
-    }
-
-    if (target.includeAdmin) {
-      await insertDemoVote(
-        supabase,
-        {
-          voterId: adminUserId,
-          post: target.post,
-          hoursAgo: Math.max(target.post.hoursAgo * 0.2, 0.25),
+          voterId,
+          post,
+          hoursAgo: Math.max(post.hoursAgo * (0.5 - voteIndex * 0.15), 0.25),
         },
         result
       );

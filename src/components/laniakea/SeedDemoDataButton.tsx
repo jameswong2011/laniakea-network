@@ -16,7 +16,7 @@ export function SeedDemoDataButton() {
       <button
         type="submit"
         disabled={pending}
-        className="h-7 border border-border bg-secondary px-2.5 font-data text-[10px] tracking-[0.12em] text-foreground uppercase hover:bg-muted disabled:opacity-50"
+        className="h-8 border border-gain/40 bg-gain-muted px-3 font-data text-[10px] tracking-[0.12em] text-foreground uppercase hover:bg-gain/15 disabled:opacity-50"
       >
         {pending ? "Seeding…" : "Seed Demo Data"}
       </button>
