@@ -3,16 +3,87 @@ import { getDeskAccess } from "@/lib/research/access";
 import {
   RESEARCH_POST_STATUS_ASCENDED,
   RESEARCH_POST_STATUS_LIVE,
+  SUB_TOPICS,
   resolveSubTopic,
   resolveTier,
   type ResearchFeedItem,
   type ResearchPost,
   type ResearchPostAuthor,
+  type SubTopic,
   type SubtopicRank,
 } from "@/types";
 
 export function researchPostPath(postId: string) {
   return `/feed/${postId}`;
+}
+
+export function researchComposePath() {
+  return "/feed/new";
+}
+
+/** null = every sub-topic (the default). */
+export function parseFeedTopics(
+  topicParam: string | string[] | undefined
+): SubTopic[] | null {
+  if (topicParam == null) {
+    return null;
+  }
+
+  const values = Array.isArray(topicParam) ? topicParam : [topicParam];
+  const selected = values
+    .map((value) => resolveSubTopic(value))
+    .filter((topic): topic is SubTopic => Boolean(topic));
+
+  if (selected.length === 0) {
+    return [];
+  }
+
+  if (selected.length === SUB_TOPICS.length) {
+    return null;
+  }
+
+  return selected;
+}
+
+export function feedTopicHref(selected: SubTopic[] | null, toggle: SubTopic) {
+  const current = selected ?? [...SUB_TOPICS];
+  const next = current.includes(toggle)
+    ? current.filter((topic) => topic !== toggle)
+    : [...current, toggle];
+
+  return feedTopicsHref(next);
+}
+
+export function feedTopicsHref(selected: SubTopic[]) {
+  if (selected.length === 0) {
+    return "/feed?topic=";
+  }
+
+  if (selected.length === SUB_TOPICS.length) {
+    return "/feed";
+  }
+
+  const params = new URLSearchParams();
+
+  for (const topic of SUB_TOPICS) {
+    if (selected.includes(topic)) {
+      params.append("topic", topic);
+    }
+  }
+
+  return `/feed?${params.toString()}`;
+}
+
+export function itemMatchesFeedTopics(
+  item: Pick<ResearchPost, "sub_topic">,
+  selected: SubTopic[] | null
+) {
+  if (selected == null) {
+    return true;
+  }
+
+  const topic = resolveSubTopic(item.sub_topic);
+  return Boolean(topic && selected.includes(topic));
 }
 
 const POST_COLUMNS =

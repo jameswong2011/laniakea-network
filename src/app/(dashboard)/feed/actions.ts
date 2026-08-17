@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { getDeskAccess } from "@/lib/research/access";
@@ -11,6 +12,7 @@ import {
   voteCostHp,
   voteHealthDelta,
 } from "@/lib/research/economy";
+import { researchPostPath } from "@/lib/research/feed";
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
 import {
   settleAscendedPost,
@@ -176,7 +178,7 @@ export async function createResearchPost(
     };
   }
 
-  return { message: "Research post published.", stamp: Date.now() };
+  redirect(researchPostPath(post.id));
 }
 
 export async function voteOnPost(

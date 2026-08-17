@@ -163,9 +163,6 @@ export default async function RankingPage({
                   </>
                 ) : (
                   <>
-                    <th className="w-20 px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                      Role
-                    </th>
                     <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
                       Tier
                     </th>
@@ -226,9 +223,6 @@ export default async function RankingPage({
                       </>
                     ) : (
                       <>
-                        <td className="px-2.5 py-1.5 font-data text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
-                          {row.role}
-                        </td>
                         <td className="px-2.5 py-1.5">
                           <TierBadge tier={row.tier} size="md" />
                         </td>

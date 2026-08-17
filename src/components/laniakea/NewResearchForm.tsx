@@ -38,7 +38,7 @@ export function NewResearchForm({
       <div className="flex items-center justify-between border-b border-border bg-surface px-2.5 py-1.5">
         <div className="flex items-center gap-2">
           <h2 className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-            New Research Post
+            Desk
           </h2>
           <TierBadge tier={deskTier} />
         </div>
