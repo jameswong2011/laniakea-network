@@ -115,39 +115,162 @@ async function insertProfile(
   return { error: legacy.error?.message ?? null };
 }
 
-async function updateDemoProfile(
+function profileFields(user: DemoUserSeed, includeTokens: boolean) {
+  return {
+    display_name: user.display_name,
+    role: user.role,
+    tier: user.tier,
+    current_hp: user.current_hp,
+    updated_at: new Date().toISOString(),
+    ...(includeTokens ? { utility_tokens: user.utility_tokens } : {}),
+  };
+}
+
+async function writeDemoProfile(
+  client: SupabaseClient,
+  id: string,
+  user: DemoUserSeed
+) {
+  const withTokens = await client
+    .from("profiles")
+    .update(profileFields(user, true))
+    .eq("id", id)
+    .select("id, tier, current_hp, role")
+    .maybeSingle();
+
+  if (!withTokens.error) {
+    return { row: withTokens.data, error: null };
+  }
+
+  if (!withTokens.error.message.includes("utility_tokens")) {
+    return { row: null, error: withTokens.error.message };
+  }
+
+  const legacy = await client
+    .from("profiles")
+    .update(profileFields(user, false))
+    .eq("id", id)
+    .select("id, tier, current_hp, role")
+    .maybeSingle();
+
+  return { row: legacy.data, error: legacy.error?.message ?? null };
+}
+
+function profileMatchesCatalog(
+  row: { tier?: string | null; current_hp?: number | null; role?: string | null } | null,
+  user: DemoUserSeed
+) {
+  return (
+    row?.tier === user.tier &&
+    row?.current_hp === user.current_hp &&
+    row?.role === user.role
+  );
+}
+
+async function applyDemoProfileAsSelf(user: DemoUserSeed, id: string) {
+  const authClient = createAuthClient();
+  const { error: signInError } = await authClient.auth.signInWithPassword({
+    email: demoEmail(user.username),
+    password: DEMO_PASSWORD,
+  });
+
+  if (signInError) {
+    return { error: signInError.message };
+  }
+
+  const written = await writeDemoProfile(authClient, id, user);
+  await authClient.auth.signOut();
+
+  if (written.error) {
+    return { error: written.error };
+  }
+
+  if (!profileMatchesCatalog(written.row, user)) {
+    return {
+      error: `Signed in as ${user.username}, but tier/HP did not change.`,
+    };
+  }
+
+  return { error: null };
+}
+
+async function applyDemoProfileAttributes(
   supabase: SupabaseClient,
   id: string,
   user: DemoUserSeed
 ) {
-  const withTokens = await supabase
-    .from("profiles")
-    .update({
-      display_name: user.display_name,
-      role: user.role,
-      tier: user.tier,
-      current_hp: user.current_hp,
-      utility_tokens: user.utility_tokens,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const asAdmin = await writeDemoProfile(supabase, id, user);
 
-  if (!withTokens.error || !withTokens.error.message.includes("utility_tokens")) {
-    return { error: withTokens.error?.message ?? null };
+  if (!asAdmin.error && profileMatchesCatalog(asAdmin.row, user)) {
+    return { error: null };
   }
 
-  const legacy = await supabase
-    .from("profiles")
-    .update({
-      display_name: user.display_name,
-      role: user.role,
-      tier: user.tier,
-      current_hp: user.current_hp,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const asSelf = await applyDemoProfileAsSelf(user, id);
 
-  return { error: legacy.error?.message ?? null };
+  if (!asSelf.error) {
+    return { error: null };
+  }
+
+  return {
+    error:
+      asAdmin.error ??
+      `Could not set ${user.username} to ${user.tier} / ${user.current_hp} HP. RLS is blocking admin writes. ${asSelf.error}`,
+  };
+}
+
+async function applyCatalogViaRpc(supabase: SupabaseClient) {
+  const payload = DEMO_USERS.map((user) => ({
+    username: user.username,
+    display_name: user.display_name,
+    role: user.role,
+    tier: user.tier,
+    current_hp: user.current_hp,
+  }));
+
+  const { error } = await supabase.rpc("apply_demo_profile_seed", { payload });
+
+  if (!error) {
+    return { error: null };
+  }
+
+  if (
+    isMissingSchema(error.message) ||
+    error.message.includes("apply_demo_profile_seed")
+  ) {
+    return { error: null };
+  }
+
+  return { error: error.message };
+}
+
+async function waitForProfile(
+  supabase: SupabaseClient,
+  username: string,
+  userId?: string | null
+) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (userId) {
+      const byId = await supabase
+        .from("profiles")
+        .select("id, username, role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (byId.data) {
+        return { profile: byId.data, error: null };
+      }
+    }
+
+    const byName = await findProfileByUsername(supabase, username);
+
+    if (byName.profile || byName.error) {
+      return byName;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  return { profile: null, error: null };
 }
 
 async function ensureDemoUser(
@@ -170,12 +293,10 @@ async function ensureDemoUser(
       };
     }
 
-    const updated = await updateDemoProfile(supabase, existing.profile.id, user);
-
     return {
       user: { ...user, id: existing.profile.id },
       created: false,
-      error: updated.error,
+      error: null,
     };
   }
 
@@ -194,6 +315,9 @@ async function ensureDemoUser(
       data: {
         username: user.username,
         display_name: user.display_name,
+        tier: user.tier,
+        role: user.role,
+        current_hp: user.current_hp,
       },
     },
   });
@@ -206,14 +330,20 @@ async function ensureDemoUser(
     };
   }
 
-  const userId = data.user?.id;
-  let found = userId
-    ? { profile: { id: userId, username: user.username, role: user.role }, error: null }
-    : await findProfileByUsername(supabase, user.username);
+  if (data.session && data.user?.id) {
+    const written = await writeDemoProfile(authClient, data.user.id, user);
+    await authClient.auth.signOut();
 
-  if (!found.profile) {
-    found = await findProfileByUsername(supabase, user.username);
+    if (profileMatchesCatalog(written.row, user)) {
+      return {
+        user: { ...user, id: data.user.id },
+        created: true,
+        error: null,
+      };
+    }
   }
+
+  const found = await waitForProfile(supabase, user.username, data.user?.id);
 
   if (!found.profile) {
     return {
@@ -231,12 +361,10 @@ async function ensureDemoUser(
     };
   }
 
-  const updated = await updateDemoProfile(supabase, found.profile.id, user);
-
   return {
     user: { ...user, id: found.profile.id },
     created: Boolean(data.user?.id && !error),
-    error: updated.error,
+    error: null,
   };
 }
 
@@ -468,6 +596,24 @@ export async function seedDemoData(
     }
   }
 
+  const rpc = await applyCatalogViaRpc(supabase);
+
+  if (rpc.error) {
+    result.warnings.push(rpc.error);
+  }
+
+  for (const user of seededUsers) {
+    if (user.id === adminUserId) {
+      continue;
+    }
+
+    const applied = await applyDemoProfileAttributes(supabase, user.id, user);
+
+    if (applied.error) {
+      result.warnings.push(applied.error);
+    }
+  }
+
   if (seededUsers.length === 0) {
     result.warnings.push(
       "No demo users could be created. Profile inserts may require an auth.users row or a looser RLS policy."
@@ -479,14 +625,17 @@ export async function seedDemoData(
   const titles = DEMO_POSTS.map((post) => post.title);
   const { data: existingPosts } = await supabase
     .from("research_posts")
-    .select("id, title")
+    .select("id, title, author_id")
     .in("title", titles);
 
   const existingByTitle = new Map(
-    ((existingPosts ?? []) as { id: string; title: string }[]).map((post) => [
-      post.title,
-      post.id,
-    ])
+    (
+      (existingPosts ?? []) as {
+        id: string;
+        title: string;
+        author_id: string;
+      }[]
+    ).map((post) => [post.title, post])
   );
 
   const createdPostIds: {
@@ -498,9 +647,24 @@ export async function seedDemoData(
   }[] = [];
 
   for (const post of DEMO_POSTS) {
-    const existingId = existingByTitle.get(post.title);
+    const existing = existingByTitle.get(post.title);
 
-    if (existingId) {
+    if (existing) {
+      const author = usersByUsername.get(post.authorUsername);
+
+      if (author && existing.author_id !== author.id) {
+        const { error: authorError } = await supabase
+          .from("research_posts")
+          .update({ author_id: author.id })
+          .eq("id", existing.id);
+
+        if (authorError) {
+          result.warnings.push(
+            `“${post.title}” exists but is not authored by ${post.authorUsername}: ${authorError.message}`
+          );
+        }
+      }
+
       result.postsSkipped += 1;
       continue;
     }

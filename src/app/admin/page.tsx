@@ -10,9 +10,10 @@ import { PassiveDrainButton } from "@/components/laniakea/PassiveDrainButton";
 import { SeedDemoDataButton } from "@/components/laniakea/SeedDemoDataButton";
 import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
 import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
+import { DEMO_SEED_WRITE_SQL } from "@/lib/research/demo-sql";
 import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
 import { requireAdmin } from "@/lib/auth/session";
-import type { Profile } from "@/types";
+import { resolveTier, type Profile } from "@/types";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -29,6 +30,29 @@ export default async function AdminPage() {
     Profile,
     "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
   >[];
+
+  const demoUsernames = new Set(DEMO_USERS.map((user) => user.username));
+  const demoProfiles = profiles.filter((profile) =>
+    demoUsernames.has(profile.username)
+  );
+  const demoStillBronze =
+    demoProfiles.length > 0 &&
+    demoProfiles.every((profile) => resolveTier(profile.tier) === "Bronze");
+
+  const { data: livePosts } = await supabase
+    .from("research_posts")
+    .select("id, title, author_id");
+
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const catalogByTitle = new Map(DEMO_POSTS.map((post) => [post.title, post]));
+  const catalogPosts = (livePosts ?? []).filter((post) =>
+    catalogByTitle.has(post.title)
+  );
+  const matchedPosts = catalogPosts.filter((post) => {
+    const expected = catalogByTitle.get(post.title);
+    const author = profileById.get(post.author_id);
+    return Boolean(expected && author?.username === expected.authorUsername);
+  });
 
   return (
     <PageFrame width="wide">
@@ -52,9 +76,27 @@ export default async function AdminPage() {
               demo users and skips titles that already exist. Your admin role
               is left alone; this desk votes on a subset so Wallet is not empty.
             </p>
+            <p className="mt-1.5 font-data text-[10px] text-muted-foreground">
+              Demo desks {demoProfiles.length}/{DEMO_USERS.length}
+              {" · "}
+              catalog notes linked to the intended author {matchedPosts.length}/
+              {DEMO_POSTS.length}
+            </p>
+            {demoStillBronze ? (
+              <p className="mt-1.5 text-[12px] text-warning">
+                Demo desks are still Bronze. Signup created them with the
+                default tier; RLS blocked the catalog write. Run the SQL below
+                once, then click Seed Demo Data again.
+              </p>
+            ) : null}
           </div>
           <SeedDemoDataButton />
         </div>
+        {demoStillBronze ? (
+          <pre className="max-h-48 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {DEMO_SEED_WRITE_SQL}
+          </pre>
+        ) : null}
       </Panel>
 
       <Panel>

@@ -93,7 +93,7 @@ export async function updateProfile(
     };
   }
 
-  const { error } = await context.supabase
+  const { data, error } = await context.supabase
     .from("profiles")
     .update({
       role,
@@ -101,10 +101,20 @@ export async function updateProfile(
       current_hp,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return { error: error.message, stamp: Date.now() };
+  }
+
+  if (!data) {
+    return {
+      error:
+        "Save did not apply. RLS is blocking writes to other profiles. Run the demo-seed SQL on Admin, then try again.",
+      stamp: Date.now(),
+    };
   }
 
   revalidatePath("/admin");
