@@ -3,8 +3,12 @@ import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { VoteControls } from "@/components/laniakea/VoteControls";
-import { getPostHealthState } from "@/lib/research/health";
-import { TIER_LABELS, type ResearchFeedItem } from "@/types";
+import { getPostHealthState, isAscendedStatus } from "@/lib/research/health";
+import {
+  RESEARCH_POST_STATUS_LIVE,
+  TIER_LABELS,
+  type ResearchFeedItem,
+} from "@/types";
 
 function excerpt(body: string, max = 220) {
   const compact = body.replace(/\s+/g, " ").trim();
@@ -32,10 +36,12 @@ export function ResearchFeed({
   items,
   viewerVotes,
   canVote,
+  availableHp,
 }: {
   items: ResearchFeedItem[];
   viewerVotes: Record<string, number>;
   canVote: boolean;
+  availableHp: number;
 }) {
   if (items.length === 0) {
     return (
@@ -50,7 +56,10 @@ export function ResearchFeed({
   return (
     <div className="flex flex-col border border-border bg-panel">
       {items.map((item) => {
-        const state = getPostHealthState(item.current_health);
+        const state = getPostHealthState(
+          item.current_health,
+          item.original_stake
+        );
 
         return (
           <article
@@ -61,6 +70,11 @@ export function ResearchFeed({
               <div className="min-w-0">
                 <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                   <SubTopicBadge topic={item.sub_topic} />
+                  {isAscendedStatus(item.status) ? (
+                    <span className="inline-flex h-6 items-center border border-gain/40 bg-gain-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-gain uppercase">
+                      Ascended
+                    </span>
+                  ) : null}
                   {item.access === "view_only" ? (
                     <span className="inline-flex h-6 items-center border border-warning/40 bg-warning-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-warning uppercase">
                       View only
@@ -75,7 +89,11 @@ export function ResearchFeed({
                   {excerpt(item.body)}
                 </p>
               </div>
-              <HealthMeter currentHealth={item.current_health} />
+              <HealthMeter
+                currentHealth={item.current_health}
+                originalStake={item.original_stake}
+                status={item.status}
+              />
             </div>
             <div className="mt-2 flex items-end justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -97,9 +115,18 @@ export function ResearchFeed({
               <VoteControls
                 postId={item.id}
                 currentVote={viewerVotes[item.id] ?? null}
-                canVote={canVote && item.access === "full"}
+                canVote={
+                  canVote &&
+                  item.access === "full" &&
+                  item.status === RESEARCH_POST_STATUS_LIVE
+                }
+                availableHp={availableHp}
                 lockReason={
-                  item.access === "view_only" ? "View only" : undefined
+                  isAscendedStatus(item.status)
+                    ? "Ascended"
+                    : item.access === "view_only"
+                      ? "View only"
+                      : undefined
                 }
               />
             </div>

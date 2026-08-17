@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { STARTING_HP } from "@/lib/research/economy";
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthFormState = {
@@ -93,6 +94,7 @@ export async function signup(
       .update({
         username,
         display_name: displayName,
+        current_hp: STARTING_HP,
       })
       .eq("id", data.user.id);
   }

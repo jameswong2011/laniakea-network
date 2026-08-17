@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSubtopicRanks } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_CALIBRATION,
+  SUB_TOPICS,
   resolveTier,
   TIERS,
+  type Profile,
   type SubTopic,
   type Tier,
 } from "@/types";
@@ -234,4 +237,72 @@ export function summarizeCalibration(moves: CalibrationMove[]) {
   ).length;
 
   return { overallUp, overallDown, topicUp, topicDown };
+}
+
+export async function runFullCalibration(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, tier, current_hp");
+
+  if (error) {
+    return { moves: [] as CalibrationMove[], error: error.message };
+  }
+
+  const profiles = (data ?? []) as Pick<
+    Profile,
+    "id" | "username" | "tier" | "current_hp"
+  >[];
+  const usernames = new Map(
+    profiles.map((profile) => [profile.id, profile.username])
+  );
+  const moves: CalibrationMove[] = planCalibration(profiles, "overall");
+
+  if (moves.length > 0) {
+    const applied = await applyCalibration(supabase, moves);
+
+    if (applied.error) {
+      return { moves, error: applied.error };
+    }
+  }
+
+  for (const subTopic of SUB_TOPICS) {
+    const { ranks, error: rankError } = await getSubtopicRanks(
+      supabase,
+      subTopic
+    );
+
+    if (rankError) {
+      return { moves, error: rankError };
+    }
+
+    const topicMoves = planCalibration(
+      ranks.map((rank) => ({
+        id: rank.user_id,
+        username: usernames.get(rank.user_id) ?? rank.user_id,
+        tier: rank.tier,
+        current_hp: rank.current_hp,
+      })),
+      subTopic
+    );
+
+    if (topicMoves.length === 0) {
+      continue;
+    }
+
+    const applied = await applySubtopicCalibration(
+      supabase,
+      subTopic,
+      topicMoves
+    );
+
+    if (applied.error) {
+      return { moves, error: applied.error };
+    }
+
+    moves.push(...topicMoves);
+  }
+
+  await recordCalibrationLogs(supabase, moves);
+
+  return { moves, error: null };
 }

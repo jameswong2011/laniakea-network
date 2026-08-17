@@ -4,18 +4,32 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { getDeskAccess } from "@/lib/research/access";
-import { DEFAULT_STAKE_HP, VOTE_COST_HP, VOTE_HEALTH_DELTA } from "@/lib/research/economy";
+import {
+  DEFAULT_STAKE_HP,
+  MAX_STAKE_HP,
+  ascentLine,
+  voteCostHp,
+  voteHealthDelta,
+} from "@/lib/research/economy";
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
+import {
+  settleAscendedPost,
+  settleHuntedPost,
+} from "@/lib/research/settlement-apply";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
   RESEARCH_POST_STATUS_ARCHIVED,
+  RESEARCH_POST_STATUS_ASCENDED,
   RESEARCH_POST_STATUS_LIVE,
-  VOTE_DOWN,
-  VOTE_UP,
+  VOTE_STRENGTH_MAX,
+  VOTE_STRENGTH_MIN,
   isSubTopic,
   resolveSubTopic,
+  signedVoteValue,
+  voteStrength,
+  type VoteDirection,
 } from "@/types";
 
 export type FeedActionState = {
@@ -36,16 +50,23 @@ const createPostSchema = z.object({
   stakeHp: z.coerce
     .number()
     .int("Stake must be a whole number.")
-    .min(1, "Stake at least 1 HP."),
+    .min(1, "Stake at least 1 HP.")
+    .max(MAX_STAKE_HP, `Stake at most ${MAX_STAKE_HP} HP.`),
 });
 
 const voteSchema = z.object({
   postId: z.string().uuid("Invalid post."),
-  value: z.coerce
+  direction: z
+    .string()
+    .trim()
+    .refine((value): value is VoteDirection => {
+      return value === "up" || value === "down";
+    }, "Choose up or down."),
+  strength: z.coerce
     .number()
-    .refine((value): value is typeof VOTE_UP | typeof VOTE_DOWN => {
-      return value === VOTE_UP || value === VOTE_DOWN;
-    }, "Invalid vote."),
+    .int("Conviction must be a whole number.")
+    .min(VOTE_STRENGTH_MIN, `Conviction at least ${VOTE_STRENGTH_MIN}.`)
+    .max(VOTE_STRENGTH_MAX, `Conviction at most ${VOTE_STRENGTH_MAX}.`),
 });
 
 function refreshFeed() {
@@ -81,7 +102,7 @@ export async function createResearchPost(
     return { error: debit.error, stamp: Date.now() };
   }
 
-  const { data: post, error: postError } = await supabase
+  const withStake = await supabase
     .from("research_posts")
     .insert({
       author_id: userId,
@@ -90,9 +111,28 @@ export async function createResearchPost(
       sub_topic: subTopic,
       status: RESEARCH_POST_STATUS_LIVE,
       current_health: stakeHp,
+      original_stake: stakeHp,
     })
     .select("id")
     .single();
+
+  const postInsert =
+    withStake.error && withStake.error.message.includes("original_stake")
+      ? await supabase
+          .from("research_posts")
+          .insert({
+            author_id: userId,
+            title,
+            body,
+            sub_topic: subTopic,
+            status: RESEARCH_POST_STATUS_LIVE,
+            current_health: stakeHp,
+          })
+          .select("id")
+          .single()
+      : withStake;
+
+  const { data: post, error: postError } = postInsert;
 
   if (postError || !post) {
     await restoreProfileHp(supabase, userId, debit.previousHp);
@@ -144,7 +184,8 @@ export async function voteOnPost(
   const { supabase, userId, profile } = await requireUser();
   const parsed = voteSchema.safeParse({
     postId: formData.get("postId"),
-    value: formData.get("value"),
+    direction: formData.get("direction"),
+    strength: formData.get("strength"),
   });
 
   if (!parsed.success) {
@@ -154,7 +195,9 @@ export async function voteOnPost(
     };
   }
 
-  const { postId, value } = parsed.data;
+  const { postId, direction, strength } = parsed.data;
+  const value = signedVoteValue(direction, strength);
+  const cost = voteCostHp(strength);
 
   const { data: existingVote } = await supabase
     .from("votes")
@@ -167,19 +210,38 @@ export async function voteOnPost(
     return { error: "You have already voted on this post.", stamp: Date.now() };
   }
 
-  const { data: post, error: postReadError } = await supabase
+  const postRead = await supabase
     .from("research_posts")
-    .select("id, author_id, current_health, status, sub_topic")
+    .select("id, author_id, current_health, original_stake, status, sub_topic")
     .eq("id", postId)
     .maybeSingle();
+
+  const { data: post, error: postReadError } =
+    postRead.error && postRead.error.message.includes("original_stake")
+      ? await supabase
+          .from("research_posts")
+          .select("id, author_id, current_health, status, sub_topic")
+          .eq("id", postId)
+          .maybeSingle()
+      : postRead;
 
   if (postReadError || !post) {
     return { error: "Post was not found.", stamp: Date.now() };
   }
 
+  if (post.status === RESEARCH_POST_STATUS_ASCENDED) {
+    return { error: "This post has ascended and is closed to votes.", stamp: Date.now() };
+  }
+
   if (post.status !== RESEARCH_POST_STATUS_LIVE) {
     return { error: "This post is no longer live.", stamp: Date.now() };
   }
+
+  const healthAtVote = post.current_health;
+  const originalStake =
+    "original_stake" in post && typeof post.original_stake === "number"
+      ? post.original_stake
+      : post.current_health;
 
   const { data: author } = await supabase
     .from("profiles")
@@ -200,31 +262,62 @@ export async function voteOnPost(
     };
   }
 
-  const debit = await debitProfileHp(supabase, userId, VOTE_COST_HP);
+  const debit = await debitProfileHp(supabase, userId, cost);
 
   if (!debit.ok) {
     return { error: debit.error, stamp: Date.now() };
   }
 
-  const { error: voteError } = await supabase.from("votes").insert({
+  // Snapshot health at the instant of the vote for continuous settlement.
+  const withHealth = await supabase.from("votes").insert({
     user_id: userId,
     post_id: postId,
     value,
+    health_at_vote: healthAtVote,
   });
+
+  const voteInsert =
+    withHealth.error && withHealth.error.message.includes("health_at_vote")
+      ? await supabase.from("votes").insert({
+          user_id: userId,
+          post_id: postId,
+          value,
+        })
+      : withHealth;
+
+  const voteError = voteInsert.error;
 
   if (voteError) {
     await restoreProfileHp(supabase, userId, debit.previousHp);
     if (voteError.code === "23505") {
       return { error: "You have already voted on this post.", stamp: Date.now() };
     }
+    if (
+      voteError.message.includes("votes_value_check") ||
+      voteError.code === "23514"
+    ) {
+      return {
+        error:
+          "Vote scale 1–5 is blocked by the database check. Run the vote-scale SQL in Supabase, then try again.",
+        stamp: Date.now(),
+      };
+    }
     return { error: voteError.message, stamp: Date.now() };
   }
 
-  const nextHealth = post.current_health + value * VOTE_HEALTH_DELTA;
-  const nextStatus =
-    nextHealth <= 0
-      ? RESEARCH_POST_STATUS_ARCHIVED
-      : RESEARCH_POST_STATUS_LIVE;
+  let nextHealth = post.current_health + voteHealthDelta(value);
+  let nextStatus = RESEARCH_POST_STATUS_LIVE;
+  let outcome: "live" | "hunt" | "ascent" = "live";
+
+  if (nextHealth <= 0) {
+    nextHealth = 0;
+    nextStatus = RESEARCH_POST_STATUS_ARCHIVED;
+    outcome = "hunt";
+  } else if (nextHealth >= ascentLine(originalStake)) {
+    nextHealth = ascentLine(originalStake);
+    nextStatus = RESEARCH_POST_STATUS_ASCENDED;
+    outcome = "ascent";
+  }
 
   const { error: healthError } = await supabase
     .from("research_posts")
@@ -238,17 +331,21 @@ export async function voteOnPost(
   if (healthError) {
     refreshFeed();
     return {
-      error: `Vote recorded, but health update failed: ${healthError.message}`,
+      error:
+        healthError.message.includes("status") ||
+        healthError.message.includes("ascended")
+          ? "Vote recorded, but ascent/archive status is blocked. Run the settlement SQL in Supabase."
+          : `Vote recorded, but health update failed: ${healthError.message}`,
       stamp: Date.now(),
     };
   }
 
   const { error: txError } = await supabase.from("hp_transactions").insert({
     user_id: userId,
-    amount: VOTE_COST_HP,
+    amount: cost,
     type: HP_TRANSACTION_VOTE,
     post_id: postId,
-    description: `${value === VOTE_UP ? "Upvote" : "Downvote"} on research post ${postId}`,
+    description: `${direction === "up" ? "Upvote" : "Downvote"} ${voteStrength(value)} on research post ${postId}`,
   });
 
   if (txError) {
@@ -266,7 +363,7 @@ export async function voteOnPost(
       supabase,
       userId,
       subTopic,
-      VOTE_COST_HP
+      cost
     );
 
     if (topic.error) {
@@ -276,6 +373,47 @@ export async function voteOnPost(
         stamp: Date.now(),
       };
     }
+  }
+
+  if (outcome === "hunt") {
+    const settled = await settleHuntedPost(supabase, postId, originalStake);
+
+    if (settled.error) {
+      refreshFeed();
+      return {
+        error: `Note hunted, but bounty failed: ${settled.error}`,
+        stamp: Date.now(),
+      };
+    }
+
+    refreshFeed();
+    return {
+      message: "Note hunted. Stake and ups paid to downvoters by timing.",
+      stamp: Date.now(),
+    };
+  }
+
+  if (outcome === "ascent") {
+    const settled = await settleAscendedPost(
+      supabase,
+      postId,
+      post.author_id,
+      originalStake
+    );
+
+    if (settled.error) {
+      refreshFeed();
+      return {
+        error: `Note ascended, but harvest failed: ${settled.error}`,
+        stamp: Date.now(),
+      };
+    }
+
+    refreshFeed();
+    return {
+      message: "Note ascended. Downvote HP harvested for early ups and the author.",
+      stamp: Date.now(),
+    };
   }
 
   refreshFeed();

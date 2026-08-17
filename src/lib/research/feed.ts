@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDeskAccess } from "@/lib/research/access";
 import {
+  RESEARCH_POST_STATUS_ASCENDED,
   RESEARCH_POST_STATUS_LIVE,
   resolveSubTopic,
   resolveTier,
@@ -11,7 +12,9 @@ import {
 } from "@/types";
 
 const POST_COLUMNS =
-  "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at";
+  "id, author_id, title, body, status, current_health, original_stake, sub_topic, created_at, updated_at";
+
+const FEED_STATUSES = [RESEARCH_POST_STATUS_LIVE, RESEARCH_POST_STATUS_ASCENDED];
 
 export async function getLiveResearchFeed(
   supabase: SupabaseClient,
@@ -20,11 +23,22 @@ export async function getLiveResearchFeed(
   const withTopic = await supabase
     .from("research_posts")
     .select(POST_COLUMNS)
-    .eq("status", RESEARCH_POST_STATUS_LIVE)
+    .in("status", FEED_STATUSES)
     .order("created_at", { ascending: false });
 
+  const withoutStake =
+    withTopic.error && withTopic.error.message.includes("original_stake")
+      ? await supabase
+          .from("research_posts")
+          .select(
+            "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at"
+          )
+          .in("status", FEED_STATUSES)
+          .order("created_at", { ascending: false })
+      : withTopic;
+
   const legacy =
-    withTopic.error && withTopic.error.message.includes("sub_topic")
+    withoutStake.error && withoutStake.error.message.includes("sub_topic")
       ? await supabase
           .from("research_posts")
           .select(
@@ -34,17 +48,21 @@ export async function getLiveResearchFeed(
           .order("created_at", { ascending: false })
       : null;
 
-  const { data, error } = legacy ?? withTopic;
+  const { data, error } = legacy ?? withoutStake;
 
   if (error) {
     return { items: [], error: error.message };
   }
 
   const posts = ((data ?? []) as Array<
-    Omit<ResearchPost, "sub_topic"> & { sub_topic?: string }
+    Omit<ResearchPost, "sub_topic" | "original_stake"> & {
+      sub_topic?: string;
+      original_stake?: number | null;
+    }
   >).map((post) => ({
     ...post,
     sub_topic: post.sub_topic ?? "",
+    original_stake: post.original_stake ?? post.current_health ?? 0,
   }));
   const authorIds = [...new Set(posts.map((post) => post.author_id))];
   const authorsById = new Map<string, ResearchPostAuthor>();

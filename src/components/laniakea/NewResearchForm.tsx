@@ -9,7 +9,7 @@ import {
 import { SubTopicSelect } from "@/components/laniakea/SubTopicSelect";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { nextTier } from "@/lib/research/access";
-import { DEFAULT_STAKE_HP } from "@/lib/research/economy";
+import { DEFAULT_STAKE_HP, MAX_STAKE_HP } from "@/lib/research/economy";
 import { TIER_LABELS, type Tier } from "@/types";
 
 const initialState: FeedActionState = {};
@@ -95,13 +95,13 @@ export function NewResearchForm({
         </p>
         <label className="flex max-w-[12rem] flex-col gap-1">
           <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-            HP to stake
+            HP to stake (max {MAX_STAKE_HP})
           </span>
           <input
             name="stakeHp"
             type="number"
             min={1}
-            max={Math.max(availableHp, 1)}
+            max={Math.min(MAX_STAKE_HP, Math.max(availableHp, 1))}
             step={1}
             required
             defaultValue={defaultStake}

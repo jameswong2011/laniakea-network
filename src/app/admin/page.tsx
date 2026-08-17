@@ -9,11 +9,19 @@ import { AdminProfileEditor } from "@/components/laniakea/AdminProfileEditor";
 import { PassiveDrainButton } from "@/components/laniakea/PassiveDrainButton";
 import { SeedDemoDataButton } from "@/components/laniakea/SeedDemoDataButton";
 import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
+import { WeeklyMaintenanceButton } from "@/components/laniakea/WeeklyMaintenanceButton";
 import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
 import { DEMO_SEED_WRITE_SQL } from "@/lib/research/demo-sql";
-import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
+import {
+  PASSIVE_DRAIN_HP,
+  WEEKLY_CRON_LABEL,
+} from "@/lib/research/economy";
+import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
+import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
+import { getLatestWeeklyRun } from "@/lib/research/weekly";
 import { requireAdmin } from "@/lib/auth/session";
 import { resolveTier, type Profile } from "@/types";
+import { format } from "date-fns";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -38,6 +46,13 @@ export default async function AdminPage() {
   const demoStillBronze =
     demoProfiles.length > 0 &&
     demoProfiles.every((profile) => resolveTier(profile.tier) === "Bronze");
+
+  const weekly = await getLatestWeeklyRun(supabase);
+  const stakeProbe = await supabase
+    .from("research_posts")
+    .select("original_stake")
+    .limit(1);
+  const settlementReady = !stakeProbe.error;
 
   const { data: livePosts } = await supabase
     .from("research_posts")
@@ -114,13 +129,59 @@ export default async function AdminPage() {
         <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
           <div>
             <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Weekly Jobs
+            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Every {WEEKLY_CRON_LABEL}: drain {PASSIVE_DRAIN_HP} HP from
+              non-admin desks, then promote / demote the top and bottom
+              quartile. Manual buttons below still work. Last run{" "}
+              {weekly.run
+                ? `${format(new Date(weekly.run.ran_at), "MMM d HH:mm")} (${weekly.run.source})`
+                : "not recorded"}
+              .
+            </p>
+            {weekly.missingTable ? (
+              <p className="mt-1.5 text-[12px] text-warning">
+                Run the weekly SQL once so the database cron is armed. Vercel
+                also hits /api/cron/weekly if CRON_SECRET and the service role
+                key are set.
+              </p>
+            ) : null}
+          </div>
+          <WeeklyMaintenanceButton />
+        </div>
+        {weekly.missingTable ? (
+          <pre className="max-h-48 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {weeklyMaintenanceSql()}
+          </pre>
+        ) : null}
+      </Panel>
+
+      {settlementReady ? null : (
+        <Panel>
+          <PanelHeader label="Settlement schema" meta="required" />
+          <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-warning">
+            Hunt and ascent payouts need original_stake, health_at_vote, and
+            hunt/ascent ledger types. Run this once.
+          </p>
+          <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {SETTLEMENT_SQL}
+          </pre>
+        </Panel>
+      )}
+
+      <Panel>
+        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
               Passive HP Drain
             </p>
             <p className="mt-1 text-[12px] text-muted-foreground">
               Deducts up to {PASSIVE_DRAIN_HP} HP from every non-admin account
               with a positive balance and writes a{" "}
               <span className="font-data text-foreground">drain</span> ledger
-              row.
+              row. This is the same {PASSIVE_DRAIN_HP} HP tax the weekly job
+              applies.
             </p>
           </div>
           <PassiveDrainButton />

@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth/session";
 import { nextTier } from "@/lib/research/access";
 import { VOTE_COST_HP } from "@/lib/research/economy";
 import { getLiveResearchFeed, getViewerVotes } from "@/lib/research/feed";
-import { TIER_LABELS, resolveTier } from "@/types";
+import { TIER_LABELS, VOTE_STRENGTH_MAX, resolveTier } from "@/types";
 
 export const metadata: Metadata = {
   title: "Feed",
@@ -35,8 +35,8 @@ export default async function FeedPage() {
         title="Research Feed"
         description={
           above
-            ? `Publish on the ${TIER_LABELS[deskTier]} desk. ${TIER_LABELS[above]} is view-only. Votes cost ${VOTE_COST_HP} HP.`
-            : `Publish on the ${TIER_LABELS[deskTier]} desk. Votes cost ${VOTE_COST_HP} HP.`
+            ? `Publish on the ${TIER_LABELS[deskTier]} desk. ${TIER_LABELS[above]} is view-only. Stake cap 100. Votes 1–${VOTE_STRENGTH_MAX}. Health 0 is hunted off the feed; 5× stake ascends and freezes votes.`
+            : `Publish on the ${TIER_LABELS[deskTier]} desk. Stake cap 100. Votes 1–${VOTE_STRENGTH_MAX}. Health 0 is hunted off the feed; 5× stake ascends and freezes votes.`
         }
         meta={
           <>
@@ -59,6 +59,7 @@ export default async function FeedPage() {
           items={items}
           viewerVotes={viewerVotes}
           canVote={availableHp >= VOTE_COST_HP}
+          availableHp={availableHp}
         />
       )}
     </PageFrame>

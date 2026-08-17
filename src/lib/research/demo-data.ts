@@ -5,7 +5,7 @@ import {
   type DemoPostSeed,
   type DemoUserSeed,
 } from "@/lib/research/demo-catalog";
-import { PASSIVE_DRAIN_HP, VOTE_COST_HP } from "@/lib/research/economy";
+import { PASSIVE_DRAIN_HP, voteCostHp } from "@/lib/research/economy";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_BUY,
@@ -13,8 +13,8 @@ import {
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
   RESEARCH_POST_STATUS_LIVE,
-  VOTE_DOWN,
-  VOTE_UP,
+  VOTE_STRENGTH_MAX,
+  signedVoteValue,
   type SubTopic,
 } from "@/types";
 
@@ -380,6 +380,7 @@ async function insertDemoPost(
     body: post.body,
     status: RESEARCH_POST_STATUS_LIVE,
     current_health: post.current_health,
+    original_stake: post.current_health,
     sub_topic: post.sub_topic,
     created_at: createdAt,
     updated_at: createdAt,
@@ -744,6 +745,7 @@ export async function seedDemoData(
           voterId,
           post,
           hoursAgo: Math.max(post.hoursAgo * (0.5 - voteIndex * 0.15), 0.25),
+          strength: ((index + voteIndex) % VOTE_STRENGTH_MAX) + 1,
         },
         result
       );
@@ -765,6 +767,7 @@ async function insertDemoVote(
       subTopic: SubTopic;
     };
     hoursAgo: number;
+    strength: number;
   },
   result: DemoSeedResult
 ) {
@@ -772,12 +775,23 @@ async function insertDemoVote(
     return;
   }
 
-  const value = input.post.health <= 40 ? VOTE_DOWN : VOTE_UP;
-  const { error: voteError } = await supabase.from("votes").insert({
+  const direction = input.post.health <= 40 ? "down" : "up";
+  const value = signedVoteValue(direction, input.strength);
+  const cost = voteCostHp(input.strength);
+  const withHealth = await supabase.from("votes").insert({
     user_id: input.voterId,
     post_id: input.post.id,
     value,
+    health_at_vote: input.post.health,
   });
+  const { error: voteError } =
+    withHealth.error && withHealth.error.message.includes("health_at_vote")
+      ? await supabase.from("votes").insert({
+          user_id: input.voterId,
+          post_id: input.post.id,
+          value,
+        })
+      : withHealth;
 
   if (voteError) {
     if (voteError.code !== "23505" && !isMissingSchema(voteError.message)) {
@@ -790,11 +804,11 @@ async function insertDemoVote(
 
   const voteLedger = await insertLedger(supabase, {
     user_id: input.voterId,
-    amount: VOTE_COST_HP,
+    amount: cost,
     type: HP_TRANSACTION_VOTE,
     post_id: input.post.id,
     created_at: hoursAgoIso(input.hoursAgo),
-    description: `${value === VOTE_UP ? "Upvote" : "Downvote"} on research post ${input.post.id}`,
+    description: `${direction === "up" ? "Upvote" : "Downvote"} ${input.strength} on research post ${input.post.id}`,
   });
 
   if (voteLedger.error) {
@@ -807,7 +821,7 @@ async function insertDemoVote(
     supabase,
     input.voterId,
     input.post.subTopic,
-    VOTE_COST_HP,
+    cost,
     result.warnings
   );
 }

@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/session";
 import { seedDemoData } from "@/lib/research/demo-data";
-import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
-import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
+import { runPassiveDrain } from "@/lib/research/drain";
+import { MAX_STAKE_HP, PASSIVE_DRAIN_HP } from "@/lib/research/economy";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
-  HP_TRANSACTION_DRAIN,
+  invokeWeeklyMaintenance,
+  weeklyMaintenanceMessage,
+} from "@/lib/research/weekly";
+import {
   RESEARCH_POST_STATUS_LIVE,
   ROLES,
   isSubTopic,
@@ -61,7 +64,8 @@ const seedPostSchema = z.object({
   initialHpStake: z.coerce
     .number()
     .int("Stake must be a whole number.")
-    .min(0, "Stake cannot be negative."),
+    .min(0, "Stake cannot be negative.")
+    .max(MAX_STAKE_HP, `Stake at most ${MAX_STAKE_HP} HP.`),
 });
 
 function firstIssue(error: z.ZodError) {
@@ -162,6 +166,7 @@ export async function seedResearchPost(
       sub_topic: subTopic,
       status: RESEARCH_POST_STATUS_LIVE,
       current_health: initialHpStake,
+      original_stake: initialHpStake,
     })
     .select("id")
     .single();
@@ -215,45 +220,10 @@ export async function applyPassiveDrain(
   _formData: FormData
 ): Promise<AdminActionState> {
   const { supabase } = await requireAdmin();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, role, current_hp")
-    .neq("role", "admin");
+  const result = await runPassiveDrain(supabase);
 
-  if (error) {
-    return { error: error.message, stamp: Date.now() };
-  }
-
-  let drained = 0;
-  let skipped = 0;
-
-  for (const profile of data ?? []) {
-    if (profile.current_hp <= 0) {
-      skipped += 1;
-      continue;
-    }
-
-    const amount = Math.min(PASSIVE_DRAIN_HP, profile.current_hp);
-    const debit = await debitProfileHp(supabase, profile.id, amount);
-
-    if (!debit.ok) {
-      skipped += 1;
-      continue;
-    }
-
-    const { error: txError } = await supabase.from("hp_transactions").insert({
-      user_id: profile.id,
-      amount,
-      type: HP_TRANSACTION_DRAIN,
-      description: `Passive drain ${amount} HP`,
-    });
-
-    if (txError) {
-      await restoreProfileHp(supabase, profile.id, debit.previousHp);
-      return { error: txError.message, stamp: Date.now() };
-    }
-
-    drained += 1;
+  if (result.error) {
+    return { error: result.error, stamp: Date.now() };
   }
 
   revalidatePath("/admin");
@@ -263,9 +233,32 @@ export async function applyPassiveDrain(
   revalidatePath("/ranking");
 
   return {
-    message: `Passive drain applied. ${drained} accounts reduced by up to ${PASSIVE_DRAIN_HP} HP${
-      skipped ? `, ${skipped} skipped` : ""
+    message: `Passive drain applied. ${result.drained} accounts reduced by up to ${PASSIVE_DRAIN_HP} HP${
+      result.skipped ? `, ${result.skipped} skipped` : ""
     }.`,
+    stamp: Date.now(),
+  };
+}
+
+export async function runWeeklyMaintenanceNow(
+  _prevState: AdminActionState,
+  _formData: FormData
+): Promise<AdminActionState> {
+  const { supabase } = await requireAdmin();
+  const result = await invokeWeeklyMaintenance(supabase, "manual");
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/wallet");
+  revalidatePath("/feed");
+  revalidatePath("/ranking");
+
+  if (result.error) {
+    return { error: weeklyMaintenanceMessage(result), stamp: Date.now() };
+  }
+
+  return {
+    message: weeklyMaintenanceMessage(result),
     stamp: Date.now(),
   };
 }

@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  HP_TRANSACTION_ASCENT,
   HP_TRANSACTION_BUY,
   HP_TRANSACTION_CALIBRATION,
   HP_TRANSACTION_CASHOUT,
   HP_TRANSACTION_DRAIN,
+  HP_TRANSACTION_HUNT,
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
   type HpTransaction,
@@ -37,7 +39,11 @@ export function signedLedgerAmount(type: string, amount: number) {
     return -Math.abs(amount);
   }
 
-  if (type === HP_TRANSACTION_BUY) {
+  if (
+    type === HP_TRANSACTION_BUY ||
+    type === HP_TRANSACTION_HUNT ||
+    type === HP_TRANSACTION_ASCENT
+  ) {
     return Math.abs(amount);
   }
 

@@ -65,6 +65,56 @@ export async function debitProfileHp(
   };
 }
 
+export async function creditProfileHp(
+  supabase: SupabaseClient,
+  userId: string,
+  amount: number
+): Promise<DebitResult> {
+  if (amount <= 0) {
+    return { ok: false, error: "Credit must be positive." };
+  }
+
+  const { data: profile, error: readError } = await supabase
+    .from("profiles")
+    .select("current_hp")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, error: readError.message };
+  }
+
+  if (!profile) {
+    return { ok: false, error: "Profile was not found." };
+  }
+
+  const nextHp = profile.current_hp + amount;
+  const { data: updated, error: writeError } = await supabase
+    .from("profiles")
+    .update({
+      current_hp: nextHp,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .eq("current_hp", profile.current_hp)
+    .select("current_hp")
+    .maybeSingle();
+
+  if (writeError) {
+    return { ok: false, error: writeError.message };
+  }
+
+  if (!updated) {
+    return { ok: false, error: "HP changed. Try again." };
+  }
+
+  return {
+    ok: true,
+    previousHp: profile.current_hp,
+    currentHp: updated.current_hp,
+  };
+}
+
 export async function restoreProfileHp(
   supabase: SupabaseClient,
   userId: string,

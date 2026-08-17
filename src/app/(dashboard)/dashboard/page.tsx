@@ -11,7 +11,9 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { requireUser } from "@/lib/auth/session";
+import { format } from "date-fns";
 import { formatHp } from "@/lib/format";
+import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import {
   getSubtopicRanks,
   topicStandingsForUser,
@@ -25,6 +27,25 @@ export default async function DashboardPage() {
   const { userId, profile, supabase } = await requireUser();
   const { ranks } = await getSubtopicRanks(supabase);
   const standings = topicStandingsForUser(ranks, userId);
+  const authoredWithStake = await supabase
+    .from("research_posts")
+    .select(
+      "id, title, status, current_health, original_stake, sub_topic, created_at"
+    )
+    .eq("author_id", userId)
+    .order("created_at", { ascending: false });
+
+  const authored =
+    authoredWithStake.error &&
+    authoredWithStake.error.message.includes("original_stake")
+      ? await supabase
+          .from("research_posts")
+          .select("id, title, status, current_health, sub_topic, created_at")
+          .eq("author_id", userId)
+          .order("created_at", { ascending: false })
+      : authoredWithStake;
+
+  const deskPosts = authored.data ?? [];
 
   return (
     <PageFrame width="narrow">
@@ -110,6 +131,46 @@ export default async function DashboardPage() {
           </p>
         </Panel>
       )}
+
+      <Panel>
+        <PanelHeader label="Your notes" meta={deskPosts.length} />
+        {deskPosts.length === 0 ? (
+          <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
+            Published notes stay here after they are hunted off the feed.
+          </p>
+        ) : (
+          <div className="flex flex-col">
+            {deskPosts.map((post) => (
+              <div
+                key={post.id}
+                className="flex items-center justify-between gap-3 border-b border-border px-2.5 py-2 last:border-b-0"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] text-foreground">
+                    {post.title}
+                  </p>
+                  <p className="mt-0.5 font-data text-[10px] text-muted-foreground uppercase">
+                    {post.status}
+                    {post.sub_topic ? ` · ${post.sub_topic}` : ""}
+                    {" · "}
+                    {format(new Date(post.created_at), "dd MMM yyyy")}
+                  </p>
+                </div>
+                <HealthMeter
+                  currentHealth={post.current_health}
+                  originalStake={
+                    "original_stake" in post &&
+                    typeof post.original_stake === "number"
+                      ? post.original_stake
+                      : undefined
+                  }
+                  status={post.status}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
       <Panel>
         <PanelHeader label="Sub-topic ranks" meta={standings.length} />

@@ -14,6 +14,7 @@ import { TierBadge } from "@/components/laniakea/TierBadge";
 import { requireUser } from "@/lib/auth/session";
 import { formatHp } from "@/lib/format";
 import { CALIBRATION_QUARTILE } from "@/lib/research/calibration";
+import { WEEKLY_CRON_LABEL } from "@/lib/research/economy";
 import {
   getSubtopicRanks,
   topicBooksByUser,
@@ -109,8 +110,8 @@ export default async function RankingPage({
         title={selectedTopic ? `${selectedTopic} Ranking` : "Ranking"}
         description={
           selectedTopic
-            ? `Topic book by ${selectedTopic} HP. Overall desk is shown for context. Calibration moves the top and bottom ${quartilePct}%.`
-            : `Overall book by current HP. Calibration promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time.`
+            ? `Topic book by ${selectedTopic} HP. Overall desk is shown for context. Calibration moves the top and bottom ${quartilePct}% each week (${WEEKLY_CRON_LABEL}).`
+            : `Overall book by current HP. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time.`
         }
         meta={
           <>

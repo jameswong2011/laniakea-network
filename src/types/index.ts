@@ -97,10 +97,12 @@ export type Profile = {
 
 export const RESEARCH_POST_STATUS_LIVE = "live";
 export const RESEARCH_POST_STATUS_ARCHIVED = "archived";
+export const RESEARCH_POST_STATUS_ASCENDED = "ascended";
 
 export type ResearchPostStatus =
   | typeof RESEARCH_POST_STATUS_LIVE
   | typeof RESEARCH_POST_STATUS_ARCHIVED
+  | typeof RESEARCH_POST_STATUS_ASCENDED
   | string;
 
 export type ResearchPost = {
@@ -110,6 +112,7 @@ export type ResearchPost = {
   body: string;
   status: ResearchPostStatus;
   current_health: number;
+  original_stake: number;
   sub_topic: SubTopic | string;
   created_at: string;
   updated_at: string;
@@ -144,6 +147,8 @@ export const HP_TRANSACTION_DRAIN = "drain";
 export const HP_TRANSACTION_BUY = "buy";
 export const HP_TRANSACTION_CASHOUT = "cashout";
 export const HP_TRANSACTION_CALIBRATION = "calibration";
+export const HP_TRANSACTION_HUNT = "hunt";
+export const HP_TRANSACTION_ASCENT = "ascent";
 
 export type HpTransaction = {
   id: string;
@@ -157,13 +162,37 @@ export type HpTransaction = {
 
 export const VOTE_UP = 1;
 export const VOTE_DOWN = -1;
+export const VOTE_STRENGTH_MIN = 1;
+export const VOTE_STRENGTH_MAX = 5;
 
-export type VoteValue = typeof VOTE_UP | typeof VOTE_DOWN;
+export type VoteDirection = "up" | "down";
+export type VoteValue = number;
+
+export function voteStrength(value: number) {
+  return Math.abs(value);
+}
+
+export function isVoteStrength(value: number) {
+  return (
+    Number.isInteger(value) &&
+    value >= VOTE_STRENGTH_MIN &&
+    value <= VOTE_STRENGTH_MAX
+  );
+}
+
+export function signedVoteValue(direction: VoteDirection, strength: number) {
+  return direction === "up" ? strength : -strength;
+}
+
+export function isVoteValue(value: number): value is VoteValue {
+  return value !== 0 && isVoteStrength(voteStrength(value));
+}
 
 export type Vote = {
   id: string;
   user_id: string;
   post_id: string;
   value: VoteValue | number;
+  health_at_vote: number | null;
   created_at: string;
 };

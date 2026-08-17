@@ -1,12 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   voteOnPost,
   type FeedActionState,
 } from "@/app/(dashboard)/feed/actions";
-import { VOTE_COST_HP } from "@/lib/research/economy";
-import { VOTE_DOWN, VOTE_UP } from "@/types";
+import { voteCostHp } from "@/lib/research/economy";
+import {
+  VOTE_STRENGTH_MAX,
+  VOTE_STRENGTH_MIN,
+  voteStrength,
+} from "@/types";
 
 const initialState: FeedActionState = {};
 
@@ -17,60 +21,90 @@ export function VoteControls({
   postId,
   currentVote,
   canVote,
+  availableHp,
   lockReason,
 }: {
   postId: string;
   currentVote: number | null;
   canVote: boolean;
+  availableHp: number;
   lockReason?: string;
 }) {
   const [state, action, pending] = useActionState(voteOnPost, initialState);
+  const maxStrength = Math.min(
+    VOTE_STRENGTH_MAX,
+    Math.max(VOTE_STRENGTH_MIN, availableHp)
+  );
+  const [strength, setStrength] = useState(() =>
+    Math.min(3, maxStrength)
+  );
   const locked = pending || currentVote !== null || !canVote;
+  const recorded = currentVote !== null ? voteStrength(currentVote) : null;
+  const cost = voteCostHp(strength);
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <form action={action} className="flex w-[9.5rem] flex-col items-end gap-1">
+      <input type="hidden" name="postId" value={postId} />
+      <div className="flex w-full items-center gap-1.5">
+        <input
+          type="range"
+          name="strength"
+          min={VOTE_STRENGTH_MIN}
+          max={locked ? VOTE_STRENGTH_MAX : maxStrength}
+          step={1}
+          value={recorded ?? strength}
+          disabled={locked}
+          onChange={(event) => setStrength(Number(event.target.value))}
+          className="h-1 w-full cursor-pointer accent-foreground disabled:cursor-default disabled:opacity-40"
+        />
+        <span className="w-3 text-right font-data text-[11px] text-foreground">
+          {recorded ?? strength}
+        </span>
+      </div>
+      <div className="flex w-full justify-between font-data text-[9px] tracking-[0.08em] text-muted-foreground">
+        <span>{VOTE_STRENGTH_MIN}</span>
+        <span>{VOTE_STRENGTH_MAX}</span>
+      </div>
       <div className="flex items-center gap-1">
-        <form action={action}>
-          <input type="hidden" name="postId" value={postId} />
-          <input type="hidden" name="value" value={VOTE_UP} />
-          <button
-            type="submit"
-            disabled={locked}
-            className={`${buttonClassName} ${
-              currentVote === VOTE_UP
-                ? "border-gain text-gain"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Up
-          </button>
-        </form>
-        <form action={action}>
-          <input type="hidden" name="postId" value={postId} />
-          <input type="hidden" name="value" value={VOTE_DOWN} />
-          <button
-            type="submit"
-            disabled={locked}
-            className={`${buttonClassName} ${
-              currentVote === VOTE_DOWN
-                ? "border-loss text-loss"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Down
-          </button>
-        </form>
+        <button
+          type="submit"
+          name="direction"
+          value="up"
+          disabled={locked}
+          className={`${buttonClassName} ${
+            currentVote !== null && currentVote > 0
+              ? "border-gain text-gain"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Up
+        </button>
+        <button
+          type="submit"
+          name="direction"
+          value="down"
+          disabled={locked}
+          className={`${buttonClassName} ${
+            currentVote !== null && currentVote < 0
+              ? "border-loss text-loss"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Down
+        </button>
       </div>
       <p className="font-data text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
         {currentVote !== null
-          ? "Vote recorded"
+          ? `${currentVote > 0 ? "Up" : "Down"} ${recorded}`
           : canVote
-            ? `${VOTE_COST_HP} HP`
-            : lockReason ?? "Need 1 HP"}
+            ? `${cost} HP`
+            : lockReason ?? `Need ${VOTE_STRENGTH_MIN} HP`}
       </p>
       {state.error ? (
-        <p className="font-data text-[10px] text-loss">{state.error}</p>
+        <p className="text-right font-data text-[10px] text-loss">
+          {state.error}
+        </p>
       ) : null}
-    </div>
+    </form>
   );
 }

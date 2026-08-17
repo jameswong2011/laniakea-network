@@ -21,7 +21,7 @@ export function CalibrationButton() {
         {pending ? "Calibrating…" : "Run Calibration"}
       </button>
       <p className="font-data text-[10px] text-muted-foreground">
-        Top / bottom quartile
+        Weekly · top / bottom quartile
       </p>
       {state.error ? (
         <p className="font-data text-[10px] text-loss">{state.error}</p>

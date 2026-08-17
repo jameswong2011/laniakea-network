@@ -77,6 +77,7 @@ export function SeedResearchForm({ authors }: { authors: AuthorOption[] }) {
           name="initialHpStake"
           type="number"
           min={0}
+          max={100}
           step={1}
           required
           defaultValue={100}

@@ -1,14 +1,17 @@
 "use client";
 
 import { useActionState } from "react";
-import { applyPassiveDrain, type AdminActionState } from "@/app/admin/actions";
-import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
+import {
+  runWeeklyMaintenanceNow,
+  type AdminActionState,
+} from "@/app/admin/actions";
+import { WEEKLY_CRON_LABEL } from "@/lib/research/economy";
 
 const initialState: AdminActionState = {};
 
-export function PassiveDrainButton() {
+export function WeeklyMaintenanceButton() {
   const [state, action, pending] = useActionState(
-    applyPassiveDrain,
+    runWeeklyMaintenanceNow,
     initialState
   );
 
@@ -19,16 +22,20 @@ export function PassiveDrainButton() {
         disabled={pending}
         className="h-7 border border-border bg-secondary px-2.5 font-data text-[10px] tracking-[0.12em] text-foreground uppercase hover:bg-muted disabled:opacity-50"
       >
-        {pending ? "Draining…" : "Apply Passive Drain"}
+        {pending ? "Running…" : "Run Weekly Jobs Now"}
       </button>
       <p className="font-data text-[10px] text-muted-foreground">
-        {PASSIVE_DRAIN_HP} HP weekly from non-admin accounts
+        Auto {WEEKLY_CRON_LABEL}
       </p>
       {state.error ? (
-        <p className="font-data text-[10px] text-loss">{state.error}</p>
+        <p className="max-w-sm text-right font-data text-[10px] text-loss">
+          {state.error}
+        </p>
       ) : null}
       {state.message ? (
-        <p className="font-data text-[10px] text-gain">{state.message}</p>
+        <p className="max-w-sm text-right font-data text-[10px] text-gain">
+          {state.message}
+        </p>
       ) : null}
     </form>
   );
