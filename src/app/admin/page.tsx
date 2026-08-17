@@ -16,6 +16,10 @@ import {
   PASSIVE_DRAIN_HP,
   WEEKLY_CRON_LABEL,
 } from "@/lib/research/economy";
+import {
+  COMMENTS_SQL_POLICIES,
+  COMMENTS_SQL_TABLES,
+} from "@/lib/research/comments-sql";
 import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
 import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
 import { getLatestWeeklyRun } from "@/lib/research/weekly";
@@ -53,6 +57,11 @@ export default async function AdminPage() {
     .select("original_stake")
     .limit(1);
   const settlementReady = !stakeProbe.error;
+  const commentsProbe = await supabase
+    .from("research_comments")
+    .select("id")
+    .limit(1);
+  const commentsReady = !commentsProbe.error;
 
   const { data: livePosts } = await supabase
     .from("research_posts")
@@ -166,6 +175,22 @@ export default async function AdminPage() {
           </p>
           <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
             {SETTLEMENT_SQL}
+          </pre>
+        </Panel>
+      )}
+
+      {commentsReady ? null : (
+        <Panel>
+          <PanelHeader label="Comments schema" meta="required" />
+          <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-warning">
+            Run part 1, then part 2, as two separate queries. One combined
+            script can deadlock against live wallet reads.
+          </p>
+          <pre className="max-h-40 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {COMMENTS_SQL_TABLES}
+          </pre>
+          <pre className="max-h-40 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {COMMENTS_SQL_POLICIES}
           </pre>
         </Panel>
       )}

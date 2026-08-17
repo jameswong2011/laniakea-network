@@ -5,6 +5,7 @@ import {
   voteOnPost,
   type FeedActionState,
 } from "@/app/(dashboard)/feed/actions";
+import { voteOnComment } from "@/app/(dashboard)/feed/[postId]/actions";
 import { voteCostHp } from "@/lib/research/economy";
 import {
   VOTE_STRENGTH_MAX,
@@ -19,18 +20,23 @@ const buttonClassName =
 
 export function VoteControls({
   postId,
+  commentId,
   currentVote,
   canVote,
   availableHp,
   lockReason,
 }: {
   postId: string;
+  commentId?: string;
   currentVote: number | null;
   canVote: boolean;
   availableHp: number;
   lockReason?: string;
 }) {
-  const [state, action, pending] = useActionState(voteOnPost, initialState);
+  const [state, action, pending] = useActionState(
+    commentId ? voteOnComment : voteOnPost,
+    initialState
+  );
   const maxStrength = Math.min(
     VOTE_STRENGTH_MAX,
     Math.max(VOTE_STRENGTH_MIN, availableHp)
@@ -45,6 +51,9 @@ export function VoteControls({
   return (
     <form action={action} className="flex w-[9.5rem] flex-col items-end gap-1">
       <input type="hidden" name="postId" value={postId} />
+      {commentId ? (
+        <input type="hidden" name="commentId" value={commentId} />
+      ) : null}
       <div className="flex w-full items-center gap-1.5">
         <input
           type="range"

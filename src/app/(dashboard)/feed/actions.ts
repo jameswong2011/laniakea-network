@@ -71,6 +71,7 @@ const voteSchema = z.object({
 
 function refreshFeed() {
   revalidatePath("/feed");
+  revalidatePath("/feed", "layout");
   revalidatePath("/dashboard");
   revalidatePath("/ranking");
   revalidatePath("/wallet");

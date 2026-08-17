@@ -11,10 +11,99 @@ import {
   type SubtopicRank,
 } from "@/types";
 
+export function researchPostPath(postId: string) {
+  return `/feed/${postId}`;
+}
+
 const POST_COLUMNS =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, created_at, updated_at";
 
 const FEED_STATUSES = [RESEARCH_POST_STATUS_LIVE, RESEARCH_POST_STATUS_ASCENDED];
+
+type RawPost = Omit<ResearchPost, "sub_topic" | "original_stake"> & {
+  sub_topic?: string;
+  original_stake?: number | null;
+};
+
+function normalizePosts(rows: RawPost[] | null): ResearchPost[] {
+  return (rows ?? []).map((post) => ({
+    ...post,
+    sub_topic: post.sub_topic ?? "",
+    original_stake: post.original_stake ?? post.current_health ?? 0,
+    current_health: post.current_health ?? 0,
+  }));
+}
+
+async function loadAuthorMeta(
+  supabase: SupabaseClient,
+  authorIds: string[]
+) {
+  const authorsById = new Map<string, ResearchPostAuthor>();
+  const topicTiers = new Map<string, ReturnType<typeof resolveTier>>();
+
+  if (authorIds.length === 0) {
+    return { authorsById, topicTiers };
+  }
+
+  const { data: authors } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, tier")
+    .in("id", authorIds);
+
+  for (const author of (authors ?? []) as ResearchPostAuthor[]) {
+    authorsById.set(author.id, author);
+  }
+
+  const { data: ranks } = await supabase
+    .from("subtopic_ranks")
+    .select("user_id, sub_topic, tier")
+    .in("user_id", authorIds);
+
+  for (const rank of (ranks ?? []) as Pick<
+    SubtopicRank,
+    "user_id" | "sub_topic" | "tier"
+  >[]) {
+    const topic = resolveSubTopic(rank.sub_topic);
+
+    if (!topic) {
+      continue;
+    }
+
+    topicTiers.set(`${rank.user_id}:${topic}`, resolveTier(rank.tier));
+  }
+
+  return { authorsById, topicTiers };
+}
+
+function toFeedItem(
+  post: ResearchPost,
+  viewer: { tier?: string | null; isAdmin?: boolean } | undefined,
+  authorsById: Map<string, ResearchPostAuthor>,
+  topicTiers: Map<string, ReturnType<typeof resolveTier>>
+): ResearchFeedItem | null {
+  const topic = resolveSubTopic(post.sub_topic);
+  const author = authorsById.get(post.author_id) ?? null;
+  const deskTier = resolveTier(author?.tier);
+  const access = getDeskAccess(
+    viewer?.tier,
+    author?.tier,
+    viewer?.isAdmin ?? false
+  );
+
+  if (access === "hidden") {
+    return null;
+  }
+
+  return {
+    ...post,
+    author,
+    authorTopicTier: topic
+      ? (topicTiers.get(`${post.author_id}:${topic}`) ?? deskTier)
+      : deskTier,
+    deskTier,
+    access,
+  };
+}
 
 export async function getLiveResearchFeed(
   supabase: SupabaseClient,
@@ -54,77 +143,64 @@ export async function getLiveResearchFeed(
     return { items: [], error: error.message };
   }
 
-  const posts = ((data ?? []) as Array<
-    Omit<ResearchPost, "sub_topic" | "original_stake"> & {
-      sub_topic?: string;
-      original_stake?: number | null;
-    }
-  >).map((post) => ({
-    ...post,
-    sub_topic: post.sub_topic ?? "",
-    original_stake: post.original_stake ?? post.current_health ?? 0,
-  }));
-  const authorIds = [...new Set(posts.map((post) => post.author_id))];
-  const authorsById = new Map<string, ResearchPostAuthor>();
-  const topicTiers = new Map<string, ReturnType<typeof resolveTier>>();
-
-  if (authorIds.length > 0) {
-    const { data: authors } = await supabase
-      .from("profiles")
-      .select("id, username, display_name, tier")
-      .in("id", authorIds);
-
-    for (const author of (authors ?? []) as ResearchPostAuthor[]) {
-      authorsById.set(author.id, author);
-    }
-
-    const { data: ranks } = await supabase
-      .from("subtopic_ranks")
-      .select("user_id, sub_topic, tier")
-      .in("user_id", authorIds);
-
-    for (const rank of (ranks ?? []) as Pick<
-      SubtopicRank,
-      "user_id" | "sub_topic" | "tier"
-    >[]) {
-      const topic = resolveSubTopic(rank.sub_topic);
-
-      if (!topic) {
-        continue;
-      }
-
-      topicTiers.set(`${rank.user_id}:${topic}`, resolveTier(rank.tier));
-    }
-  }
+  const posts = normalizePosts(data as RawPost[] | null);
+  const { authorsById, topicTiers } = await loadAuthorMeta(
+    supabase,
+    [...new Set(posts.map((post) => post.author_id))]
+  );
 
   return {
     items: posts.flatMap((post) => {
-      const topic = resolveSubTopic(post.sub_topic);
-      const author = authorsById.get(post.author_id) ?? null;
-      const deskTier = resolveTier(author?.tier);
-      const access = getDeskAccess(
-        viewer?.tier,
-        author?.tier,
-        viewer?.isAdmin ?? false
-      );
-
-      if (access === "hidden") {
-        return [];
-      }
-
-      return [
-        {
-          ...post,
-          current_health: post.current_health ?? 0,
-          author,
-          authorTopicTier: topic
-            ? (topicTiers.get(`${post.author_id}:${topic}`) ?? deskTier)
-            : deskTier,
-          deskTier,
-          access,
-        },
-      ];
+      const item = toFeedItem(post, viewer, authorsById, topicTiers);
+      return item ? [item] : [];
     }),
+    error: null,
+  };
+}
+
+export async function getResearchPostById(
+  supabase: SupabaseClient,
+  postId: string,
+  viewer?: { tier?: string | null; isAdmin?: boolean }
+): Promise<{ item: ResearchFeedItem | null; error: string | null }> {
+  const withStake = await supabase
+    .from("research_posts")
+    .select(POST_COLUMNS)
+    .eq("id", postId)
+    .maybeSingle();
+
+  const postRead =
+    withStake.error && withStake.error.message.includes("original_stake")
+      ? await supabase
+          .from("research_posts")
+          .select(
+            "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at"
+          )
+          .eq("id", postId)
+          .maybeSingle()
+      : withStake;
+
+  if (postRead.error) {
+    return { item: null, error: postRead.error.message };
+  }
+
+  if (!postRead.data) {
+    return { item: null, error: null };
+  }
+
+  const posts = normalizePosts([postRead.data as RawPost]);
+  const post = posts[0];
+
+  if (!post) {
+    return { item: null, error: null };
+  }
+
+  const { authorsById, topicTiers } = await loadAuthorMeta(supabase, [
+    post.author_id,
+  ]);
+
+  return {
+    item: toFeedItem(post, viewer, authorsById, topicTiers),
     error: null,
   };
 }

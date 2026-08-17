@@ -1,8 +1,10 @@
 import { format } from "date-fns";
+import Link from "next/link";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { VoteControls } from "@/components/laniakea/VoteControls";
+import { researchPostPath } from "@/lib/research/feed";
 import { getPostHealthState, isAscendedStatus } from "@/lib/research/health";
 import {
   RESEARCH_POST_STATUS_LIVE,
@@ -83,10 +85,28 @@ export function ResearchFeed({
                   ) : null}
                 </div>
                 <h2 className="text-[13px] font-medium tracking-tight text-foreground">
-                  {item.title}
+                  <Link
+                    href={researchPostPath(item.id)}
+                    className="hover:text-gain"
+                  >
+                    {item.title}
+                  </Link>
                 </h2>
                 <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
-                  {excerpt(item.body)}
+                  <Link
+                    href={researchPostPath(item.id)}
+                    className="hover:text-foreground"
+                  >
+                    {excerpt(item.body)}
+                  </Link>
+                </p>
+                <p className="mt-1.5 font-data text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
+                  <Link
+                    href={researchPostPath(item.id)}
+                    className="hover:text-foreground"
+                  >
+                    {item.commentCount ?? 0} comments · Open thread
+                  </Link>
                 </p>
               </div>
               <HealthMeter

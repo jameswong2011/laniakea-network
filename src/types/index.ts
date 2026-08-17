@@ -130,6 +130,41 @@ export type ResearchFeedItem = ResearchPost & {
   authorTopicTier: Tier | null;
   deskTier: Tier | null;
   access: FeedAccess;
+  commentCount?: number;
+};
+
+export const COMMENT_BODY_MAX = 8000;
+export const REPLY_BODY_MAX = 2000;
+
+export type ResearchComment = {
+  id: string;
+  post_id: string;
+  author_id: string;
+  body: string;
+  status: ResearchPostStatus;
+  current_health: number;
+  original_stake: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommentReply = {
+  id: string;
+  comment_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+};
+
+export type CommentReplyView = CommentReply & {
+  author: ResearchPostAuthor | null;
+  likeCount: number;
+  likedByViewer: boolean;
+};
+
+export type CommentThreadItem = ResearchComment & {
+  author: ResearchPostAuthor | null;
+  replies: CommentReplyView[];
 };
 
 export type SubtopicRank = {
@@ -157,6 +192,7 @@ export type HpTransaction = {
   type: string;
   description: string | null;
   post_id: string | null;
+  comment_id?: string | null;
   created_at: string;
 };
 

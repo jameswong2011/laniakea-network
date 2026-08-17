@@ -2,6 +2,7 @@ import { voteStrength } from "@/types";
 
 export const DEFAULT_STAKE_HP = 10;
 export const MAX_STAKE_HP = 100;
+export const DEFAULT_COMMENT_STAKE_HP = 5;
 export const STARTING_HP = 1000;
 /** Voting freezes when health reaches this multiple of original stake. */
 export const ASCENT_MULTIPLE = 5;

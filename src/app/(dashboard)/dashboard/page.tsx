@@ -14,6 +14,7 @@ import { requireUser } from "@/lib/auth/session";
 import { format } from "date-fns";
 import { formatHp } from "@/lib/format";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { researchPostPath } from "@/lib/research/feed";
 import {
   getSubtopicRanks,
   topicStandingsForUser,
@@ -147,7 +148,12 @@ export default async function DashboardPage() {
               >
                 <div className="min-w-0">
                   <p className="truncate text-[13px] text-foreground">
-                    {post.title}
+                    <Link
+                      href={researchPostPath(post.id)}
+                      className="hover:text-gain"
+                    >
+                      {post.title}
+                    </Link>
                   </p>
                   <p className="mt-0.5 font-data text-[10px] text-muted-foreground uppercase">
                     {post.status}

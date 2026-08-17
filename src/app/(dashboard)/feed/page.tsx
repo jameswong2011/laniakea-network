@@ -5,9 +5,10 @@ import { ResearchFeed } from "@/components/laniakea/ResearchFeed";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { requireUser } from "@/lib/auth/session";
 import { nextTier } from "@/lib/research/access";
+import { getCommentCounts } from "@/lib/research/comments";
 import { VOTE_COST_HP } from "@/lib/research/economy";
 import { getLiveResearchFeed, getViewerVotes } from "@/lib/research/feed";
-import { TIER_LABELS, VOTE_STRENGTH_MAX, resolveTier } from "@/types";
+import { TIER_LABELS, resolveTier } from "@/types";
 
 export const metadata: Metadata = {
   title: "Feed",
@@ -25,6 +26,14 @@ export default async function FeedPage() {
     userId,
     items.map((item) => item.id)
   );
+  const commentCounts = await getCommentCounts(
+    supabase,
+    items.map((item) => item.id)
+  );
+  const feedItems = items.map((item) => ({
+    ...item,
+    commentCount: commentCounts[item.id] ?? 0,
+  }));
   const availableHp = profile?.current_hp ?? 0;
   const above = nextTier(deskTier);
 
@@ -35,8 +44,8 @@ export default async function FeedPage() {
         title="Research Feed"
         description={
           above
-            ? `Publish on the ${TIER_LABELS[deskTier]} desk. ${TIER_LABELS[above]} is view-only. Stake cap 100. Votes 1–${VOTE_STRENGTH_MAX}. Health 0 is hunted off the feed; 5× stake ascends and freezes votes.`
-            : `Publish on the ${TIER_LABELS[deskTier]} desk. Stake cap 100. Votes 1–${VOTE_STRENGTH_MAX}. Health 0 is hunted off the feed; 5× stake ascends and freezes votes.`
+            ? `Publish on the ${TIER_LABELS[deskTier]} desk. ${TIER_LABELS[above]} is view-only. Open any note for the full thread. Stake comments to hunt or ascend them.`
+            : `Publish on the ${TIER_LABELS[deskTier]} desk. Open any note for the full thread. Stake comments to hunt or ascend them.`
         }
         meta={
           <>
@@ -56,7 +65,7 @@ export default async function FeedPage() {
         </p>
       ) : (
         <ResearchFeed
-          items={items}
+          items={feedItems}
           viewerVotes={viewerVotes}
           canVote={availableHp >= VOTE_COST_HP}
           availableHp={availableHp}

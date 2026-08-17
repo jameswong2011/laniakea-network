@@ -1,5 +1,8 @@
 import { ascentLine } from "@/lib/research/economy";
-import { RESEARCH_POST_STATUS_ASCENDED } from "@/types";
+import {
+  RESEARCH_POST_STATUS_ARCHIVED,
+  RESEARCH_POST_STATUS_ASCENDED,
+} from "@/types";
 
 /** Dying / at-risk bands are shares of the note's ascent line (5 × S). */
 export const POST_HEALTH_DYING_RATIO = 0.05;
@@ -26,6 +29,10 @@ export function getPostHealthState(
 
 export function isAscendedStatus(status?: string | null) {
   return status === RESEARCH_POST_STATUS_ASCENDED;
+}
+
+export function isHuntedStatus(status?: string | null) {
+  return status === RESEARCH_POST_STATUS_ARCHIVED;
 }
 
 export function getPostHealthLabel(state: PostHealthState) {

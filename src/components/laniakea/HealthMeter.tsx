@@ -3,6 +3,7 @@ import {
   getPostHealthPercent,
   getPostHealthState,
   isAscendedStatus,
+  isHuntedStatus,
   type PostHealthState,
 } from "@/lib/research/health";
 import { formatHp } from "@/lib/format";
@@ -41,13 +42,16 @@ export function HealthMeter({
   status?: string;
 }) {
   const ascended = isAscendedStatus(status);
+  const hunted = isHuntedStatus(status);
   const state = getPostHealthState(currentHealth, originalStake);
   const percent = ascended
     ? 100
     : getPostHealthPercent(currentHealth, originalStake);
   const tone = ascended
     ? { value: "text-gain", bar: "bg-gain", label: "text-gain" }
-    : healthTone(state);
+    : hunted
+      ? { value: "text-loss", bar: "bg-loss", label: "text-loss" }
+      : healthTone(state);
 
   return (
     <div className="flex w-[6.75rem] shrink-0 flex-col gap-1">
@@ -68,7 +72,7 @@ export function HealthMeter({
       <span
         className={`font-data text-[9px] tracking-[0.14em] uppercase ${tone.label}`}
       >
-        {ascended ? "Ascended" : getPostHealthLabel(state)}
+        {ascended ? "Ascended" : hunted ? "Hunted" : getPostHealthLabel(state)}
       </span>
     </div>
   );

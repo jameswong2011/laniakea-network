@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { format } from "date-fns";
 import {
   PageFrame,
@@ -14,6 +15,7 @@ import { requireUser } from "@/lib/auth/session";
 import { formatSignedHp } from "@/lib/format";
 import { canBuyHp, canCashOutHp } from "@/lib/research/access";
 import { probeUtilityTokenColumn, UTILITY_TOKEN_SQL } from "@/lib/research/tokens";
+import { researchPostPath } from "@/lib/research/feed";
 import { getWalletLedger } from "@/lib/research/wallet";
 import { resolveTier } from "@/types";
 
@@ -143,9 +145,12 @@ export default async function WalletPage() {
                     {entry.relatedPost ? (
                       <div className="flex min-w-0 items-center gap-2">
                         <SubTopicBadge topic={entry.relatedPost.sub_topic} />
-                        <span className="truncate font-data text-[12px] text-foreground">
+                        <Link
+                          href={researchPostPath(entry.relatedPost.id)}
+                          className="truncate font-data text-[12px] text-foreground hover:text-gain"
+                        >
                           {entry.relatedPost.title}
-                        </span>
+                        </Link>
                       </div>
                     ) : (
                       <span className="font-data text-[11px] text-muted-foreground">
