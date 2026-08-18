@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  compareTierThenHp,
   resolveSubTopic,
   resolveTier,
   type SubTopic,
@@ -135,13 +136,7 @@ export function topicStandingsForUser(
   const standings: TopicStanding[] = [];
 
   for (const [subTopic, list] of byTopic) {
-    const sorted = [...list].sort((a, b) => {
-      if (b.current_hp !== a.current_hp) {
-        return b.current_hp - a.current_hp;
-      }
-
-      return a.user_id.localeCompare(b.user_id);
-    });
+    const sorted = [...list].sort(compareTierThenHp);
 
     const index = sorted.findIndex((row) => row.user_id === userId);
 

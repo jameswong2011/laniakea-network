@@ -63,7 +63,8 @@ export function isMissingForumSchema(message: string) {
       message.includes("author_subscriptions") ||
       message.includes("content_drafts") ||
       message.includes("profiles.bio") ||
-      message.includes("column bio")) &&
+      message.includes("column bio") ||
+      message.includes("avatar_url")) &&
     (message.includes("does not exist") ||
       message.includes("42P01") ||
       message.includes("42703") ||

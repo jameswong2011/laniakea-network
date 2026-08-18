@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { format } from "date-fns";
 import {
   PageFrame,
@@ -7,10 +8,12 @@ import {
   PanelHeader,
 } from "@/components/layout/PageFrame";
 import { CalibrationButton } from "@/components/laniakea/CalibrationButton";
+import { DeskAvatar } from "@/components/laniakea/DeskAvatar";
 import { RankingBooks } from "@/components/laniakea/RankingBooks";
 import { RankingTopicNav } from "@/components/laniakea/RankingTopicNav";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
+import { profilePath } from "@/lib/research/forum";
 import { requireUser } from "@/lib/auth/session";
 import { formatHp } from "@/lib/format";
 import { CALIBRATION_QUARTILE } from "@/lib/research/calibration";
@@ -21,6 +24,7 @@ import {
 } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_CALIBRATION,
+  compareTierThenHp,
   resolveSubTopic,
   type HpTransaction,
   type Profile,
@@ -40,17 +44,26 @@ export default async function RankingPage({
   const { topic: topicParam } = await searchParams;
   const selectedTopic = resolveSubTopic(firstSearchParam(topicParam));
   const { supabase, userId, profile } = await requireUser();
-  const { data, error } = await supabase
+  const withAvatar = await supabase
     .from("profiles")
-    .select("id, username, display_name, role, tier, current_hp")
-    .order("current_hp", { ascending: false })
+    .select("id, username, display_name, role, tier, current_hp, avatar_url")
     .order("username", { ascending: true });
+  const listed =
+    withAvatar.error && withAvatar.error.message.includes("avatar_url")
+      ? await supabase
+          .from("profiles")
+          .select("id, username, display_name, role, tier, current_hp")
+          .order("username", { ascending: true })
+      : withAvatar;
+  const { data, error } = listed;
 
   const profiles = (
-    (data ?? []) as Pick<
-      Profile,
-      "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
-    >[]
+    (data ?? []) as Array<
+      Pick<
+        Profile,
+        "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
+      > & { avatar_url?: string | null }
+    >
   ).filter((row) => row.username !== "laniakea_treasury");
   const profilesById = new Map(profiles.map((row) => [row.id, row]));
   const isAdmin = profile?.role === "admin";
@@ -79,17 +92,14 @@ export default async function RankingPage({
         current_hp: rank.current_hp,
         overallTier: identity?.tier ?? "Bronze",
         overallHp: identity?.current_hp ?? 0,
+        avatar_url: identity?.avatar_url ?? null,
       };
     })
-    .sort((a, b) => {
-      if (b.current_hp !== a.current_hp) {
-        return b.current_hp - a.current_hp;
-      }
+    .sort(compareTierThenHp);
 
-      return a.username.localeCompare(b.username);
-    });
-
-  const rows = selectedTopic ? topicRows : profiles;
+  const rows = selectedTopic
+    ? topicRows
+    : [...profiles].sort(compareTierThenHp);
   const listError = selectedTopic ? topicRanks.error : error?.message ?? null;
   const quartilePct = Math.round(CALIBRATION_QUARTILE * 100);
 
@@ -112,8 +122,8 @@ export default async function RankingPage({
         title={selectedTopic ? `${selectedTopic} Ranking` : "Ranking"}
         description={
           selectedTopic
-            ? `Topic book by ${selectedTopic} HP. Overall desk is shown for context. Calibration moves the top and bottom ${quartilePct}% each week (${WEEKLY_CRON_LABEL}) and resets swept desks to 1000 HP.`
-            : `Overall book by current HP. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time, and resets swept desks to 1000 HP.`
+            ? `Topic book by ${selectedTopic} tier, then HP in that desk. Overall desk is shown for context. Calibration moves the top and bottom ${quartilePct}% each week (${WEEKLY_CRON_LABEL}) and resets swept desks to 1000 HP.`
+            : `Overall book by tier, then HP in that desk. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time, and resets swept desks to 1000 HP.`
         }
         meta={
           <>
@@ -194,17 +204,28 @@ export default async function RankingPage({
                       {String(index + 1).padStart(2, "0")}
                     </td>
                     <td className="px-2.5 py-1.5">
-                      <p className="font-data text-[12px] text-foreground">
-                        {row.display_name}
-                        {isViewer ? (
-                          <span className="ml-2 text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
-                            You
+                      <Link
+                        href={profilePath(row.username)}
+                        className="flex items-center gap-2 hover:opacity-90"
+                      >
+                        <DeskAvatar
+                          url={"avatar_url" in row ? row.avatar_url : null}
+                          name={row.display_name}
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-data text-[12px] text-foreground hover:underline">
+                            {row.display_name}
+                            {isViewer ? (
+                              <span className="ml-2 text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
+                                You
+                              </span>
+                            ) : null}
                           </span>
-                        ) : null}
-                      </p>
-                      <p className="font-data text-[10px] text-muted-foreground">
-                        @{row.username}
-                      </p>
+                          <span className="block font-data text-[10px] text-muted-foreground">
+                            @{row.username}
+                          </span>
+                        </span>
+                      </Link>
                     </td>
                     {topicRow ? (
                       <>

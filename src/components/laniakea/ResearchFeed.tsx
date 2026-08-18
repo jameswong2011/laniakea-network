@@ -113,6 +113,7 @@ export function ResearchFeed({
                   <AuthorLink
                     username={item.author?.username}
                     displayName={item.author?.display_name}
+                    avatarUrl={item.author?.avatar_url}
                   />
                   <span className="text-muted-foreground">
                     {format(new Date(item.created_at), "d MMM yyyy")}

@@ -166,10 +166,18 @@ async function loadAuthorMeta(
     return { authorsById, topicTiers };
   }
 
-  const { data: authors } = await supabase
+  const authorsWithAvatar = await supabase
     .from("profiles")
-    .select("id, username, display_name, tier")
+    .select("id, username, display_name, tier, avatar_url")
     .in("id", authorIds);
+  const { data: authors } =
+    authorsWithAvatar.error &&
+    authorsWithAvatar.error.message.includes("avatar_url")
+      ? await supabase
+          .from("profiles")
+          .select("id, username, display_name, tier")
+          .in("id", authorIds)
+      : authorsWithAvatar;
 
   for (const author of (authors ?? []) as ResearchPostAuthor[]) {
     authorsById.set(author.id, author);

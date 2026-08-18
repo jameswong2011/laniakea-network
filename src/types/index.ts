@@ -47,6 +47,25 @@ export function resolveTier(value: string | null | undefined): Tier | null {
   return TIERS.find((tier) => tier.toLowerCase() === normalized) ?? null;
 }
 
+/** Masters first, then HP within the desk. Tie-break is username / id. */
+export function compareTierThenHp(
+  a: { tier: string; current_hp: number; username?: string; user_id?: string },
+  b: { tier: string; current_hp: number; username?: string; user_id?: string }
+) {
+  const aRank = TIER_RANK[resolveTier(a.tier) ?? "Bronze"];
+  const bRank = TIER_RANK[resolveTier(b.tier) ?? "Bronze"];
+
+  if (bRank !== aRank) {
+    return bRank - aRank;
+  }
+
+  if (b.current_hp !== a.current_hp) {
+    return b.current_hp - a.current_hp;
+  }
+
+  return (a.username ?? a.user_id ?? "").localeCompare(b.username ?? b.user_id ?? "");
+}
+
 export const SUB_TOPICS = [
   "Healthcare",
   "Biotech",
@@ -140,6 +159,7 @@ export type Profile = {
   registration_path: RegistrationPath;
   is_system: boolean;
   bio: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -171,7 +191,7 @@ export type ResearchPost = {
 
 export type ResearchPostAuthor = Pick<
   Profile,
-  "id" | "username" | "display_name" | "tier"
+  "id" | "username" | "display_name" | "tier" | "avatar_url"
 >;
 
 export type FeedAccess = "full" | "view_only" | "hidden";

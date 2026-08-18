@@ -5,7 +5,7 @@ import { isMissingInviteSchema } from "@/lib/research/invite";
 import type { Profile, RegistrationPath } from "@/types";
 
 const PROFILE_COLUMNS =
-  "id, username, display_name, role, tier, current_hp, utility_tokens, invited_by, account_code, registration_path, is_system, bio, created_at, updated_at";
+  "id, username, display_name, role, tier, current_hp, utility_tokens, invited_by, account_code, registration_path, is_system, bio, avatar_url, created_at, updated_at";
 
 const PROFILE_COLUMNS_TOKENS =
   "id, username, display_name, role, tier, current_hp, utility_tokens, created_at, updated_at";
@@ -31,6 +31,7 @@ type ProfileRow = Omit<
   | "registration_path"
   | "is_system"
   | "bio"
+  | "avatar_url"
 > & {
   utility_tokens?: number | null;
   invited_by?: string | null;
@@ -38,6 +39,7 @@ type ProfileRow = Omit<
   registration_path?: string | null;
   is_system?: boolean | null;
   bio?: string | null;
+  avatar_url?: string | null;
 };
 
 function asProfile(row: ProfileRow): Profile {
@@ -52,6 +54,7 @@ function asProfile(row: ProfileRow): Profile {
     registration_path: path,
     is_system: row.is_system ?? false,
     bio: row.bio ?? null,
+    avatar_url: row.avatar_url ?? null,
   };
 }
 
@@ -69,7 +72,26 @@ async function loadProfile(
     return withInvite.data ? asProfile(withInvite.data as ProfileRow) : null;
   }
 
-  if (withInvite.error.message.includes("bio")) {
+  if (
+    withInvite.error.message.includes("avatar_url") ||
+    withInvite.error.message.includes("bio")
+  ) {
+    const withoutAvatar = withInvite.error.message.includes("avatar_url")
+      ? await supabase
+          .from("profiles")
+          .select(
+            "id, username, display_name, role, tier, current_hp, utility_tokens, invited_by, account_code, registration_path, is_system, bio, created_at, updated_at"
+          )
+          .eq("id", userId)
+          .maybeSingle()
+      : withInvite;
+
+    if (!withoutAvatar.error) {
+      return withoutAvatar.data
+        ? asProfile(withoutAvatar.data as ProfileRow)
+        : null;
+    }
+
     const withoutBio = await supabase
       .from("profiles")
       .select(

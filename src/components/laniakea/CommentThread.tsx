@@ -211,6 +211,7 @@ export function CommentThread({
                   <AuthorLink
                     username={comment.author?.username}
                     displayName={comment.author?.display_name}
+                    avatarUrl={comment.author?.avatar_url}
                   />
                   <span className="text-muted-foreground">
                     {format(new Date(comment.created_at), "d MMM yyyy")}
@@ -311,6 +312,7 @@ export function CommentThread({
                         <AuthorLink
                           username={reply.author?.username}
                           displayName={reply.author?.display_name}
+                          avatarUrl={reply.author?.avatar_url}
                         />
                         <span className="text-muted-foreground">
                           {format(new Date(reply.created_at), "d MMM yyyy")}

@@ -14,7 +14,9 @@ import { requireUser } from "@/lib/auth/session";
 import { format } from "date-fns";
 import { formatHp } from "@/lib/format";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { AvatarUpload } from "@/components/laniakea/AvatarUpload";
 import { BioEditor } from "@/components/laniakea/BioEditor";
+import { PROFILE_AVATAR_SQL } from "@/lib/research/avatar-sql";
 import { InviteDesk } from "@/components/laniakea/InviteDesk";
 import { researchPostPath } from "@/lib/research/feed";
 import { loadInviteDesk } from "@/lib/research/invite";
@@ -51,6 +53,12 @@ export default async function DashboardPage() {
       : authoredWithStake;
 
   const deskPosts = authored.data ?? [];
+  const avatarProbe = await supabase
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", userId)
+    .limit(1);
+  const avatarReady = !avatarProbe.error;
 
   return (
     <PageFrame width="narrow">
@@ -129,6 +137,22 @@ export default async function DashboardPage() {
               </dd>
             </div>
           </dl>
+          {avatarReady ? (
+            <AvatarUpload
+              name={profile.display_name}
+              url={profile.avatar_url}
+            />
+          ) : (
+            <div className="px-4 py-3">
+              <p className="mb-2 text-[13px] text-warning">
+                Profile pictures need a one-time SQL update. Paste this in the
+                Supabase SQL editor, then refresh Account.
+              </p>
+              <pre className="max-h-40 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+                {PROFILE_AVATAR_SQL}
+              </pre>
+            </div>
+          )}
           <BioEditor bio={profile.bio ?? ""} />
         </Panel>
       ) : (

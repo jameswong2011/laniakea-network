@@ -342,6 +342,47 @@ export async function updateBio(
   return { message: "Bio saved.", stamp: Date.now() };
 }
 
+export async function updateAvatar(url: string): Promise<ForumActionState> {
+  const { supabase, userId } = await requireUser();
+  const parsed = z
+    .string()
+    .trim()
+    .url("Invalid picture URL.")
+    .max(800)
+    .safeParse(url);
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message, stamp: Date.now() };
+  }
+
+  if (!parsed.data.includes(userId) || !parsed.data.includes("research-media")) {
+    return { error: "Picture must be uploaded to your desk folder.", stamp: Date.now() };
+  }
+
+  const write = await supabase
+    .from("profiles")
+    .update({
+      avatar_url: parsed.data,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  if (write.error) {
+    return {
+      error: write.error.message.includes("avatar_url")
+        ? "Profile pictures need a one-time SQL update. Run supabase/migrations/20260818180000_profile_avatars.sql."
+        : write.error.message,
+      stamp: Date.now(),
+    };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/ranking");
+  revalidatePath("/u", "layout");
+  revalidatePath("/feed");
+  return { message: "Picture saved.", stamp: Date.now() };
+}
+
 export async function saveDraft(
   _prev: ForumActionState,
   formData: FormData

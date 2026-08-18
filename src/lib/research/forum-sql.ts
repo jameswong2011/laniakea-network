@@ -130,4 +130,16 @@ create policy research_media_delete on storage.objects
     bucket_id = 'research-media'
     and split_part(name, '/', 1) = auth.uid()::text
   );
+
+drop policy if exists research_media_update on storage.objects;
+create policy research_media_update on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'research-media'
+    and split_part(name, '/', 1) = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'research-media'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
 `;

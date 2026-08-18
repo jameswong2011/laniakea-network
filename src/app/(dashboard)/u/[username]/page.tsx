@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { PageFrame, PageHeading, Panel, PanelHeader } from "@/components/layout/PageFrame";
+import { DeskAvatar } from "@/components/laniakea/DeskAvatar";
 import { FollowAuthorButton } from "@/components/laniakea/FollowAuthorButton";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
@@ -33,18 +34,26 @@ export default async function PublicProfilePage({
   const { supabase, userId } = await requireUser();
   const withBio = await supabase
     .from("profiles")
-    .select("id, username, display_name, tier, bio, created_at")
+    .select("id, username, display_name, tier, bio, avatar_url, created_at")
     .eq("username", username)
     .maybeSingle();
-  const profileRead = withBio.error?.message.includes("bio")
+  const profileRead = withBio.error
     ? await supabase
         .from("profiles")
-        .select("id, username, display_name, tier, created_at")
+        .select(
+          withBio.error.message.includes("avatar_url")
+            ? "id, username, display_name, tier, bio, created_at"
+            : "id, username, display_name, tier, created_at"
+        )
         .eq("username", username)
         .maybeSingle()
     : withBio;
   const profile = profileRead.data
-    ? { bio: null as string | null, ...profileRead.data }
+    ? {
+        bio: null as string | null,
+        avatar_url: null as string | null,
+        ...profileRead.data,
+      }
     : null;
 
   if (!profile || profile.username === "laniakea_treasury") {
@@ -73,27 +82,36 @@ export default async function PublicProfilePage({
 
   return (
     <PageFrame>
-      <PageHeading
-        kicker="Desk"
-        title={profile.display_name}
-        description={`@${profile.username} · joined ${format(new Date(profile.created_at), "d MMM yyyy")}`}
-        meta={
-          <div className="flex items-center gap-3">
-            <TierBadge tier={profile.tier} size="md" />
-            {profile.id !== userId ? (
-              <FollowAuthorButton
-                authorId={profile.id}
-                following={following}
-                followerCount={followerCount}
-              />
-            ) : (
-              <span className="text-[13px] text-muted-foreground">
-                {followerCount} {followerCount === 1 ? "follower" : "followers"}
-              </span>
-            )}
-          </div>
-        }
-      />
+      <div className="flex items-end gap-4">
+        <DeskAvatar
+          url={profile.avatar_url}
+          name={profile.display_name}
+          size="lg"
+        />
+        <div className="min-w-0 flex-1">
+          <PageHeading
+            kicker="Desk"
+            title={profile.display_name}
+            description={`@${profile.username} · joined ${format(new Date(profile.created_at), "d MMM yyyy")}`}
+            meta={
+              <div className="flex items-center gap-3">
+                <TierBadge tier={profile.tier} size="md" />
+                {profile.id !== userId ? (
+                  <FollowAuthorButton
+                    authorId={profile.id}
+                    following={following}
+                    followerCount={followerCount}
+                  />
+                ) : (
+                  <span className="text-[13px] text-muted-foreground">
+                    {followerCount} {followerCount === 1 ? "follower" : "followers"}
+                  </span>
+                )}
+              </div>
+            }
+          />
+        </div>
+      </div>
 
       {profile.bio ? (
         <p className="max-w-2xl text-[16px] leading-relaxed text-foreground">

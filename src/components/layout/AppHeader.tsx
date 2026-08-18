@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/layout/LogoutButton";
 import { HpReadout } from "@/components/laniakea/HpReadout";
 import { NotificationMenu } from "@/components/laniakea/NotificationMenu";
 import { SearchBox } from "@/components/laniakea/SearchBox";
+import { DeskAvatar } from "@/components/laniakea/DeskAvatar";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { feedSingleTopicHref, parseFeedTopics } from "@/lib/research/feed";
@@ -183,9 +184,14 @@ export function AppHeader({
             {profile ? (
               <Link
                 href={profilePath(profile.username)}
-                className="hidden max-w-[8rem] truncate text-[13px] text-muted-foreground hover:text-foreground md:inline"
+                className="hidden items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground md:flex"
               >
-                @{profile.username}
+                <DeskAvatar
+                  url={profile.avatar_url}
+                  name={profile.display_name}
+                  size="xs"
+                />
+                <span className="max-w-[8rem] truncate">@{profile.username}</span>
               </Link>
             ) : null}
           </div>
