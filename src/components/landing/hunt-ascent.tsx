@@ -72,7 +72,7 @@ export function HuntAscent() {
     <section id="arena" className="border-t border-border">
       <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 md:grid-cols-12 md:gap-10 md:px-8 md:py-28">
         <div className="md:col-span-5">
-          <p className="section-kicker">05 — The arena</p>
+          <p className="section-kicker">03 — The arena</p>
           <h2 className="mt-4 font-display text-2xl leading-title text-fg">
             A thesis lives until the room hunts it or lifts it.
           </h2>

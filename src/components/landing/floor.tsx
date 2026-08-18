@@ -4,7 +4,7 @@ export function Floor() {
   return (
     <section id="floor" className="border-t border-border">
       <div className="mx-auto max-w-6xl px-5 py-20 md:px-8 md:py-28">
-        <p className="section-kicker">04 — The floor</p>
+        <p className="section-kicker">02 — The floor</p>
         <h2 className="mt-4 max-w-2xl font-display text-2xl leading-title text-fg">
           A research community with a cost of speech. Not another club with a
           moderator.

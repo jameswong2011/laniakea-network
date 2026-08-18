@@ -5,7 +5,7 @@ import { LandingHeader } from "@/components/landing/header";
 import { Hero } from "@/components/landing/hero";
 import { HuntAscent } from "@/components/landing/hunt-ascent";
 import { Close, Rulebook } from "@/components/landing/mechanisms";
-import { Mission, Wave } from "@/components/landing/mission";
+import { Mission } from "@/components/landing/mission";
 import { getAuthContext } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -23,7 +23,6 @@ export default async function LandingPage() {
       <main>
         <Hero />
         <Mission />
-        <Wave />
         <Floor />
         <HuntAscent />
         <Rulebook />
