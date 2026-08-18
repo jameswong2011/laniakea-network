@@ -229,9 +229,9 @@ export default async function AdminPage() {
       <Panel>
         <PanelHeader label="Vote scale" meta="1–5" />
         <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
-          If Up/Down at conviction 2–5 fails, the live votes table still only
-          allows ±1. Paste this once in the Supabase SQL editor. Hunt and
-          Ascent math is unchanged.
+          If Up/Down at conviction 2–5 fails, paste this once in the Supabase
+          SQL editor. The last SELECT must show abs(value) between 1 and 5.
+          Hunt and Ascent math is unchanged.
         </p>
         <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
           {VOTE_SCALE_SQL}

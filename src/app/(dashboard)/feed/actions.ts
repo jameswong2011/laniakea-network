@@ -31,6 +31,7 @@ import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
   VOTE_SCALE_BLOCKED_MESSAGE,
   VOTE_SCALE_SQL,
+  formatVoteInsertError,
   isVoteScaleBlocked,
 } from "@/lib/research/vote-scale-sql";
 import {
@@ -372,12 +373,12 @@ export async function voteOnPost(
     }
     if (isVoteScaleBlocked(voteError)) {
       return {
-        error: VOTE_SCALE_BLOCKED_MESSAGE,
+        error: `${VOTE_SCALE_BLOCKED_MESSAGE} ${formatVoteInsertError(voteError)}`,
         voteScaleSql: VOTE_SCALE_SQL,
         stamp: Date.now(),
       };
     }
-    return { error: voteError.message, stamp: Date.now() };
+    return { error: formatVoteInsertError(voteError), stamp: Date.now() };
   }
 
   let nextHealth = post.current_health + voteHealthDelta(value);
