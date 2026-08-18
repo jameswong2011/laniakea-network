@@ -5,16 +5,18 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { LogoutButton } from "@/components/layout/LogoutButton";
 import { HpReadout } from "@/components/laniakea/HpReadout";
+import { NotificationMenu } from "@/components/laniakea/NotificationMenu";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { feedSingleTopicHref, parseFeedTopics } from "@/lib/research/feed";
+import { profilePath, type NotificationRow } from "@/lib/research/forum";
 import { SUB_TOPIC_CODES, type Profile, type SubTopic } from "@/types";
 
 function navClassName(active: boolean) {
-  return `flex h-full shrink-0 items-center px-2.5 font-data text-[10px] tracking-[0.14em] uppercase ${
+  return `flex h-full shrink-0 items-center px-3 text-[13px] ${
     active
-      ? "bg-panel-elevated text-foreground shadow-[inset_0_-2px_0_0_var(--gain)]"
-      : "text-muted-foreground hover:bg-panel-elevated hover:text-foreground"
+      ? "text-foreground shadow-[inset_0_-2px_0_0_var(--gain)]"
+      : "text-muted-foreground hover:text-foreground"
   }`;
 }
 
@@ -69,29 +71,30 @@ export function AppHeader({
   profile = null,
   isAuthenticated = false,
   engagedTopics = [],
+  notifications = [],
+  unreadCount = 0,
 }: {
   profile?: Profile | null;
   isAuthenticated?: boolean;
   engagedTopics?: SubTopic[];
+  notifications?: NotificationRow[];
+  unreadCount?: number;
 }) {
   const pathname = usePathname();
 
   return (
-    <header className="shrink-0 border-b border-border bg-surface">
-      <div className="flex h-9 items-stretch justify-between">
+    <header className="shrink-0 border-b border-border bg-surface/90 backdrop-blur">
+      <div className="flex h-12 items-stretch justify-between">
         <div className="flex min-w-0 flex-1 items-stretch">
           <Link
             href={isAuthenticated ? "/feed" : "/"}
-            className="flex shrink-0 items-center gap-2 border-r border-border px-2.5"
+            className="flex shrink-0 items-center gap-2 border-r border-border px-3"
           >
-            <span className="flex h-5 w-5 items-center justify-center border border-border bg-panel-elevated font-data text-[9px] font-semibold tracking-wide text-foreground">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-panel-elevated text-[10px] font-semibold tracking-wide text-foreground">
               LN
             </span>
-            <span className="text-[12px] font-medium tracking-tight text-foreground">
+            <span className="font-heading text-[18px] text-foreground">
               Laniakea
-            </span>
-            <span className="hidden font-data text-[9px] tracking-[0.16em] text-muted-foreground uppercase sm:inline">
-              Network
             </span>
           </Link>
 
@@ -123,6 +126,13 @@ export function AppHeader({
         <div className="flex shrink-0 items-stretch">
           {isAuthenticated ? (
             <nav className="flex items-stretch">
+              <NotificationMenu items={notifications} unread={unreadCount} />
+              <Link
+                href="/saved"
+                className={navClassName(isActivePath(pathname, "/saved"))}
+              >
+                Saved
+              </Link>
               <Link
                 href="/wallet"
                 className={navClassName(isActivePath(pathname, "/wallet"))}
@@ -137,11 +147,11 @@ export function AppHeader({
               </Link>
             </nav>
           ) : null}
-          <div className="flex items-center gap-1.5 px-2">
+          <div className="flex items-center gap-2 px-2">
             {profile ? (
               <TierBadge tier={profile.tier} size="md" />
             ) : (
-              <span className="hidden font-data text-[10px] text-muted-foreground sm:inline">
+              <span className="hidden text-[12px] text-muted-foreground sm:inline">
                 —
               </span>
             )}
@@ -156,8 +166,8 @@ export function AppHeader({
             </Link>
             {profile ? (
               <Link
-                href="/dashboard"
-                className="hidden max-w-[8rem] truncate font-data text-[11px] text-muted-foreground hover:text-foreground md:inline"
+                href={profilePath(profile.username)}
+                className="hidden max-w-[8rem] truncate text-[13px] text-muted-foreground hover:text-foreground md:inline"
               >
                 @{profile.username}
               </Link>
@@ -172,7 +182,7 @@ export function AppHeader({
             </Link>
           ) : null}
           {isAuthenticated ? (
-            <div className="flex items-center border-l border-border px-2">
+            <div className="flex items-center border-l border-border px-3">
               <LogoutButton />
             </div>
           ) : null}

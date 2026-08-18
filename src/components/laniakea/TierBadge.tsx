@@ -24,8 +24,8 @@ export function TierBadge({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center border font-data font-medium tracking-[0.12em] uppercase ${frame} ${
-        compact ? "h-6 px-1.5 text-[10px]" : "h-7 px-2 text-[11px]"
+      className={`inline-flex shrink-0 items-center rounded-full border ${frame} ${
+        compact ? "h-6 px-2 text-[11px]" : "h-7 px-2.5 text-[12px]"
       }`}
     >
       {label}

@@ -28,7 +28,11 @@ export function researchComposePath() {
 }
 
 export function researchExcerpt(body: string, max = 220) {
-  const compact = body.replace(/\s+/g, " ").trim();
+  const compact = body
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, " ")
+    .replace(/[#*_`>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
   if (compact.length <= max) {
     return compact;

@@ -26,7 +26,7 @@ export default async function NewResearchPage() {
             <TierBadge tier={deskTier} size="md" />
             <Link
               href="/feed"
-              className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
+              className="text-[13px] text-muted-foreground hover:text-foreground"
             >
               Back to feed
             </Link>

@@ -6,6 +6,7 @@ import {
   createResearchPost,
   type FeedActionState,
 } from "@/app/(dashboard)/feed/actions";
+import { ImageAttachButton } from "@/components/laniakea/ImageAttachButton";
 import { SubTopicSelect } from "@/components/laniakea/SubTopicSelect";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { nextTier } from "@/lib/research/access";
@@ -38,6 +39,7 @@ export function NewResearchForm({
   const [unlockMultiple, setUnlockMultiple] = useState(
     DEFAULT_UNLOCK_RATE_MULTIPLE
   );
+  const [body, setBody] = useState("");
   const defaultStake =
     availableHp >= DEFAULT_STAKE_HP ? DEFAULT_STAKE_HP : Math.max(availableHp, 1);
   const canPost = availableHp >= 1;
@@ -48,17 +50,15 @@ export function NewResearchForm({
   );
 
   return (
-    <section className="border border-border bg-panel">
-      <div className="flex items-center justify-between border-b border-border bg-surface px-2.5 py-1.5">
+    <section className="rounded-xl border border-border bg-panel">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <h2 className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-            Desk
-          </h2>
+          <h2 className="text-[15px] font-medium text-foreground">New note</h2>
           <TierBadge tier={deskTier} />
         </div>
         <Link
           href="/wallet"
-          className="font-data text-[11px] text-muted-foreground hover:text-foreground"
+          className="text-[13px] text-muted-foreground hover:text-foreground"
         >
           Wallet {new Intl.NumberFormat("en-US").format(availableHp)} HP
         </Link>
@@ -66,13 +66,11 @@ export function NewResearchForm({
       <form
         key={state.stamp ?? "new-post"}
         action={action}
-        className="flex flex-col gap-2.5 p-2.5"
+        className="flex flex-col gap-4 p-4"
       >
         <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_13rem]">
           <label className="flex flex-col gap-1">
-            <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Title
-            </span>
+            <span className="text-[13px] text-muted-foreground">Title</span>
             <input
               name="title"
               required
@@ -82,25 +80,29 @@ export function NewResearchForm({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Sub-topic
-            </span>
+            <span className="text-[13px] text-muted-foreground">Sub-topic</span>
             <SubTopicSelect />
           </label>
         </div>
-        <label className="flex flex-col gap-1">
-          <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-            Body
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] text-muted-foreground">
+            Body · markdown, images, and links
           </span>
           <textarea
             name="body"
             required
-            rows={5}
+            rows={8}
             maxLength={20000}
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
             placeholder="Thesis, evidence, and risk."
-            className="min-h-24 w-full border border-border bg-panel-elevated px-2.5 py-2 text-[13px] text-foreground outline-none focus-visible:border-ring"
+            className="min-h-40 w-full rounded-lg border border-border bg-background px-3 py-2 text-[15px] leading-relaxed text-foreground outline-none focus-visible:border-ring"
           />
         </label>
+        <ImageAttachButton
+          disabled={pending}
+          onInsert={(markdown) => setBody((current) => `${current}${markdown}`)}
+        />
         <p className="font-data text-[11px] text-muted-foreground">
           Publishes to your {TIER_LABELS[deskTier]} desk.
           {visibleAbove
@@ -175,7 +177,7 @@ export function NewResearchForm({
         <button
           type="submit"
           disabled={pending || !canPost}
-          className="h-8 w-fit border border-border bg-secondary px-3 text-[12px] font-medium tracking-wide text-foreground hover:bg-muted disabled:opacity-50"
+          className="h-9 w-fit rounded-md bg-secondary px-4 text-[14px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
         >
           {pending ? "Publishing…" : "Publish"}
         </button>

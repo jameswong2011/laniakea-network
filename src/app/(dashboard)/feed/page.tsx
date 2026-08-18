@@ -14,6 +14,7 @@ import {
   parseFeedTopics,
   researchComposePath,
 } from "@/lib/research/feed";
+import { loadSavedPostIds } from "@/lib/research/forum";
 import { resolveTier } from "@/types";
 
 export const metadata: Metadata = {
@@ -48,6 +49,11 @@ export default async function FeedPage({
     ...item,
     commentCount: commentCounts[item.id] ?? 0,
   }));
+  const savedIds = await loadSavedPostIds(
+    supabase,
+    userId,
+    feedItems.map((item) => item.id)
+  );
   const availableHp = profile?.current_hp ?? 0;
 
   return (
@@ -57,18 +63,18 @@ export default async function FeedPage({
         title={
           selectedTopics?.length === 1 ? selectedTopics[0] : "Main Feed"
         }
-        description="Open a thread to read, vote, and comment. Lower desks can unlock a higher note with UTL."
+        description="Read, vote, and comment. Lower desks can unlock a higher note with UTL."
         meta={
           <>
             <TierBadge tier={deskTier} size="md" />
-            <span className="font-data text-[11px] text-muted-foreground">
+            <span className="text-[13px] text-muted-foreground">
               {feedItems.length} live
             </span>
             <Link
               href={researchComposePath()}
-              className="inline-flex h-7 items-center border border-border bg-secondary px-2.5 font-data text-[10px] tracking-[0.14em] text-foreground uppercase hover:bg-muted"
+              className="inline-flex h-9 items-center rounded-md bg-secondary px-3 text-[13px] font-medium text-foreground hover:bg-muted"
             >
-              New Research Post
+              New post
             </Link>
           </>
         }
@@ -77,11 +83,11 @@ export default async function FeedPage({
       <FeedTopicFilter selected={selectedTopics} />
 
       {error ? (
-        <p className="border border-border bg-panel px-2.5 py-3 font-data text-[12px] text-loss">
+        <p className="rounded-xl border border-border bg-panel px-4 py-3 text-[14px] text-loss">
           {error}
         </p>
       ) : selectedTopics?.length === 0 ? (
-        <p className="border border-border bg-panel px-2.5 py-5 font-data text-[12px] text-muted-foreground">
+        <p className="rounded-xl border border-border bg-panel px-5 py-8 text-[15px] text-muted-foreground">
           Select at least one sub-topic.
         </p>
       ) : (
@@ -91,6 +97,7 @@ export default async function FeedPage({
           canVote={availableHp >= VOTE_COST_HP}
           availableHp={availableHp}
           availableTokens={profile?.utility_tokens ?? 0}
+          savedIds={savedIds}
         />
       )}
     </PageFrame>

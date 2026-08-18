@@ -3,10 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { PageFrame, PageHeading } from "@/components/layout/PageFrame";
+import { AuthorLink } from "@/components/laniakea/AuthorLink";
 import { CommentThread } from "@/components/laniakea/CommentThread";
+import { EditBodyForm } from "@/components/laniakea/EditBodyForm";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
+import { PostToolbar } from "@/components/laniakea/PostToolbar";
+import { ReactionBar } from "@/components/laniakea/ReactionBar";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
-import { TierBadge } from "@/components/laniakea/TierBadge";
 import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
 import { requireUser } from "@/lib/auth/session";
@@ -16,7 +20,12 @@ import {
   getViewerCommentVotes,
 } from "@/lib/research/comments";
 import { VOTE_COST_HP } from "@/lib/research/economy";
-import { getResearchPostById, getViewerVotes } from "@/lib/research/feed";
+import { getResearchPostById, getViewerVotes, researchPostPath } from "@/lib/research/feed";
+import {
+  isPostSubscribed,
+  loadReactions,
+  loadSavedPostIds,
+} from "@/lib/research/forum";
 import {
   isAscendedStatus,
   isHuntedStatus,
@@ -61,7 +70,7 @@ export default async function ResearchPostPage({
   if (error) {
     return (
       <PageFrame>
-        <p className="border border-border bg-panel px-2.5 py-3 font-data text-[12px] text-loss">
+        <p className="rounded-xl border border-border bg-panel px-4 py-3 text-[14px] text-loss">
           {error}
         </p>
       </PageFrame>
@@ -85,23 +94,23 @@ export default async function ResearchPostPage({
           meta={
             <Link
               href="/feed"
-              className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
+              className="text-[13px] text-muted-foreground hover:text-foreground"
             >
               Back to feed
             </Link>
           }
         />
-        <article className="border border-border bg-panel px-2.5 py-4">
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <article className="rounded-xl border border-border bg-panel px-5 py-5">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <SubTopicBadge topic={item.sub_topic} />
             {accessLabel ? (
-              <span className="inline-flex h-6 items-center border border-border bg-panel-elevated px-1.5 font-data text-[9px] tracking-[0.12em] text-muted-foreground uppercase">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[12px] text-muted-foreground">
                 {accessLabel}
               </span>
             ) : null}
           </div>
           {item.body ? (
-            <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="mb-4 text-[15px] leading-relaxed text-muted-foreground">
               {item.body}
             </p>
           ) : null}
@@ -114,7 +123,7 @@ export default async function ResearchPostPage({
               layout="block"
             />
           ) : (
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
+            <p className="text-[15px] leading-relaxed text-muted-foreground">
               Earn {item.deskTier ? TIER_LABELS[item.deskTier] : "this desk"} to
               open it.
             </p>
@@ -131,83 +140,42 @@ export default async function ResearchPostPage({
     userId,
     thread.comments.map((comment) => comment.id)
   );
+  const replyIds = thread.comments.flatMap((comment) =>
+    comment.replies.map((reply) => reply.id)
+  );
+  const [postReactions, commentReactions, replyReactions, savedIds, subscribed] =
+    await Promise.all([
+      loadReactions(supabase, "post", [item.id], userId),
+      loadReactions(
+        supabase,
+        "comment",
+        thread.comments.map((comment) => comment.id),
+        userId
+      ),
+      loadReactions(supabase, "reply", replyIds, userId),
+      loadSavedPostIds(supabase, userId, [item.id]),
+      isPostSubscribed(supabase, userId, item.id),
+    ]);
   const availableHp = profile?.current_hp ?? 0;
 
   return (
     <PageFrame>
       <PageHeading
-        kicker="Thread"
+        kicker={item.sub_topic || "Thread"}
         title={item.title}
         description="Stake comments to hunt or ascend them. Direct replies are like-only."
         meta={
           <Link
             href="/feed"
-            className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
+            className="text-[13px] text-muted-foreground hover:text-foreground"
           >
             Back to feed
           </Link>
         }
       />
 
-      <article className="border border-border bg-panel">
-        <div className="flex items-start justify-between gap-3 border-b border-border px-2.5 py-2.5">
-          <div className="min-w-0">
-            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-              <SubTopicBadge topic={item.sub_topic} />
-              {isAscendedStatus(item.status) ? (
-                <span className="inline-flex h-6 items-center border border-gain/40 bg-gain-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-gain uppercase">
-                  Ascended
-                </span>
-              ) : null}
-              {isHuntedStatus(item.status) ? (
-                <span className="inline-flex h-6 items-center border border-loss/40 bg-loss-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-loss uppercase">
-                  Hunted
-                </span>
-              ) : null}
-              {accessLabel ? (
-                <span className="inline-flex h-6 items-center border border-warning/40 bg-warning-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-warning uppercase">
-                  {accessLabel}
-                </span>
-              ) : null}
-            </div>
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
-              {item.body}
-            </p>
-            {item.unlockQuote ? (
-              <div className="mt-3">
-                <UnlockPostButton
-                  postId={item.id}
-                  access={item.access}
-                  quote={item.unlockQuote}
-                  availableTokens={availableTokens}
-                  layout="block"
-                />
-              </div>
-            ) : null}
-          </div>
-          <HealthMeter
-            currentHealth={item.current_health}
-            originalStake={item.original_stake}
-            status={item.status}
-          />
-        </div>
-        <div className="flex items-end justify-between gap-3 px-2.5 py-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            {item.authorTopicTier ? (
-              <TierBadge tier={item.authorTopicTier} />
-            ) : item.author ? (
-              <TierBadge tier={item.author.tier} />
-            ) : null}
-            <span className="font-data text-[12px] text-foreground">
-              {item.author?.display_name ?? "Unknown"}
-            </span>
-            <span className="font-data text-[11px] text-muted-foreground">
-              @{item.author?.username ?? "—"}
-            </span>
-            <span className="font-data text-[10px] text-muted-foreground">
-              {format(new Date(item.created_at), "dd MMM yyyy HH:mm")}
-            </span>
-          </div>
+      <article className="rounded-xl border border-border bg-panel px-5 py-5">
+        <div className="flex items-start gap-5">
           <VoteControls
             postId={item.id}
             currentVote={viewerVotes[item.id] ?? null}
@@ -227,6 +195,79 @@ export default async function ResearchPostPage({
                     : undefined
             }
           />
+          <div className="min-w-0 flex-1">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <SubTopicBadge topic={item.sub_topic} />
+              {isAscendedStatus(item.status) ? (
+                <span className="rounded-full bg-gain-muted px-2 py-0.5 text-[12px] text-gain">
+                  Ascended
+                </span>
+              ) : null}
+              {isHuntedStatus(item.status) ? (
+                <span className="rounded-full bg-loss-muted px-2 py-0.5 text-[12px] text-loss">
+                  Hunted
+                </span>
+              ) : null}
+              {accessLabel ? (
+                <span className="rounded-full bg-warning-muted px-2 py-0.5 text-[12px] text-warning">
+                  {accessLabel}
+                </span>
+              ) : null}
+            </div>
+            <MarkdownBody source={item.body} />
+            {item.author_id === userId ? (
+              <EditBodyForm
+                kind="post"
+                postId={item.id}
+                targetId={item.id}
+                initialBody={item.body}
+                maxLength={20000}
+              />
+            ) : null}
+            {item.unlockQuote ? (
+              <div className="mt-4">
+                <UnlockPostButton
+                  postId={item.id}
+                  access={item.access}
+                  quote={item.unlockQuote}
+                  availableTokens={availableTokens}
+                  layout="block"
+                />
+              </div>
+            ) : null}
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+                <AuthorLink
+                  username={item.author?.username}
+                  displayName={item.author?.display_name}
+                />
+                <span className="text-muted-foreground">
+                  {format(new Date(item.created_at), "d MMM yyyy")}
+                  {item.updated_at !== item.created_at ? " · edited" : ""}
+                </span>
+              </div>
+              <HealthMeter
+                currentHealth={item.current_health}
+                originalStake={item.original_stake}
+                status={item.status}
+              />
+            </div>
+            <div className="mt-4 flex flex-col gap-3">
+              <ReactionBar
+                targetType="post"
+                targetId={item.id}
+                postId={item.id}
+                counts={postReactions[item.id] ?? []}
+                canReact={item.access === "full"}
+              />
+              <PostToolbar
+                postId={item.id}
+                saved={savedIds.has(item.id)}
+                subscribed={subscribed}
+                sharePath={researchPostPath(item.id)}
+              />
+            </div>
+          </div>
         </div>
       </article>
 
@@ -240,6 +281,9 @@ export default async function ResearchPostPage({
         postHunted={isHuntedStatus(item.status)}
         missingTable={thread.missingTable}
         error={thread.error}
+        viewerId={userId}
+        commentReactions={commentReactions}
+        replyReactions={replyReactions}
       />
     </PageFrame>
   );

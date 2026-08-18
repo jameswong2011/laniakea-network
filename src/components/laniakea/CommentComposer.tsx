@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   createComment,
   type ThreadActionState,
 } from "@/app/(dashboard)/feed/[postId]/actions";
+import { ImageAttachButton } from "@/components/laniakea/ImageAttachButton";
 import {
   DEFAULT_COMMENT_STAKE_HP,
   MAX_STAKE_HP,
@@ -12,9 +13,6 @@ import {
 import { COMMENT_BODY_MAX } from "@/types";
 
 const initialState: ThreadActionState = {};
-
-const fieldClassName =
-  "w-full border border-border bg-panel-elevated px-2.5 text-[13px] text-foreground outline-none focus-visible:border-ring";
 
 export function CommentComposer({
   postId,
@@ -28,6 +26,7 @@ export function CommentComposer({
   closedReason?: string;
 }) {
   const [state, action, pending] = useActionState(createComment, initialState);
+  const [body, setBody] = useState("");
   const defaultStake =
     availableHp >= DEFAULT_COMMENT_STAKE_HP
       ? DEFAULT_COMMENT_STAKE_HP
@@ -37,33 +36,35 @@ export function CommentComposer({
     <form
       key={state.stamp ?? "new-comment"}
       action={action}
-      className="flex flex-col gap-2 border-b border-border p-2.5"
+      className="flex flex-col gap-3 border-b border-border p-4"
     >
       <input type="hidden" name="postId" value={postId} />
-      <label className="flex flex-col gap-1">
-        <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-          Stake a comment
-        </span>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[13px] text-muted-foreground">Add a comment</span>
         <textarea
           name="body"
           required
-          rows={3}
+          rows={4}
           maxLength={COMMENT_BODY_MAX}
           disabled={!canStake || pending}
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
           placeholder={
             canStake
-              ? "Thesis, objection, or addendum. Stake HP to post."
+              ? "Thesis, objection, or addendum. Markdown and images are welcome."
               : (closedReason ??
                 "View-only desk. Comments require a matching or lower-tier book.")
           }
-          className={`${fieldClassName} min-h-16 py-2 disabled:opacity-50`}
+          className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-[15px] leading-relaxed text-foreground outline-none focus-visible:border-ring disabled:opacity-50"
         />
       </label>
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex w-[8.5rem] flex-col gap-1">
-          <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-            HP stake
-          </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <ImageAttachButton
+          disabled={!canStake || pending}
+          onInsert={(markdown) => setBody((current) => `${current}${markdown}`)}
+        />
+        <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+          Stake
           <input
             name="stakeHp"
             type="number"
@@ -73,25 +74,20 @@ export function CommentComposer({
             required
             defaultValue={defaultStake}
             disabled={!canStake || pending}
-            className={`${fieldClassName} h-8 font-data disabled:opacity-50`}
+            className="h-8 w-20 rounded-md border border-border bg-background px-2 text-[13px] disabled:opacity-50"
           />
+          HP
         </label>
         <button
           type="submit"
           disabled={!canStake || pending || availableHp < 1}
-          className="h-8 border border-border bg-secondary px-3 text-[12px] font-medium tracking-wide text-foreground hover:bg-muted disabled:opacity-50"
+          className="ml-auto rounded-md bg-secondary px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
         >
-          {pending ? "Staking…" : "Post comment"}
+          {pending ? "Posting…" : "Comment"}
         </button>
-        <p className="font-data text-[10px] text-muted-foreground uppercase">
-          Hunt / ascent same as notes
-        </p>
       </div>
       {state.error ? (
-        <p className="font-data text-[11px] text-loss">{state.error}</p>
-      ) : null}
-      {state.message ? (
-        <p className="font-data text-[11px] text-gain">{state.message}</p>
+        <p className="text-[13px] text-loss">{state.error}</p>
       ) : null}
     </form>
   );

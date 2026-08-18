@@ -1,6 +1,13 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
+import { AuthorLink } from "@/components/laniakea/AuthorLink";
 import { CommentComposer } from "@/components/laniakea/CommentComposer";
+import { EditBodyForm } from "@/components/laniakea/EditBodyForm";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
+import { ReactionBar } from "@/components/laniakea/ReactionBar";
 import { ReplyComposer } from "@/components/laniakea/ReplyComposer";
 import { ReplyLikeButton } from "@/components/laniakea/ReplyLikeButton";
 import { TierBadge } from "@/components/laniakea/TierBadge";
@@ -15,7 +22,10 @@ import {
   COMMENTS_SQL_POLICIES,
   COMMENTS_SQL_TABLES,
 } from "@/lib/research/comments-sql";
+import type { ReactionCount } from "@/lib/research/forum";
 import {
+  COMMENT_BODY_MAX,
+  REPLY_BODY_MAX,
   RESEARCH_POST_STATUS_LIVE,
   type CommentThreadItem,
   type FeedAccess,
@@ -43,6 +53,9 @@ export function CommentThread({
   postHunted,
   missingTable,
   error,
+  viewerId,
+  commentReactions,
+  replyReactions,
 }: {
   postId: string;
   comments: CommentThreadItem[];
@@ -53,21 +66,61 @@ export function CommentThread({
   postHunted?: boolean;
   missingTable: boolean;
   error: string | null;
+  viewerId: string;
+  commentReactions: Record<string, ReactionCount[]>;
+  replyReactions: Record<string, ReactionCount[]>;
 }) {
+  const [sort, setSort] = useState<"top" | "new">("top");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const canWrite = access === "full" && !postHunted;
+
+  const ordered = useMemo(() => {
+    const next = [...comments];
+
+    if (sort === "new") {
+      return next.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
+
+    return next.sort((a, b) => {
+      if (b.current_health !== a.current_health) {
+        return b.current_health - a.current_health;
+      }
+
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+  }, [comments, sort]);
+
   return (
-    <section className="border border-border bg-panel">
-      <header className="flex items-center justify-between border-b border-border bg-surface px-2.5 py-1.5">
-        <h2 className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-          Comments
+    <section className="overflow-hidden rounded-xl border border-border bg-panel">
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <h2 className="text-[16px] font-medium text-foreground">
+          {comments.length} {comments.length === 1 ? "comment" : "comments"}
         </h2>
-        <span className="font-data text-[11px] text-foreground">
-          {comments.length}
-        </span>
+        <div className="flex items-center gap-2 text-[13px]">
+          <button
+            type="button"
+            onClick={() => setSort("top")}
+            className={sort === "top" ? "text-foreground" : "text-muted-foreground"}
+          >
+            Top
+          </button>
+          <span className="text-border">·</span>
+          <button
+            type="button"
+            onClick={() => setSort("new")}
+            className={sort === "new" ? "text-foreground" : "text-muted-foreground"}
+          >
+            New
+          </button>
+        </div>
       </header>
 
       {missingTable ? (
-        <div className="border-b border-border px-2.5 py-2">
-          <p className="text-[12px] text-warning">
+        <div className="border-b border-border px-4 py-3">
+          <p className="text-[13px] text-warning">
             Comments need a one-time schema update. Run part 1, then part 2,
             as two separate queries in the Supabase SQL editor.
           </p>
@@ -82,7 +135,7 @@ export function CommentThread({
         <CommentComposer
           postId={postId}
           availableHp={availableHp}
-          canStake={access === "full" && !postHunted}
+          canStake={canWrite}
           closedReason={
             postHunted
               ? "This post has been hunted. Comments are closed."
@@ -96,121 +149,164 @@ export function CommentThread({
       )}
 
       {error && !missingTable ? (
-        <p className="px-2.5 py-3 font-data text-[12px] text-loss">{error}</p>
+        <p className="px-4 py-3 text-[13px] text-loss">{error}</p>
       ) : null}
 
       {comments.length === 0 && !missingTable && !error ? (
-        <p className="px-2.5 py-4 font-data text-[12px] text-muted-foreground">
+        <p className="px-4 py-6 text-[14px] text-muted-foreground">
           No comments yet. Stake HP to open a position on this note.
         </p>
       ) : null}
 
-      {comments.map((comment) => {
+      {ordered.map((comment) => {
         const state = getPostHealthState(
           comment.current_health,
           comment.original_stake
         );
+        const hidden = collapsed[comment.id];
+        const isAuthor = comment.author_id === viewerId;
 
         return (
           <article
             key={comment.id}
-            className={`border-b border-border border-l-[3px] px-2.5 py-2.5 last:border-b-0 ${healthSurface(state)}`}
+            className={`border-b border-border border-l-2 px-4 py-4 last:border-b-0 ${healthSurface(state)}`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <p className="min-w-0 whitespace-pre-wrap text-[13px] leading-snug text-foreground">
-                {comment.body}
-              </p>
-              <HealthMeter
-                currentHealth={comment.current_health}
-                originalStake={comment.original_stake}
-                status={comment.status}
-              />
-            </div>
-            <div className="mt-2 flex items-end justify-between gap-3">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                {comment.author ? <TierBadge tier={comment.author.tier} /> : null}
-                <span className="font-data text-[12px] text-foreground">
-                  {comment.author?.display_name ?? "Unknown"}
-                </span>
-                <span className="font-data text-[11px] text-muted-foreground">
-                  @{comment.author?.username ?? "—"}
-                </span>
-                <span className="font-data text-[10px] text-muted-foreground">
-                  {format(new Date(comment.created_at), "dd MMM yyyy HH:mm")}
-                </span>
-                {isAscendedStatus(comment.status) ? (
-                  <span className="font-data text-[9px] tracking-[0.12em] text-gain uppercase">
-                    Ascended
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                  {comment.author ? <TierBadge tier={comment.author.tier} /> : null}
+                  <AuthorLink
+                    username={comment.author?.username}
+                    displayName={comment.author?.display_name}
+                  />
+                  <span className="text-muted-foreground">
+                    {format(new Date(comment.created_at), "d MMM yyyy")}
                   </span>
-                ) : null}
-                {isHuntedStatus(comment.status) ? (
-                  <span className="font-data text-[9px] tracking-[0.12em] text-loss uppercase">
-                    Hunted
-                  </span>
-                ) : null}
-                {isRefundedStatus(comment.status) ? (
-                  <span className="font-data text-[9px] tracking-[0.12em] text-muted-foreground uppercase">
-                    Refunded
-                  </span>
-                ) : null}
-              </div>
-              <VoteControls
-                postId={postId}
-                commentId={comment.id}
-                currentVote={viewerVotes[comment.id] ?? null}
-                canVote={
-                  canVote &&
-                  access === "full" &&
-                  !postHunted &&
-                  comment.status === RESEARCH_POST_STATUS_LIVE
-                }
-                availableHp={availableHp}
-                lockReason={
-                  isAscendedStatus(comment.status)
-                    ? "Ascended"
-                    : isHuntedStatus(comment.status)
-                      ? "Hunted"
-                      : isRefundedStatus(comment.status)
-                        ? "Refunded"
-                        : access === "view_only"
-                        ? "View only"
-                        : undefined
-                }
-              />
-            </div>
-
-            <div className="mt-2 flex flex-col gap-2 border-t border-border/70 pt-2 pl-3">
-              {comment.replies.map((reply) => (
-                <div key={reply.id} className="flex flex-col gap-1">
-                  <p className="whitespace-pre-wrap text-[12px] leading-snug text-foreground">
-                    {reply.body}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {reply.author ? (
-                      <TierBadge tier={reply.author.tier} />
-                    ) : null}
-                    <span className="font-data text-[11px] text-foreground">
-                      {reply.author?.display_name ?? "Unknown"}
-                    </span>
-                    <span className="font-data text-[10px] text-muted-foreground">
-                      @{reply.author?.username ?? "—"}
-                    </span>
-                    <span className="font-data text-[10px] text-muted-foreground">
-                      {format(new Date(reply.created_at), "dd MMM yyyy HH:mm")}
-                    </span>
-                    <ReplyLikeButton
-                      postId={postId}
-                      replyId={reply.id}
-                      likeCount={reply.likeCount}
-                      likedByViewer={reply.likedByViewer}
-                    />
-                  </div>
+                  {comment.updated_at !== comment.created_at ? (
+                    <span className="text-muted-foreground">edited</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsed((current) => ({
+                        ...current,
+                        [comment.id]: !hidden,
+                      }))
+                    }
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    {hidden ? "Expand" : "Collapse"}
+                  </button>
                 </div>
-              ))}
-              {access === "full" ? (
-                <ReplyComposer postId={postId} commentId={comment.id} />
-              ) : null}
+                {hidden ? (
+                  <p className="text-[13px] text-muted-foreground">
+                    {comment.replies.length} hidden{" "}
+                    {comment.replies.length === 1 ? "reply" : "replies"}
+                  </p>
+                ) : (
+                  <>
+                    <MarkdownBody source={comment.body} />
+                    {isAuthor ? (
+                      <EditBodyForm
+                        kind="comment"
+                        postId={postId}
+                        targetId={comment.id}
+                        initialBody={comment.body}
+                        maxLength={COMMENT_BODY_MAX}
+                      />
+                    ) : null}
+                  </>
+                )}
+              </div>
+              {hidden ? null : (
+                <HealthMeter
+                  currentHealth={comment.current_health}
+                  originalStake={comment.original_stake}
+                  status={comment.status}
+                />
+              )}
             </div>
+            {hidden ? null : (
+              <>
+                <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                  <ReactionBar
+                    targetType="comment"
+                    targetId={comment.id}
+                    postId={postId}
+                    counts={commentReactions[comment.id] ?? []}
+                    canReact={access === "full"}
+                  />
+                  <VoteControls
+                    postId={postId}
+                    commentId={comment.id}
+                    currentVote={viewerVotes[comment.id] ?? null}
+                    canVote={
+                      canVote &&
+                      canWrite &&
+                      comment.status === RESEARCH_POST_STATUS_LIVE
+                    }
+                    availableHp={availableHp}
+                    lockReason={
+                      isAscendedStatus(comment.status)
+                        ? "Ascended"
+                        : isHuntedStatus(comment.status)
+                          ? "Hunted"
+                          : isRefundedStatus(comment.status)
+                            ? "Refunded"
+                            : access === "view_only"
+                              ? "View only"
+                              : undefined
+                    }
+                  />
+                </div>
+                <div className="mt-4 flex flex-col gap-4 border-l border-border pl-4">
+                  {comment.replies.map((reply) => (
+                    <div key={reply.id} className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                        {reply.author ? (
+                          <TierBadge tier={reply.author.tier} />
+                        ) : null}
+                        <AuthorLink
+                          username={reply.author?.username}
+                          displayName={reply.author?.display_name}
+                        />
+                        <span className="text-muted-foreground">
+                          {format(new Date(reply.created_at), "d MMM yyyy")}
+                        </span>
+                      </div>
+                      <MarkdownBody source={reply.body} />
+                      {reply.author_id === viewerId ? (
+                        <EditBodyForm
+                          kind="reply"
+                          postId={postId}
+                          targetId={reply.id}
+                          initialBody={reply.body}
+                          maxLength={REPLY_BODY_MAX}
+                        />
+                      ) : null}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <ReactionBar
+                          targetType="reply"
+                          targetId={reply.id}
+                          postId={postId}
+                          counts={replyReactions[reply.id] ?? []}
+                          canReact={access === "full"}
+                        />
+                        <ReplyLikeButton
+                          postId={postId}
+                          replyId={reply.id}
+                          likeCount={reply.likeCount}
+                          likedByViewer={reply.likedByViewer}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {access === "full" ? (
+                    <ReplyComposer postId={postId} commentId={comment.id} />
+                  ) : null}
+                </div>
+              </>
+            )}
           </article>
         );
       })}

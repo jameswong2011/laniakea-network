@@ -16,7 +16,7 @@ export function PageFrame({
 }) {
   return (
     <section
-      className={`mx-auto flex w-full ${WIDTH[width]} flex-col gap-3 px-3 py-4`}
+      className={`mx-auto flex w-full ${WIDTH[width]} flex-col gap-5 px-4 py-6`}
     >
       {children}
     </section>
@@ -35,16 +35,16 @@ export function PageHeading({
   meta?: ReactNode;
 }) {
   return (
-    <div className="flex items-end justify-between gap-3 border-b border-border pb-2">
+    <div className="flex items-end justify-between gap-4 pb-1">
       <div className="min-w-0">
-        <p className="font-data text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+        <p className="text-[12px] text-muted-foreground">
           {kicker}
         </p>
-        <h1 className="text-[15px] font-medium tracking-tight text-foreground">
+        <h1 className="mt-1 font-heading text-[28px] leading-tight text-foreground">
           {title}
         </h1>
         {description ? (
-          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -62,7 +62,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <div className={`border border-border bg-panel ${className}`}>{children}</div>
+    <div className={`overflow-hidden rounded-xl border border-border bg-panel ${className}`}>{children}</div>
   );
 }
 
@@ -74,12 +74,12 @@ export function PanelHeader({
   meta?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-border bg-surface px-2.5 py-1.5">
-      <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <span className="text-[14px] font-medium text-foreground">
         {label}
       </span>
       {meta ? (
-        <span className="font-data text-[11px] text-foreground">{meta}</span>
+        <span className="text-[13px] text-muted-foreground">{meta}</span>
       ) : null}
     </div>
   );

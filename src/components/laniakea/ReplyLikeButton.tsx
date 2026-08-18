@@ -31,10 +31,10 @@ export function ReplyLikeButton({
       <button
         type="submit"
         disabled={pending}
-        className={`h-6 border px-2 font-data text-[10px] tracking-[0.12em] uppercase disabled:opacity-50 ${
+        className={`rounded-md px-2 py-0.5 text-[12px] disabled:opacity-50 ${
           likedByViewer
-            ? "border-gain/40 text-gain"
-            : "border-border text-muted-foreground hover:text-foreground"
+            ? "bg-gain-muted text-gain"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
         }`}
       >
         {likedByViewer ? "Liked" : "Like"} {likeCount}

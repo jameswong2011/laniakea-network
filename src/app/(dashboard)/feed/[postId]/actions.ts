@@ -18,6 +18,10 @@ import {
   settleAscendedComment,
   settleHuntedComment,
 } from "@/lib/research/settlement-apply";
+import {
+  notifyCommentOnPost,
+  notifyReplyToComment,
+} from "@/lib/research/forum";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
   COMMENT_BODY_MAX,
@@ -249,6 +253,13 @@ export async function createComment(
       };
     }
   }
+
+  await notifyCommentOnPost(supabase, {
+    actorId: userId,
+    postId,
+    commentId: comment.id,
+    postAuthorId: visible.post.author_id,
+  });
 
   refreshThread(postId);
   return { message: "Comment posted.", stamp: Date.now() };
@@ -507,7 +518,7 @@ export async function createReply(
 
   const { data: comment } = await supabase
     .from("research_comments")
-    .select("id")
+    .select("id, author_id")
     .eq("id", commentId)
     .eq("post_id", postId)
     .maybeSingle();
@@ -530,6 +541,13 @@ export async function createReply(
       stamp: Date.now(),
     };
   }
+
+  await notifyReplyToComment(supabase, {
+    actorId: userId,
+    postId,
+    commentId,
+    commentAuthorId: comment.author_id,
+  });
 
   refreshThread(postId);
   return { message: "Reply posted.", stamp: Date.now() };
