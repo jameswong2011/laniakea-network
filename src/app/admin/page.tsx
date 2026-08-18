@@ -21,7 +21,6 @@ import {
   COMMENTS_SQL_TABLES,
 } from "@/lib/research/comments-sql";
 import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
-import { VOTE_SCALE_SQL } from "@/lib/research/vote-scale-sql";
 import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
 import { getLatestWeeklyRun } from "@/lib/research/weekly";
 import { loadRevenueTotals } from "@/lib/research/invite";
@@ -224,18 +223,6 @@ export default async function AdminPage() {
             {weeklyMaintenanceSql()}
           </pre>
         ) : null}
-      </Panel>
-
-      <Panel>
-        <PanelHeader label="Vote scale" meta="1–5" />
-        <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
-          If Up/Down at conviction 2–5 fails, paste this once in the Supabase
-          SQL editor. The last SELECT must show abs(value) between 1 and 5.
-          Hunt and Ascent math is unchanged.
-        </p>
-        <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-          {VOTE_SCALE_SQL}
-        </pre>
       </Panel>
 
       {settlementReady ? null : (
