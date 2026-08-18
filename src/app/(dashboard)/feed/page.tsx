@@ -54,7 +54,9 @@ export default async function FeedPage({
     <PageFrame>
       <PageHeading
         kicker="Market"
-        title="Research Feed"
+        title={
+          selectedTopics?.length === 1 ? selectedTopics[0] : "Main Feed"
+        }
         description="Open a thread to read, vote, and comment. Lower desks can unlock a higher note with UTL."
         meta={
           <>

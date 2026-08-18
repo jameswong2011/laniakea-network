@@ -48,6 +48,8 @@ export function missingInviteSchemaMessage() {
   return "Invite schema is missing. Run supabase/migrations/20260818123000_invite_referral.sql in the Supabase SQL editor, then refresh.";
 }
 
+export type InviteDeskData = Awaited<ReturnType<typeof loadInviteDesk>>;
+
 export async function loadInviteDesk(
   supabase: SupabaseClient,
   userId: string

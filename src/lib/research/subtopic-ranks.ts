@@ -50,6 +50,33 @@ export async function recordSubtopicParticipation(
   return { error: error?.message ?? null };
 }
 
+export async function getEngagedTopics(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<SubTopic[]> {
+  const { data, error } = await supabase
+    .from("subtopic_ranks")
+    .select("sub_topic, current_hp")
+    .eq("user_id", userId)
+    .order("current_hp", { ascending: false });
+
+  if (error) {
+    return [];
+  }
+
+  const topics: SubTopic[] = [];
+
+  for (const row of data ?? []) {
+    const topic = resolveSubTopic(row.sub_topic as string);
+
+    if (topic && !topics.includes(topic)) {
+      topics.push(topic);
+    }
+  }
+
+  return topics;
+}
+
 export async function getSubtopicRanks(
   supabase: SupabaseClient,
   subTopic?: SubTopic

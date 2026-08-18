@@ -70,6 +70,10 @@ export function feedTopicHref(selected: SubTopic[] | null, toggle: SubTopic) {
   return feedTopicsHref(next);
 }
 
+export function feedSingleTopicHref(topic: SubTopic) {
+  return feedTopicsHref([topic]);
+}
+
 export function feedTopicsHref(selected: SubTopic[]) {
   if (selected.length === 0) {
     return "/feed?topic=";

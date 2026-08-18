@@ -17,13 +17,23 @@ function Field({
   type = "text",
   autoComplete,
   required = true,
+  hint,
+  pattern,
+  title,
+  placeholder,
 }: {
   id: string;
   label: string;
   type?: string;
   autoComplete?: string;
   required?: boolean;
+  hint?: string;
+  pattern?: string;
+  title?: string;
+  placeholder?: string;
 }) {
+  const hintId = hint ? `${id}-hint` : undefined;
+
   return (
     <div className="flex flex-col gap-1">
       <label
@@ -38,8 +48,17 @@ function Field({
         type={type}
         autoComplete={autoComplete}
         required={required}
+        pattern={pattern}
+        title={title}
+        placeholder={placeholder}
+        aria-describedby={hintId}
         className="h-8 w-full border border-border bg-panel-elevated px-2.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring"
       />
+      {hint ? (
+        <p id={hintId} className="font-data text-[10px] text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -53,7 +72,15 @@ export function AuthForm({ mode, inviteCode = "" }: AuthFormProps) {
     <form action={formAction} className="flex flex-col gap-3">
       {isSignup ? (
         <>
-          <Field id="username" label="Username" autoComplete="username" />
+          <Field
+            id="username"
+            label="Username"
+            autoComplete="username"
+            placeholder="vale_hart"
+            pattern="[A-Za-z0-9_]+"
+            title="Username cannot contain spaces. Use letters, numbers, and underscores only."
+            hint="Cannot contain spaces. Letters, numbers, and underscores only."
+          />
           <Field id="displayName" label="Display Name" autoComplete="name" />
         </>
       ) : null}

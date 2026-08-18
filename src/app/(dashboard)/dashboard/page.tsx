@@ -14,7 +14,9 @@ import { requireUser } from "@/lib/auth/session";
 import { format } from "date-fns";
 import { formatHp } from "@/lib/format";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { InviteDesk } from "@/components/laniakea/InviteDesk";
 import { researchPostPath } from "@/lib/research/feed";
+import { loadInviteDesk } from "@/lib/research/invite";
 import {
   getSubtopicRanks,
   topicStandingsForUser,
@@ -28,6 +30,7 @@ export default async function DashboardPage() {
   const { userId, profile, supabase } = await requireUser();
   const { ranks } = await getSubtopicRanks(supabase);
   const standings = topicStandingsForUser(ranks, userId);
+  const inviteDesk = await loadInviteDesk(supabase, userId);
   const authoredWithStake = await supabase
     .from("research_posts")
     .select(
@@ -53,22 +56,14 @@ export default async function DashboardPage() {
       <PageHeading
         kicker="Session"
         title="Account"
-        description="Identity, overall tier, and sub-topic books."
+        description="Identity, invites, overall tier, and sub-topic books."
         meta={
-          <>
-            <Link
-              href="/wallet"
-              className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
-            >
-              Open wallet
-            </Link>
-            <Link
-              href="/invites"
-              className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
-            >
-              Invites
-            </Link>
-          </>
+          <Link
+            href="/wallet"
+            className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
+          >
+            Open wallet
+          </Link>
         }
       />
 
@@ -81,6 +76,10 @@ export default async function DashboardPage() {
               </h2>
               <p className="font-data text-[11px] text-muted-foreground">
                 @{profile.username}
+                {profile.account_code ? ` · ${profile.account_code}` : ""}
+                {profile.registration_path === "invite"
+                  ? " · joined by invite"
+                  : " · public desk"}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
@@ -140,6 +139,12 @@ export default async function DashboardPage() {
           </p>
         </Panel>
       )}
+
+      <InviteDesk
+        desk={inviteDesk}
+        availableTokens={profile?.utility_tokens ?? 0}
+        origin={process.env.NEXT_PUBLIC_SITE_URL ?? ""}
+      />
 
       <Panel>
         <PanelHeader label="Your notes" meta={deskPosts.length} />
