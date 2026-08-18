@@ -1,9 +1,13 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile } from "@/types";
+import { isMissingInviteSchema } from "@/lib/research/invite";
+import type { Profile, RegistrationPath } from "@/types";
 
 const PROFILE_COLUMNS =
+  "id, username, display_name, role, tier, current_hp, utility_tokens, invited_by, account_code, registration_path, is_system, created_at, updated_at";
+
+const PROFILE_COLUMNS_TOKENS =
   "id, username, display_name, role, tier, current_hp, utility_tokens, created_at, updated_at";
 
 const PROFILE_COLUMNS_LEGACY =
@@ -19,12 +23,32 @@ export type AuthenticatedContext = AuthContext & {
   userId: string;
 };
 
-function asProfile(
-  row: Omit<Profile, "utility_tokens"> & { utility_tokens?: number | null }
-): Profile {
+type ProfileRow = Omit<
+  Profile,
+  | "utility_tokens"
+  | "invited_by"
+  | "account_code"
+  | "registration_path"
+  | "is_system"
+> & {
+  utility_tokens?: number | null;
+  invited_by?: string | null;
+  account_code?: string | null;
+  registration_path?: string | null;
+  is_system?: boolean | null;
+};
+
+function asProfile(row: ProfileRow): Profile {
+  const path: RegistrationPath =
+    row.registration_path === "invite" ? "invite" : "public";
+
   return {
     ...row,
     utility_tokens: row.utility_tokens ?? 0,
+    invited_by: row.invited_by ?? null,
+    account_code: row.account_code ?? null,
+    registration_path: path,
+    is_system: row.is_system ?? false,
   };
 }
 
@@ -32,18 +56,29 @@ async function loadProfile(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string
 ): Promise<Profile | null> {
-  const withTokens = await supabase
+  const withInvite = await supabase
     .from("profiles")
     .select(PROFILE_COLUMNS)
     .eq("id", userId)
     .maybeSingle();
 
+  if (!withInvite.error) {
+    return withInvite.data ? asProfile(withInvite.data as ProfileRow) : null;
+  }
+
+  const withTokens = withInvite.error.message.includes("invited_by")
+    || withInvite.error.message.includes("account_code")
+    || withInvite.error.message.includes("registration_path")
+    || withInvite.error.message.includes("is_system")
+    ? await supabase
+        .from("profiles")
+        .select(PROFILE_COLUMNS_TOKENS)
+        .eq("id", userId)
+        .maybeSingle()
+    : withInvite;
+
   if (!withTokens.error) {
-    return withTokens.data
-      ? asProfile(withTokens.data as Omit<Profile, "utility_tokens"> & {
-          utility_tokens?: number | null;
-        })
-      : null;
+    return withTokens.data ? asProfile(withTokens.data as ProfileRow) : null;
   }
 
   if (!withTokens.error.message.includes("utility_tokens")) {
@@ -56,9 +91,30 @@ async function loadProfile(
     .eq("id", userId)
     .maybeSingle();
 
-  return legacy.data
-    ? asProfile(legacy.data as Omit<Profile, "utility_tokens">)
-    : null;
+  return legacy.data ? asProfile(legacy.data as ProfileRow) : null;
+}
+
+async function provisionInviteDesk(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  profile: Profile | null
+) {
+  if (!profile || profile.account_code) {
+    return profile;
+  }
+
+  const { error } = await supabase.rpc("finalize_signup", {
+    p_invite_code: null,
+  });
+
+  if (error && !isMissingInviteSchema(error.message)) {
+    return profile;
+  }
+
+  if (error) {
+    return profile;
+  }
+
+  return (await loadProfile(supabase, profile.id)) ?? profile;
 }
 
 export const getAuthContext = cache(async (): Promise<AuthContext> => {
@@ -70,11 +126,12 @@ export const getAuthContext = cache(async (): Promise<AuthContext> => {
     return { supabase, userId: null, profile: null };
   }
 
-  return {
+  const profile = await provisionInviteDesk(
     supabase,
-    userId,
-    profile: await loadProfile(supabase, userId),
-  };
+    await loadProfile(supabase, userId)
+  );
+
+  return { supabase, userId, profile };
 });
 
 export async function requireUser(): Promise<AuthenticatedContext> {

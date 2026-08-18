@@ -6,6 +6,7 @@ import { login, signup, type AuthFormState } from "@/lib/auth/actions";
 
 type AuthFormProps = {
   mode: "login" | "signup";
+  inviteCode?: string;
 };
 
 const initialState: AuthFormState = {};
@@ -43,7 +44,7 @@ function Field({
   );
 }
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode, inviteCode = "" }: AuthFormProps) {
   const action = mode === "login" ? login : signup;
   const [state, formAction, pending] = useActionState(action, initialState);
   const isSignup = mode === "signup";
@@ -68,6 +69,28 @@ export function AuthForm({ mode }: AuthFormProps) {
         type="password"
         autoComplete={isSignup ? "new-password" : "current-password"}
       />
+      {isSignup ? (
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="inviteCode"
+            className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
+          >
+            Invite code
+          </label>
+          <input
+            id="inviteCode"
+            name="inviteCode"
+            defaultValue={inviteCode}
+            placeholder="LANI-XXXX-XXXX"
+            autoComplete="off"
+            className="h-8 w-full border border-border bg-panel-elevated px-2.5 font-data text-[13px] text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring"
+          />
+          <p className="font-data text-[10px] text-muted-foreground">
+            Optional. Public signup starts Bronze. A valid code starts you on
+            the inviter’s desk.
+          </p>
+        </div>
+      ) : null}
 
       {state.error ? (
         <p className="font-data text-[11px] text-loss">{state.error}</p>

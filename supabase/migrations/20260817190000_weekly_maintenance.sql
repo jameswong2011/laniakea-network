@@ -87,6 +87,7 @@ begin
         current_hp,
         count(*) over () as n
       from public.profiles
+      where id <> '00000000-0000-4000-8000-000000000001'
     ),
     prepared as (
       select
@@ -303,6 +304,7 @@ begin
     least(3, current_hp)
   from public.profiles
   where role is distinct from 'admin'
+    and id <> '00000000-0000-4000-8000-000000000001'
     and current_hp > 0;
 
   update public.profiles p

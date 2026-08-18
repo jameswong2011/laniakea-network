@@ -27,4 +27,17 @@ export const WEEKLY_CRON_SCHEDULE = "0 8 * * 1";
 export const WEEKLY_CRON_LABEL = "Monday 08:00 UTC";
 export const HP_PER_UTILITY_TOKEN = 10;
 export const DEFAULT_UTILITY_TOKENS = 100;
+export const BUY_HP_CAP = STARTING_HP;
+
+/** Whole HP Bronze can still buy without going above the restore cap. */
+export function maxBuyableHp(currentHp: number) {
+  return Math.max(0, BUY_HP_CAP - currentHp);
+}
+
+/** UTL Bronze can spend (1 UTL = 10 HP) without exceeding the restore cap. */
+export function maxBuyHpTokens(currentHp: number) {
+  return Math.floor(maxBuyableHp(currentHp) / HP_PER_UTILITY_TOKEN);
+}
+
 export const MASTERS_CASHOUT_RESERVE_HP = 50;
+export { INVITE_PURCHASE_UTL, SIGNUP_INVITE_GRANT } from "@/lib/research/referral";

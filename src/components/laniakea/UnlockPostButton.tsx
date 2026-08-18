@@ -42,8 +42,8 @@ export function UnlockPostButton({
       {layout === "block" ? (
         <p className="text-[12px] leading-relaxed text-muted-foreground">
           {label}. {quote.tokens} UTL at {quote.multiple}× the {quote.baseTokens}{" "}
-          UTL base. {quote.authorShare} UTL to the author, {quote.burned} UTL
-          burned.
+          UTL base. {quote.authorShare} UTL to the author. The residual is
+          split up the invite tree; the rest is burned.
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">

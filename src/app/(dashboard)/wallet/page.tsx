@@ -14,6 +14,7 @@ import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { requireUser } from "@/lib/auth/session";
 import { formatSignedHp } from "@/lib/format";
 import { canBuyHp, canCashOutHp } from "@/lib/research/access";
+import { BUY_HP_CAP } from "@/lib/research/economy";
 import { probeUtilityTokenColumn, UTILITY_TOKEN_SQL } from "@/lib/research/tokens";
 import { researchPostPath } from "@/lib/research/feed";
 import { getWalletLedger } from "@/lib/research/wallet";
@@ -70,7 +71,7 @@ export default async function WalletPage() {
       <Panel>
         <PanelHeader
           label={showCashout ? "Cash out HP" : "Buy HP"}
-          meta={showCashout ? "Masters desk" : "Below Masters"}
+          meta={showCashout ? "Masters desk" : `Bronze · restore to ${BUY_HP_CAP}`}
         />
         {showBuy || showCashout ? (
           <TokenDesk
@@ -81,7 +82,8 @@ export default async function WalletPage() {
           />
         ) : (
           <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
-            Conversion is unavailable for this account.
+            Buy HP is Bronze only, and only restores overall HP up to {BUY_HP_CAP}.
+            Masters can cash out.
           </p>
         )}
       </Panel>

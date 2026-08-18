@@ -57,6 +57,10 @@ export const HP_RULES = [
   { label: "Weekly drain", value: `${PASSIVE_DRAIN_HP} HP` },
   { label: "Calibration reset", value: `${STARTING_HP} HP` },
   {
+    label: "Buy HP",
+    value: `Bronze only · restore to ${STARTING_HP}`,
+  },
+  {
     label: "Desk unlock",
     value: "1 / 5 / 25 / 200 UTL · 1–5× · 75% author",
   },

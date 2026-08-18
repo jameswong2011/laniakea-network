@@ -62,7 +62,7 @@ export function splitUnlockProceeds(tokens: number) {
 
   const authorShare = Math.min(
     tokens,
-    Math.max(0, Math.round((tokens * UNLOCK_AUTHOR_SHARE_PCT) / 100))
+    Math.max(0, Math.floor((tokens * UNLOCK_AUTHOR_SHARE_PCT) / 100))
   );
 
   return { authorShare, burned: tokens - authorShare };

@@ -12,7 +12,7 @@ export function nextTier(tier: Tier): Tier | null {
 }
 
 export function canBuyHp(tier: Tier) {
-  return tier !== "Masters";
+  return tier === "Bronze";
 }
 
 export function canCashOutHp(tier: Tier) {

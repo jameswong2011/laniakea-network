@@ -7,8 +7,10 @@ import {
   type WalletActionState,
 } from "@/app/(dashboard)/wallet/actions";
 import {
+  BUY_HP_CAP,
   HP_PER_UTILITY_TOKEN,
   MASTERS_CASHOUT_RESERVE_HP,
+  maxBuyHpTokens,
 } from "@/lib/research/economy";
 
 const initialState: WalletActionState = {};
@@ -34,13 +36,18 @@ export function TokenDesk({
     Math.floor((availableHp - MASTERS_CASHOUT_RESERVE_HP) / HP_PER_UTILITY_TOKEN) *
       HP_PER_UTILITY_TOKEN
   );
+  const maxBuyTokens = Math.min(availableTokens, maxBuyHpTokens(availableHp));
   const blockedReason = !schemaReady
     ? "Token column is missing. Run the SQL above, then refresh."
-    : mode === "buy" && availableTokens < 1
-      ? "Need at least 1 UTL."
-      : mode === "cashout" && maxCashout < HP_PER_UTILITY_TOKEN
-        ? `Need ${HP_PER_UTILITY_TOKEN + MASTERS_CASHOUT_RESERVE_HP} HP to cash out.`
-        : null;
+    : mode === "buy" && maxBuyHpTokens(availableHp) < 1
+      ? availableHp >= BUY_HP_CAP
+        ? `Already at ${BUY_HP_CAP} HP. Bronze can only restore up to that cap.`
+        : `Not enough room under ${BUY_HP_CAP} HP. Purchases are ${HP_PER_UTILITY_TOKEN} HP each.`
+      : mode === "buy" && availableTokens < 1
+        ? "Need at least 1 UTL."
+        : mode === "cashout" && maxCashout < HP_PER_UTILITY_TOKEN
+          ? `Need ${HP_PER_UTILITY_TOKEN + MASTERS_CASHOUT_RESERVE_HP} HP to cash out.`
+          : null;
 
   return (
     <form
@@ -51,7 +58,12 @@ export function TokenDesk({
       {mode === "buy" ? (
         <>
           <p className="text-[12px] text-muted-foreground">
-            1 UTL buys {HP_PER_UTILITY_TOKEN} HP. Mock conversion only.
+            1 UTL buys {HP_PER_UTILITY_TOKEN} HP. Bronze only, and only to
+            restore overall HP up to {BUY_HP_CAP}. That UTL spend shares residual
+            up the invite tree; the rest is burned.
+            {maxBuyTokens > 0
+              ? ` Room for ${maxBuyTokens} UTL (${maxBuyTokens * HP_PER_UTILITY_TOKEN} HP).`
+              : ""}
           </p>
           <label className="flex max-w-[12rem] flex-col gap-1">
             <span className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
@@ -61,7 +73,7 @@ export function TokenDesk({
               name="tokens"
               type="number"
               min={1}
-              max={Math.max(availableTokens, 1)}
+              max={Math.max(maxBuyTokens, 1)}
               step={1}
               required
               defaultValue={1}

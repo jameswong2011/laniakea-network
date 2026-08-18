@@ -125,6 +125,8 @@ export function resolveSubTopic(
   );
 }
 
+export type RegistrationPath = "public" | "invite";
+
 export type Profile = {
   id: string;
   username: string;
@@ -133,6 +135,10 @@ export type Profile = {
   tier: Tier;
   current_hp: number;
   utility_tokens: number;
+  invited_by: string | null;
+  account_code: string | null;
+  registration_path: RegistrationPath;
+  is_system: boolean;
   created_at: string;
   updated_at: string;
 };

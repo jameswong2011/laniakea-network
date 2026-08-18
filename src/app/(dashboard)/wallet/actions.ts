@@ -5,10 +5,13 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { canBuyHp, canCashOutHp } from "@/lib/research/access";
 import {
+  BUY_HP_CAP,
   HP_PER_UTILITY_TOKEN,
   MASTERS_CASHOUT_RESERVE_HP,
+  maxBuyHpTokens,
 } from "@/lib/research/economy";
 import { applyWalletMove } from "@/lib/research/hp";
+import { isMissingInviteSchema } from "@/lib/research/invite";
 import { isMissingUtilityTokenColumn, missingUtilityTokenMessage } from "@/lib/research/tokens";
 import { HP_TRANSACTION_BUY, HP_TRANSACTION_CASHOUT, resolveTier } from "@/types";
 
@@ -48,7 +51,7 @@ export async function buyHp(
 
   if (!tier || !canBuyHp(tier)) {
     return {
-      error: "Buy HP is available below Masters.",
+      error: "Buy HP is available to Bronze only.",
       stamp: Date.now(),
     };
   }
@@ -64,6 +67,50 @@ export async function buyHp(
 
   const tokens = parsed.data.tokens;
   const hp = tokens * HP_PER_UTILITY_TOKEN;
+  const room = maxBuyHpTokens(profile?.current_hp ?? 0);
+
+  if (room < 1) {
+    return {
+      error:
+        (profile?.current_hp ?? 0) >= BUY_HP_CAP
+          ? `Already at ${BUY_HP_CAP} HP. Bronze can only restore up to that cap.`
+          : `Not enough room under ${BUY_HP_CAP} HP. Purchases are ${HP_PER_UTILITY_TOKEN} HP each.`,
+      stamp: Date.now(),
+    };
+  }
+
+  if (tokens > room) {
+    return {
+      error: `Bronze can restore up to ${BUY_HP_CAP} HP. Room for ${room} UTL (${room * HP_PER_UTILITY_TOKEN} HP).`,
+      stamp: Date.now(),
+    };
+  }
+  const referred = await supabase.rpc("buy_hp_with_referral", {
+    p_tokens: tokens,
+  });
+
+  if (!referred.error) {
+    const receipt =
+      referred.data && typeof referred.data === "object"
+        ? (referred.data as { currentHp?: number; utilityTokens?: number })
+        : null;
+    refreshWallet();
+    return {
+      message: `Bought ${hp} HP for ${tokens} UTL. Balance ${receipt?.currentHp ?? "—"} HP / ${receipt?.utilityTokens ?? "—"} UTL.`,
+      stamp: Date.now(),
+    };
+  }
+
+  if (!isMissingInviteSchema(referred.error.message)
+    && !referred.error.message.includes("buy_hp_with_referral")) {
+    return {
+      error: referred.error.message
+        .replace(/^ERROR:\s*/i, "")
+        .replace(/\s+CONTEXT:[\s\S]*$/, ""),
+      stamp: Date.now(),
+    };
+  }
+
   const move = await applyWalletMove(supabase, userId, {
     hpDelta: hp,
     tokenDelta: -tokens,

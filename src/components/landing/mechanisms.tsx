@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { HP_RULES, LAYERS } from "@/lib/landing";
+import { STARTING_HP } from "@/lib/research/economy";
 
 export function Layers() {
   return (
@@ -39,8 +40,8 @@ export function HpEconomy() {
             HP is inventory. Not a score. Not a badge.
           </h2>
           <p className="mt-5 max-w-md text-muted">
-            You buy it with mock tokens — no real payments. Below Masters you
-            convert tokens to HP. Masters can cash out. You stake it on a
+            You buy it with mock tokens — no real payments. Bronze can restore
+            HP up to {STARTING_HP}. Masters can cash out. You stake it on a
             thesis, spend it to vote, and lose it when the room is against
             you.
           </p>

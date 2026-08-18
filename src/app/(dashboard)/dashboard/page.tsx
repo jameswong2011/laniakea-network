@@ -55,12 +55,20 @@ export default async function DashboardPage() {
         title="Account"
         description="Identity, overall tier, and sub-topic books."
         meta={
-          <Link
-            href="/wallet"
-            className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
-          >
-            Open wallet
-          </Link>
+          <>
+            <Link
+              href="/wallet"
+              className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
+            >
+              Open wallet
+            </Link>
+            <Link
+              href="/invites"
+              className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
+            >
+              Invites
+            </Link>
+          </>
         }
       />
 

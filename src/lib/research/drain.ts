@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PASSIVE_DRAIN_HP } from "@/lib/research/economy";
+import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
 import { HP_TRANSACTION_DRAIN } from "@/types";
 
@@ -12,10 +13,18 @@ export type DrainResult = {
 export async function runPassiveDrain(
   supabase: SupabaseClient
 ): Promise<DrainResult> {
-  const { data, error } = await supabase
+  const withSystem = await supabase
     .from("profiles")
-    .select("id, role, current_hp")
+    .select("id, role, current_hp, is_system")
     .neq("role", "admin");
+
+  const { data, error } =
+    withSystem.error && withSystem.error.message.includes("is_system")
+      ? await supabase
+          .from("profiles")
+          .select("id, role, current_hp")
+          .neq("role", "admin")
+      : withSystem;
 
   if (error) {
     return { drained: 0, skipped: 0, error: error.message };
@@ -25,6 +34,14 @@ export async function runPassiveDrain(
   let skipped = 0;
 
   for (const profile of data ?? []) {
+    if (
+      profile.id === TREASURY_PROFILE_ID ||
+      ("is_system" in profile && profile.is_system)
+    ) {
+      skipped += 1;
+      continue;
+    }
+
     if (profile.current_hp <= 0) {
       skipped += 1;
       continue;

@@ -46,10 +46,12 @@ export default async function RankingPage({
     .order("current_hp", { ascending: false })
     .order("username", { ascending: true });
 
-  const profiles = (data ?? []) as Pick<
-    Profile,
-    "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
-  >[];
+  const profiles = (
+    (data ?? []) as Pick<
+      Profile,
+      "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
+    >[]
+  ).filter((row) => row.username !== "laniakea_treasury");
   const profilesById = new Map(profiles.map((row) => [row.id, row]));
   const isAdmin = profile?.role === "admin";
   const { ranks: allTopicRanks } = await getSubtopicRanks(supabase);

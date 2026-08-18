@@ -190,9 +190,47 @@ export async function applyWalletMove(
     return { ok: false, error: "Wallet changed. Try again." };
   }
 
+  if (move.tokenDelta !== 0) {
+    await recordUtilityLedger(
+      supabase,
+      userId,
+      Math.abs(move.tokenDelta),
+      move.tokenDelta > 0 ? "credit" : "debit",
+      move.tokenDelta > 0 ? "cashout" : "buy_hp"
+    );
+  }
+
   return {
     ok: true,
     currentHp: updated.current_hp,
     utilityTokens: updated.utility_tokens,
   };
+}
+
+async function recordUtilityLedger(
+  supabase: SupabaseClient,
+  userId: string,
+  amount: number,
+  direction: "credit" | "debit",
+  reason: string
+) {
+  if (amount <= 0) {
+    return;
+  }
+
+  const { error } = await supabase.from("token_ledger").insert({
+    user_id: userId,
+    amount,
+    direction,
+    reason,
+    metadata: { source: "wallet" },
+  });
+
+  if (
+    error &&
+    !error.message.includes("token_ledger") &&
+    !error.message.includes("42P01")
+  ) {
+    console.error(error.message);
+  }
 }

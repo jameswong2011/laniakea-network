@@ -3,6 +3,14 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { STARTING_HP } from "@/lib/research/economy";
+import {
+  isMissingInviteSchema,
+  missingInviteSchemaMessage,
+} from "@/lib/research/invite";
+import {
+  isInviteCodeFormat,
+  normalizeInviteCode,
+} from "@/lib/research/referral";
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthFormState = {
@@ -27,6 +35,14 @@ const signupSchema = z.object({
     .string()
     .min(2, "Display name must be at least 2 characters.")
     .max(48, "Display name must be 48 characters or fewer."),
+  inviteCode: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? normalizeInviteCode(value) : ""))
+    .refine((value) => value === "" || isInviteCodeFormat(value), {
+      message: "Invite code must look like LANI-XXXX-XXXX.",
+    }),
 });
 
 function firstIssue(error: z.ZodError) {
@@ -65,14 +81,35 @@ export async function signup(
     password: formData.get("password"),
     username: formData.get("username"),
     displayName: formData.get("displayName"),
+    inviteCode: formData.get("inviteCode") ?? "",
   });
 
   if (!parsed.success) {
     return { error: firstIssue(parsed.error) };
   }
 
-  const { email, password, username, displayName } = parsed.data;
+  const { email, password, username, displayName, inviteCode } = parsed.data;
   const supabase = await createClient();
+
+  if (inviteCode) {
+    const preview = await supabase.rpc("preview_invite_code", {
+      p_code: inviteCode,
+    });
+
+    if (preview.error && isMissingInviteSchema(preview.error.message)) {
+      return { error: missingInviteSchemaMessage() };
+    }
+
+    const previewRow =
+      preview.data && typeof preview.data === "object"
+        ? (preview.data as { ok?: boolean })
+        : null;
+
+    if (!previewRow?.ok) {
+      return { error: "Invite code is invalid or already used." };
+    }
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -80,6 +117,7 @@ export async function signup(
       data: {
         username,
         display_name: displayName,
+        invite_code: inviteCode || null,
       },
     },
   });
@@ -99,9 +137,21 @@ export async function signup(
       .eq("id", data.user.id);
   }
 
+  if (data.session) {
+    const provisioned = await supabase.rpc("finalize_signup", {
+      p_invite_code: inviteCode || null,
+    });
+
+    if (provisioned.error && !isMissingInviteSchema(provisioned.error.message)) {
+      return { error: provisioned.error.message.replace(/^ERROR:\s*/i, "") };
+    }
+  }
+
   if (!data.session) {
     return {
-      message: "Account created. Confirm your email before signing in.",
+      message: inviteCode
+        ? "Account created. Confirm your email before signing in. Your invite will apply on first login."
+        : "Account created. Confirm your email before signing in.",
     };
   }
 

@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/feed", label: "Feed" },
   { href: "/ranking", label: "Ranking" },
   { href: "/wallet", label: "Wallet" },
+  { href: "/invites", label: "Invites" },
   { href: "/dashboard", label: "Account" },
 ] as const;
 

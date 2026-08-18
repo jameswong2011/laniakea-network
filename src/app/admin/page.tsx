@@ -23,9 +23,11 @@ import {
 import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
 import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
 import { getLatestWeeklyRun } from "@/lib/research/weekly";
+import { loadRevenueTotals } from "@/lib/research/invite";
+import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
 import { requireAdmin } from "@/lib/auth/session";
 import { resolveTier, type Profile } from "@/types";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -38,10 +40,16 @@ export default async function AdminPage() {
     .select("id, username, display_name, role, tier, current_hp")
     .order("username", { ascending: true });
 
-  const profiles = (data ?? []) as Pick<
-    Profile,
-    "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
-  >[];
+  const profiles = (
+    (data ?? []) as Pick<
+      Profile,
+      "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
+    >[]
+  ).filter(
+    (profile) =>
+      profile.id !== TREASURY_PROFILE_ID &&
+      profile.username !== "laniakea_treasury"
+  );
 
   const demoUsernames = new Set(DEMO_USERS.map((user) => user.username));
   const demoProfiles = profiles.filter((profile) =>
@@ -52,6 +60,12 @@ export default async function AdminPage() {
     demoProfiles.every((profile) => resolveTier(profile.tier) === "Bronze");
 
   const weekly = await getLatestWeeklyRun(supabase);
+  const now = new Date();
+  const revenue7d = await loadRevenueTotals(supabase, subDays(now, 7).toISOString());
+  const revenue30d = await loadRevenueTotals(
+    supabase,
+    subDays(now, 30).toISOString()
+  );
   const stakeProbe = await supabase
     .from("research_posts")
     .select("original_stake")
@@ -121,6 +135,51 @@ export default async function AdminPage() {
             {DEMO_SEED_WRITE_SQL}
           </pre>
         ) : null}
+      </Panel>
+
+      <Panel>
+        <PanelHeader label="UTL residual" meta="7d / 30d" />
+        {revenue7d.error ? (
+          <p className="px-2.5 py-2 font-data text-[12px] text-muted-foreground">
+            {revenue7d.error}
+          </p>
+        ) : (
+          <dl className="grid grid-cols-2 divide-x divide-border md:grid-cols-4">
+            <div className="px-2.5 py-2.5">
+              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+                Creator share
+              </dt>
+              <dd className="mt-1 font-data text-[13px] text-foreground">
+                {revenue7d.creatorShare} / {revenue30d.creatorShare}
+              </dd>
+            </div>
+            <div className="px-2.5 py-2.5">
+              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+                Referral pool
+              </dt>
+              <dd className="mt-1 font-data text-[13px] text-foreground">
+                {revenue7d.referralPool} / {revenue30d.referralPool}
+              </dd>
+            </div>
+            <div className="px-2.5 py-2.5">
+              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+                Platform burn
+              </dt>
+              <dd className="mt-1 font-data text-[13px] text-foreground">
+                {revenue7d.platformBurn + revenue7d.dust} /{" "}
+                {revenue30d.platformBurn + revenue30d.dust}
+              </dd>
+            </div>
+            <div className="px-2.5 py-2.5">
+              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+                Events
+              </dt>
+              <dd className="mt-1 font-data text-[13px] text-foreground">
+                {revenue7d.events} / {revenue30d.events}
+              </dd>
+            </div>
+          </dl>
+        )}
       </Panel>
 
       <Panel>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STARTING_HP } from "@/lib/research/economy";
+import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
 import { getSubtopicRanks } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_CALIBRATION,
@@ -245,18 +246,30 @@ export function summarizeCalibration(moves: CalibrationMove[]) {
 }
 
 export async function runFullCalibration(supabase: SupabaseClient) {
-  const { data, error } = await supabase
+  const withSystem = await supabase
     .from("profiles")
-    .select("id, username, tier, current_hp");
+    .select("id, username, tier, current_hp, is_system")
+    .neq("id", TREASURY_PROFILE_ID);
+
+  const { data, error } =
+    withSystem.error && withSystem.error.message.includes("is_system")
+      ? await supabase
+          .from("profiles")
+          .select("id, username, tier, current_hp")
+          .neq("id", TREASURY_PROFILE_ID)
+      : withSystem;
 
   if (error) {
     return { moves: [] as CalibrationMove[], error: error.message };
   }
 
-  const profiles = (data ?? []) as Pick<
-    Profile,
-    "id" | "username" | "tier" | "current_hp"
-  >[];
+  const profiles = ((data ?? []) as Array<
+    Pick<Profile, "id" | "username" | "tier" | "current_hp"> & {
+      is_system?: boolean | null;
+    }
+  >).filter(
+    (profile) => profile.id !== TREASURY_PROFILE_ID && !profile.is_system
+  );
   const usernames = new Map(
     profiles.map((profile) => [profile.id, profile.username])
   );
