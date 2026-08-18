@@ -12,6 +12,15 @@ import {
   ascentMultiplier,
   huntMultiplier,
 } from "@/lib/research/settlement";
+import {
+  INVITE_PURCHASE_UTL,
+  REFERRAL_MAX_DEPTH,
+  SIGNUP_INVITE_GRANT,
+  UNLOCK_CREATOR_SHARE_PCT,
+  splitResidual,
+  unlockCreatorShare,
+  walkReferralKeeps,
+} from "@/lib/research/referral";
 import { SUB_TOPICS, VOTE_STRENGTH_MAX, VOTE_STRENGTH_MIN } from "@/types";
 
 export const LANIAKEA_PRONUNCIATION = "lah-nee-ah-KAY-ah";
@@ -85,6 +94,55 @@ export const HP_RULES = [
     value: `${SUB_TOPICS.length} books, overall plus per sector`,
   },
 ] as const;
+
+export const REFERRAL_STEPS = [
+  {
+    title: "A code starts the line",
+    body: `Public signup starts Bronze. An invite snapshots the inviter’s overall tier at redeem and does not follow them later. Every desk gets ${SIGNUP_INVITE_GRANT} codes. Members buy extras for ${INVITE_PURCHASE_UTL} UTL. Elite desks mint without a cap.`,
+  },
+  {
+    title: "Only UTL spends feed the chain",
+    body: `Unlock a note, buy a code, or restore HP. Publish, vote, comment, and the weekly drain stay HP — they do not pay anyone upline. Cash-out credits UTL, so it does not split either.`,
+  },
+  {
+    title: "The poster takes first, then the leftover halves",
+    body: `Unlocks send ${UNLOCK_CREATOR_SHARE_PCT}% to the author. Buying a code or restoring HP has no creator. Half of what remains is the referral pool. The other half burns. The odd token burns.`,
+  },
+  {
+    title: "Each ancestor keeps half of what reaches them",
+    body: `The walk climbs invited-by, ${REFERRAL_MAX_DEPTH} desks max, no cycles. Keep half, pass the rest. The odd token moves up. Whatever is left at the top of the chain or past depth ${REFERRAL_MAX_DEPTH} is dust. The last desk does not keep the remainder.`,
+  },
+] as const;
+
+const WORKED_REFERRAL_CHAIN = ["C", "B", "A"] as const;
+
+function quoteReferralSpend(gross: number, creatorShare: number) {
+  const residual = Math.max(0, gross - creatorShare);
+  const { referralPool, platformBurn } = splitResidual(residual);
+  const { keeps, dust } = walkReferralKeeps(
+    [...WORKED_REFERRAL_CHAIN],
+    referralPool
+  );
+
+  return {
+    gross,
+    creatorShare,
+    residual,
+    referralPool,
+    platformBurn,
+    dust,
+    keeps: keeps.map((row) => ({
+      desk: WORKED_REFERRAL_CHAIN[row.depth - 1] ?? `D${row.depth}`,
+      amount: row.amount,
+    })),
+  };
+}
+
+export const WORKED_INVITE_REFERRAL = quoteReferralSpend(INVITE_PURCHASE_UTL, 0);
+export const WORKED_UNLOCK_REFERRAL = quoteReferralSpend(
+  100,
+  unlockCreatorShare(100)
+);
 
 export const WORKED_STAKE = 100;
 export const WORKED_CONVICTION = 5;

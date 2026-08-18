@@ -6,6 +6,7 @@ import { Hero } from "@/components/landing/hero";
 import { HuntAscent } from "@/components/landing/hunt-ascent";
 import { Close, Rulebook } from "@/components/landing/mechanisms";
 import { Mission } from "@/components/landing/mission";
+import { Referral } from "@/components/landing/referral";
 import { getAuthContext } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default async function LandingPage() {
         <Floor />
         <HuntAscent />
         <Rulebook />
+        <Referral />
         <Close />
       </main>
       <LandingFooter />

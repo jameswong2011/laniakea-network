@@ -59,6 +59,12 @@ export function LandingHeader({
         >
           Arena
         </a>
+        <a
+          href="#chain"
+          className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
+        >
+          Chain
+        </a>
       </nav>
 
       {isSignedIn ? (
