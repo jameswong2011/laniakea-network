@@ -708,11 +708,23 @@ set search_path = public
 as $$
 declare
   v_user uuid := auth.uid();
+  v_role text;
   v_receipt jsonb;
   v_code text;
 begin
   if v_user is null then
     raise exception 'Not authenticated';
+  end if;
+
+  select role into v_role from public.profiles where id = v_user;
+
+  v_code := public.generate_lani_invite_code();
+
+  if v_role in ('elite', 'admin') then
+    insert into public.invite_codes (code, owner_id, minted_how)
+    values (v_code, v_user, 'signup_grant');
+
+    return jsonb_build_object('code', v_code, 'free', true);
   end if;
 
   v_receipt := public.spend_with_referral_internal(
@@ -725,12 +737,10 @@ begin
     'buy_invite:' || v_user::text || ':' || gen_random_uuid()::text
   );
 
-  v_code := public.generate_lani_invite_code();
-
   insert into public.invite_codes (code, owner_id, minted_how)
   values (v_code, v_user, 'token_purchase');
 
-  return v_receipt || jsonb_build_object('code', v_code);
+  return v_receipt || jsonb_build_object('code', v_code, 'free', false);
 end;
 $$;
 
@@ -1049,4 +1059,51 @@ grant execute on function public.preview_invite_code(text) to anon;
 grant execute on function public.buy_invite_code() to authenticated;
 grant execute on function public.buy_hp_with_referral(integer) to authenticated;
 grant execute on function public.purchase_post_unlock(uuid) to authenticated;
+`;
+
+/** Live DBs already have the invite schema. Paste this to unlock elite/admin free mints. */
+export const ELITE_UNLIMITED_INVITE_SQL = `
+create or replace function public.buy_invite_code()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_role text;
+  v_receipt jsonb;
+  v_code text;
+begin
+  if v_user is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select role into v_role from public.profiles where id = v_user;
+
+  v_code := public.generate_lani_invite_code();
+
+  if v_role in ('elite', 'admin') then
+    insert into public.invite_codes (code, owner_id, minted_how)
+    values (v_code, v_user, 'signup_grant');
+
+    return jsonb_build_object('code', v_code, 'free', true);
+  end if;
+
+  v_receipt := public.spend_with_referral_internal(
+    v_user,
+    'buy_invite',
+    100,
+    null,
+    'invite_code',
+    null,
+    'buy_invite:' || v_user::text || ':' || gen_random_uuid()::text
+  );
+
+  insert into public.invite_codes (code, owner_id, minted_how)
+  values (v_code, v_user, 'token_purchase');
+
+  return v_receipt || jsonb_build_object('code', v_code, 'free', false);
+end;
+$$;
 `;

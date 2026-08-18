@@ -19,7 +19,7 @@ import { BioEditor } from "@/components/laniakea/BioEditor";
 import { PROFILE_AVATAR_SQL } from "@/lib/research/avatar-sql";
 import { InviteDesk } from "@/components/laniakea/InviteDesk";
 import { researchPostPath } from "@/lib/research/feed";
-import { loadInviteDesk } from "@/lib/research/invite";
+import { canMintFreeInvites, loadInviteDesk } from "@/lib/research/invite";
 import {
   getSubtopicRanks,
   topicStandingsForUser,
@@ -170,6 +170,7 @@ export default async function DashboardPage() {
         desk={inviteDesk}
         availableTokens={profile?.utility_tokens ?? 0}
         origin={process.env.NEXT_PUBLIC_SITE_URL ?? ""}
+        unlimitedInvites={canMintFreeInvites(profile?.role)}
       />
 
       <Panel>

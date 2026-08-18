@@ -4,6 +4,7 @@ import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { Panel, PanelHeader } from "@/components/layout/PageFrame";
 import type { InviteDeskData } from "@/lib/research/invite";
+import { ELITE_UNLIMITED_INVITE_SQL } from "@/lib/research/invite-sql";
 import { INVITE_PURCHASE_UTL, inviteSharePath } from "@/lib/research/referral";
 import { resolveTier } from "@/types";
 
@@ -11,10 +12,12 @@ export function InviteDesk({
   desk,
   availableTokens,
   origin = "",
+  unlimitedInvites = false,
 }: {
   desk: InviteDeskData;
   availableTokens: number;
   origin?: string;
+  unlimitedInvites?: boolean;
 }) {
   const available = desk.codes.filter((code) => code.status === "available");
   const redeemed = desk.codes.filter((code) => code.status === "redeemed");
@@ -34,13 +37,25 @@ export function InviteDesk({
               Invites
             </p>
             <p className="mt-1 text-[12px] text-muted-foreground">
-              Five grant codes at signup. Extra codes cost {INVITE_PURCHASE_UTL}{" "}
-              UTL. Share a link or the code. One redemption each.{" "}
+              {unlimitedInvites
+                ? "Elite desk. Mint as many codes as you need, at no UTL. Share a link or the code. One redemption each."
+                : `Five grant codes at signup. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Share a link or the code. One redemption each.`}{" "}
               {available.length} open · {redeemed.length} used.
             </p>
           </div>
-          <BuyInviteButton availableTokens={availableTokens} />
+          <BuyInviteButton
+            availableTokens={availableTokens}
+            unlimited={unlimitedInvites}
+          />
         </div>
+        {unlimitedInvites ? (
+          <div className="flex items-center justify-between gap-2 border-b border-border px-2.5 py-2">
+            <p className="text-[12px] text-muted-foreground">
+              If New invite still charges UTL, paste this once in the Supabase SQL editor.
+            </p>
+            <CopyInviteButton value={ELITE_UNLIMITED_INVITE_SQL} label="SQL" />
+          </div>
+        ) : null}
         {desk.codes.length === 0 && !desk.error ? (
           <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
             No codes yet. Refresh after the invite SQL has been run.

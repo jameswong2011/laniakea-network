@@ -2,7 +2,7 @@
 
 Two signup paths. Public starts Bronze. An invite code snapshots the inviter’s overall tier at redeem time and does not follow them later.
 
-Each new desk is minted 5 `LANI-XXXX-XXXX` codes (no `0 O 1 I L`). Extra codes cost **100 UTL**. Share `/join?code=LANI-XXXX-XXXX`.
+Each new desk is minted 5 `LANI-XXXX-XXXX` codes (no `0 O 1 I L`). Members buy extras for **100 UTL**. Elite and admin mint extras at no UTL, with no cap. Share `/join?code=LANI-XXXX-XXXX`.
 
 ## Currency
 
@@ -63,4 +63,4 @@ Replay the same unlock idempotency key (`unlock:<user>:<post>`) and the second c
 
 ## Apply
 
-Run `supabase/migrations/20260818123000_invite_referral.sql` once in the Supabase SQL editor. Safe to re-run. If that file already ran, paste `supabase/migrations/20260818124500_buy_hp_bronze_cap.sql` so Buy HP is Bronze-only and cannot restore past 1000 HP. If Monday cron is already installed, re-apply the weekly SQL so the treasury desk is excluded from the sweep.
+Run `supabase/migrations/20260818123000_invite_referral.sql` once in the Supabase SQL editor. Safe to re-run. If that file already ran, paste `supabase/migrations/20260818124500_buy_hp_bronze_cap.sql` so Buy HP is Bronze-only and cannot restore past 1000 HP. If Monday cron is already installed, re-apply the weekly SQL so the treasury desk is excluded from the sweep. For elite/admin free mints on a live database that already has invites, paste `supabase/migrations/20260818220000_elite_unlimited_invites.sql`.

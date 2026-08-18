@@ -9,9 +9,15 @@ import { INVITE_PURCHASE_UTL } from "@/lib/research/referral";
 
 const initialState: InviteActionState = {};
 
-export function BuyInviteButton({ availableTokens }: { availableTokens: number }) {
+export function BuyInviteButton({
+  availableTokens,
+  unlimited = false,
+}: {
+  availableTokens: number;
+  unlimited?: boolean;
+}) {
   const [state, action, pending] = useActionState(buyInviteCode, initialState);
-  const canBuy = availableTokens >= INVITE_PURCHASE_UTL;
+  const canBuy = unlimited || availableTokens >= INVITE_PURCHASE_UTL;
 
   return (
     <form action={action} className="flex flex-col items-end gap-1">
@@ -20,7 +26,13 @@ export function BuyInviteButton({ availableTokens }: { availableTokens: number }
         disabled={pending || !canBuy}
         className="h-7 border border-border bg-secondary px-2.5 font-data text-[10px] tracking-[0.14em] text-foreground uppercase hover:bg-muted disabled:opacity-50"
       >
-        {pending ? "Buying…" : `Buy invite · ${INVITE_PURCHASE_UTL} UTL`}
+        {pending
+          ? unlimited
+            ? "Minting…"
+            : "Buying…"
+          : unlimited
+            ? "New invite"
+            : `Buy invite · ${INVITE_PURCHASE_UTL} UTL`}
       </button>
       {!canBuy ? (
         <p className="font-data text-[10px] text-warning">Need {INVITE_PURCHASE_UTL} UTL</p>

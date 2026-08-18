@@ -29,15 +29,21 @@ export async function buyInviteCode(
     };
   }
 
-  const code =
-    data && typeof data === "object" && "code" in data
-      ? String((data as { code?: string }).code ?? "")
-      : "";
+  const payload = data && typeof data === "object" ? (data as { code?: string; free?: boolean }) : {};
+  const code = payload.code ? String(payload.code) : "";
+  const free = payload.free === true;
 
   revalidatePath("/invites");
   revalidatePath("/wallet");
   revalidatePath("/dashboard");
   revalidatePath("/feed");
+
+  if (free) {
+    return {
+      message: code ? `Minted invite ${code}. No UTL charged.` : "Minted one invite. No UTL charged.",
+      stamp: Date.now(),
+    };
+  }
 
   return {
     message: code
