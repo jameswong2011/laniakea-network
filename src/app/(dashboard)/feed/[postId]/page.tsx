@@ -12,10 +12,11 @@ import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
 import { PostToolbar } from "@/components/laniakea/PostToolbar";
 import { ReactionBar } from "@/components/laniakea/ReactionBar";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
+import { TierBadge } from "@/components/laniakea/TierBadge";
 import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
 import { requireUser } from "@/lib/auth/session";
-import { canOpenDesk, deskAccessLabel } from "@/lib/research/access";
+import { canOpenDesk, deskAccessRailClass } from "@/lib/research/access";
 import {
   getCommentThread,
   getViewerCommentVotes,
@@ -92,7 +93,6 @@ export default async function ResearchPostPage({
   }
 
   const locked = !canOpenDesk(item.access);
-  const accessLabel = deskAccessLabel(item.access, item.deskTier);
 
   if (locked) {
     return (
@@ -110,13 +110,13 @@ export default async function ResearchPostPage({
             </Link>
           }
         />
-        <article className="rounded-xl border border-border bg-panel px-5 py-5">
+        <article
+          className={`rounded-xl border border-border border-l-[3px] bg-panel px-5 py-5 ${deskAccessRailClass(item.access)}`}
+        >
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <SubTopicBadge topic={item.sub_topic} />
-            {accessLabel ? (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[12px] text-muted-foreground">
-                {accessLabel}
-              </span>
+            {item.deskTier ? (
+              <TierBadge tier={item.deskTier} locked />
             ) : null}
           </div>
           {item.body ? (
@@ -189,7 +189,9 @@ export default async function ResearchPostPage({
         }
       />
 
-      <article className="rounded-xl border border-border bg-panel px-5 py-5">
+      <article
+        className={`rounded-xl border border-border border-l-[3px] bg-panel px-5 py-5 ${deskAccessRailClass(item.access)}`}
+      >
         <div className="flex items-start gap-5">
           <VoteControls
             postId={item.id}
@@ -213,6 +215,12 @@ export default async function ResearchPostPage({
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <SubTopicBadge topic={item.sub_topic} />
+              {item.deskTier ? (
+                <TierBadge
+                  tier={item.deskTier}
+                  locked={item.access === "hidden"}
+                />
+              ) : null}
               {isAscendedStatus(item.status) ? (
                 <span className="rounded-full bg-gain-muted px-2 py-0.5 text-[12px] text-gain">
                   Ascended
@@ -221,11 +229,6 @@ export default async function ResearchPostPage({
               {isHuntedStatus(item.status) ? (
                 <span className="rounded-full bg-loss-muted px-2 py-0.5 text-[12px] text-loss">
                   Hunted
-                </span>
-              ) : null}
-              {accessLabel ? (
-                <span className="rounded-full bg-warning-muted px-2 py-0.5 text-[12px] text-warning">
-                  {accessLabel}
                 </span>
               ) : null}
             </div>

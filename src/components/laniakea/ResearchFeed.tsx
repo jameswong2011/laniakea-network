@@ -4,27 +4,20 @@ import { AuthorLink } from "@/components/laniakea/AuthorLink";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { PostToolbar } from "@/components/laniakea/PostToolbar";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
+import { TierBadge } from "@/components/laniakea/TierBadge";
 import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
-import { canOpenDesk, canWriteDesk, deskAccessLabel } from "@/lib/research/access";
+import {
+  canOpenDesk,
+  canWriteDesk,
+  deskAccessRailClass,
+} from "@/lib/research/access";
 import { researchExcerpt, researchPostPath } from "@/lib/research/feed";
-import { getPostHealthState, isAscendedStatus } from "@/lib/research/health";
+import { isAscendedStatus } from "@/lib/research/health";
 import {
   RESEARCH_POST_STATUS_LIVE,
   type ResearchFeedItem,
 } from "@/types";
-
-function healthSurface(state: ReturnType<typeof getPostHealthState>) {
-  if (state === "dying") {
-    return "border-l-loss";
-  }
-
-  if (state === "at_risk") {
-    return "border-l-warning";
-  }
-
-  return "border-l-gain";
-}
 
 export function ResearchFeed({
   items,
@@ -52,19 +45,14 @@ export function ResearchFeed({
   return (
     <div className="flex flex-col gap-3">
       {items.map((item) => {
-        const state = getPostHealthState(
-          item.current_health,
-          item.original_stake
-        );
         const open = canOpenDesk(item.access);
         const write = canWriteDesk(item.access);
-        const accessLabel = deskAccessLabel(item.access, item.deskTier);
         const href = researchPostPath(item.id);
 
         return (
           <article
             key={item.id}
-            className={`rounded-xl border border-border border-l-[3px] bg-panel px-4 py-4 ${healthSurface(state)}`}
+            className={`rounded-xl border border-border border-l-[3px] bg-panel px-4 py-4 ${deskAccessRailClass(item.access)}`}
           >
             <div className="flex items-start gap-4">
               <VoteControls
@@ -89,14 +77,15 @@ export function ResearchFeed({
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <SubTopicBadge topic={item.sub_topic} />
+                  {item.deskTier ? (
+                    <TierBadge
+                      tier={item.deskTier}
+                      locked={item.access === "hidden"}
+                    />
+                  ) : null}
                   {isAscendedStatus(item.status) ? (
                     <span className="rounded-full bg-gain-muted px-2 py-0.5 text-[11px] text-gain">
                       Ascended
-                    </span>
-                  ) : null}
-                  {accessLabel ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                      {accessLabel}
                     </span>
                   ) : null}
                 </div>

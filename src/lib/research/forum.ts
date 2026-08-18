@@ -2,24 +2,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { researchCommentPath, researchPostPath } from "@/lib/research/feed";
 
 export const REACTION_KEYS = [
-  "insightful",
   "agree",
   "disagree",
-  "clarifying",
-  "skeptical",
-  "updated",
+  "detailed",
+  "non_consensus",
+  "informative",
 ] as const;
 
 export type ReactionKey = (typeof REACTION_KEYS)[number];
 export type ReactionTarget = "post" | "comment" | "reply";
 
 export const REACTION_LABELS: Record<ReactionKey, string> = {
-  insightful: "Insightful",
   agree: "Agree",
   disagree: "Disagree",
-  clarifying: "Clarifying",
-  skeptical: "Skeptical",
-  updated: "Updated",
+  detailed: "Detailed",
+  non_consensus: "Non-consensus",
+  informative: "Informative",
 };
 
 export type ReactionCount = {

@@ -11,9 +11,12 @@ const TIER_TONE: Record<Tier, string> = {
 export function TierBadge({
   tier,
   size = "sm",
+  locked,
 }: {
   tier: string;
   size?: "sm" | "md";
+  /** When set, show 🔒 (hidden) or 🔓 (full / one tier above). */
+  locked?: boolean;
 }) {
   const resolved = resolveTier(tier);
   const compact = size === "sm";
@@ -21,13 +24,21 @@ export function TierBadge({
     ? TIER_TONE[resolved]
     : "border-border bg-panel-elevated text-muted-foreground";
   const label = resolved ? TIER_LABELS[resolved] : tier || "—";
+  const lockMark =
+    locked === undefined ? null : locked ? "🔒" : "🔓";
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full border ${frame} ${
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border ${frame} ${
         compact ? "h-6 px-2 text-[11px]" : "h-7 px-2.5 text-[12px]"
       }`}
+      aria-label={
+        lockMark
+          ? `${label} desk, ${locked ? "locked" : "unlocked"}`
+          : undefined
+      }
     >
+      {lockMark ? <span aria-hidden="true">{lockMark}</span> : null}
       {label}
     </span>
   );
