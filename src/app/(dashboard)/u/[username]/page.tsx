@@ -32,31 +32,47 @@ export default async function PublicProfilePage({
   const { username: raw } = await params;
   const username = decodeURIComponent(raw);
   const { supabase, userId } = await requireUser();
-  const withBio = await supabase
+  const withAvatar = await supabase
     .from("profiles")
     .select("id, username, display_name, tier, bio, avatar_url, created_at")
     .eq("username", username)
     .maybeSingle();
-  const profileRead = withBio.error
-    ? await supabase
-        .from("profiles")
-        .select(
-          withBio.error.message.includes("avatar_url")
-            ? "id, username, display_name, tier, bio, created_at"
-            : "id, username, display_name, tier, created_at"
-        )
-        .eq("username", username)
-        .maybeSingle()
-    : withBio;
-  const profile = profileRead.data
-    ? {
-        bio: null as string | null,
-        avatar_url: null as string | null,
-        ...profileRead.data,
-      }
-    : null;
+  const withBio =
+    withAvatar.error && withAvatar.error.message.includes("avatar_url")
+      ? await supabase
+          .from("profiles")
+          .select("id, username, display_name, tier, bio, created_at")
+          .eq("username", username)
+          .maybeSingle()
+      : withAvatar;
+  const profileRead =
+    withBio.error && withBio.error.message.includes("bio")
+      ? await supabase
+          .from("profiles")
+          .select("id, username, display_name, tier, created_at")
+          .eq("username", username)
+          .maybeSingle()
+      : withBio;
+  const row = profileRead.data;
 
-  if (!profile || profile.username === "laniakea_treasury") {
+  if (!row) {
+    notFound();
+  }
+
+  const profile = {
+    id: row.id,
+    username: row.username,
+    display_name: row.display_name,
+    tier: row.tier,
+    created_at: row.created_at,
+    bio: "bio" in row && typeof row.bio === "string" ? row.bio : null,
+    avatar_url:
+      "avatar_url" in row && typeof row.avatar_url === "string"
+        ? row.avatar_url
+        : null,
+  };
+
+  if (profile.username === "laniakea_treasury") {
     notFound();
   }
 
