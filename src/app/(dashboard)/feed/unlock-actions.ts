@@ -54,9 +54,7 @@ export async function unlockHigherDeskPost(
 
   refreshUnlock(postId);
   return {
-    message: receipt
-      ? `Unlocked for ${receipt.tokens} UTL. ${receipt.authorShare} to the author, ${receipt.burned} burned.`
-      : "Unlocked.",
+    message: receipt ? `Unlocked for ${receipt.tokens} UTL.` : "Unlocked.",
     stamp: Date.now(),
   };
 }

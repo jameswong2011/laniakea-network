@@ -39,13 +39,6 @@ export function UnlockPostButton({
       className={layout === "block" ? "flex flex-col gap-2" : "flex flex-col gap-1"}
     >
       <input type="hidden" name="postId" value={postId} />
-      {layout === "block" ? (
-        <p className="text-[12px] leading-relaxed text-muted-foreground">
-          {label}. {quote.tokens} UTL at {quote.multiple}× the {quote.baseTokens}{" "}
-          UTL base. {quote.authorShare} UTL to the author. The residual is
-          split up the invite tree; the rest is burned.
-        </p>
-      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="submit"

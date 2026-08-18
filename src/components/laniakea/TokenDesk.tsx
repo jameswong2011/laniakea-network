@@ -59,8 +59,7 @@ export function TokenDesk({
         <>
           <p className="text-[12px] text-muted-foreground">
             1 UTL buys {HP_PER_UTILITY_TOKEN} HP. Bronze only, and only to
-            restore overall HP up to {BUY_HP_CAP}. That UTL spend shares residual
-            up the invite tree; the rest is burned.
+            restore overall HP up to {BUY_HP_CAP}.
             {maxBuyTokens > 0
               ? ` Room for ${maxBuyTokens} UTL (${maxBuyTokens * HP_PER_UTILITY_TOKEN} HP).`
               : ""}

@@ -10,17 +10,14 @@ import { saveDraft } from "@/app/(dashboard)/forum/actions";
 import { ImageAttachButton } from "@/components/laniakea/ImageAttachButton";
 import { SubTopicSelect } from "@/components/laniakea/SubTopicSelect";
 import { TierBadge } from "@/components/laniakea/TierBadge";
-import { nextTier } from "@/lib/research/access";
 import { DEFAULT_STAKE_HP, MAX_STAKE_HP } from "@/lib/research/economy";
 import type { ContentDraft } from "@/lib/research/forum";
 import {
   DEFAULT_UNLOCK_RATE_MULTIPLE,
-  UNLOCK_BASE_RATES,
   UNLOCK_RATE_MULTIPLE_MAX,
   UNLOCK_RATE_MULTIPLE_MIN,
-  unlockQuotesForAuthor,
 } from "@/lib/research/unlock";
-import { TIER_LABELS, type Tier } from "@/types";
+import type { Tier } from "@/types";
 
 const initialState: FeedActionState = {};
 
@@ -54,11 +51,7 @@ export function NewResearchForm({
   const [draftNote, setDraftNote] = useState<string | null>(null);
   const saving = useRef(false);
   const canPost = availableHp >= 1;
-  const visibleAbove = nextTier(deskTier);
-  const buyerQuotes = unlockQuotesForAuthor(deskTier, unlockMultiple);
-  const pricedBook = UNLOCK_BASE_RATES.map((base) => base * unlockMultiple).join(
-    " / "
-  );
+  const showUnlockRate = deskTier !== "Bronze";
 
   async function persistDraft() {
     if (saving.current || (!title.trim() && !body.trim())) {
@@ -157,14 +150,14 @@ export function NewResearchForm({
           disabled={pending}
           onInsert={(markdown) => setBody((current) => `${current}${markdown}`)}
         />
-        <p className="text-[13px] text-muted-foreground">
-          Publishes to your {TIER_LABELS[deskTier]} desk.
-          {visibleAbove
-            ? ` ${TIER_LABELS[visibleAbove]} is view-only unless they pay UTL. Desks further above stay locked until they unlock this note.`
-            : " You are on the top desk."}
-        </p>
-        <div className="grid gap-2.5 md:grid-cols-[12rem_minmax(0,1fr)]">
-          <label className="flex flex-col gap-1">
+        <div
+          className={
+            showUnlockRate
+              ? "grid gap-2.5 md:grid-cols-[12rem_minmax(0,1fr)]"
+              : undefined
+          }
+        >
+          <label className="flex max-w-[12rem] flex-col gap-1">
             <span className="text-[13px] text-muted-foreground">
               HP to stake (max {MAX_STAKE_HP})
             </span>
@@ -180,42 +173,40 @@ export function NewResearchForm({
               className={`${fieldClassName} font-data`}
             />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[13px] text-muted-foreground">Unlock rate</span>
-            <select
+          {showUnlockRate ? (
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] text-muted-foreground">
+                Unlock rate
+              </span>
+              <select
+                name="unlockRateMultiple"
+                value={unlockMultiple}
+                onChange={(event) => {
+                  setUnlockMultiple(Number(event.target.value));
+                }}
+                className={`${fieldClassName} font-data`}
+              >
+                {Array.from(
+                  {
+                    length:
+                      UNLOCK_RATE_MULTIPLE_MAX - UNLOCK_RATE_MULTIPLE_MIN + 1,
+                  },
+                  (_, index) => UNLOCK_RATE_MULTIPLE_MIN + index
+                ).map((multiple) => (
+                  <option key={multiple} value={multiple}>
+                    {multiple}× default
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <input
+              type="hidden"
               name="unlockRateMultiple"
-              value={unlockMultiple}
-              onChange={(event) => {
-                setUnlockMultiple(Number(event.target.value));
-              }}
-              className={`${fieldClassName} font-data`}
-            >
-              {Array.from(
-                {
-                  length:
-                    UNLOCK_RATE_MULTIPLE_MAX - UNLOCK_RATE_MULTIPLE_MIN + 1,
-                },
-                (_, index) => UNLOCK_RATE_MULTIPLE_MIN + index
-              ).map((multiple) => (
-                <option key={multiple} value={multiple}>
-                  {multiple}× default
-                </option>
-              ))}
-            </select>
-          </label>
+              value={DEFAULT_UNLOCK_RATE_MULTIPLE}
+            />
+          )}
         </div>
-        <p className="text-[13px] text-muted-foreground">
-          Lower desks pay {pricedBook} UTL to open a note 1 / 2 / 3 / 4 desks
-          above them. 75% of that UTL comes to you; 25% is burned.
-          {buyerQuotes.length > 0
-            ? ` On this desk: ${buyerQuotes
-                .map(
-                  (quote) =>
-                    `${TIER_LABELS[quote.buyer]} ${quote.tokens} UTL`
-                )
-                .join(", ")}.`
-            : " No desk is below Bronze; the rate applies if you are promoted."}
-        </p>
         {!canPost ? (
           <p className="text-[13px] text-warning">Not enough HP to publish.</p>
         ) : null}
