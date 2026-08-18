@@ -14,6 +14,7 @@ import { requireUser } from "@/lib/auth/session";
 import { format } from "date-fns";
 import { formatHp } from "@/lib/format";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { BioEditor } from "@/components/laniakea/BioEditor";
 import { InviteDesk } from "@/components/laniakea/InviteDesk";
 import { researchPostPath } from "@/lib/research/feed";
 import { loadInviteDesk } from "@/lib/research/invite";
@@ -128,6 +129,7 @@ export default async function DashboardPage() {
               </dd>
             </div>
           </dl>
+          <BioEditor bio={profile.bio ?? ""} />
         </Panel>
       ) : (
         <Panel className="px-2.5 py-5">

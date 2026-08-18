@@ -254,6 +254,13 @@ export async function createComment(
     }
   }
 
+  await supabase
+    .from("content_drafts")
+    .delete()
+    .eq("user_id", userId)
+    .eq("kind", "comment")
+    .eq("post_id", postId);
+
   await notifyCommentOnPost(supabase, {
     actorId: userId,
     postId,

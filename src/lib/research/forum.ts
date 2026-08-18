@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { researchPostPath } from "@/lib/research/feed";
+import { researchCommentPath, researchPostPath } from "@/lib/research/feed";
 
 export const REACTION_KEYS = [
   "insightful",
@@ -30,7 +30,7 @@ export type ReactionCount = {
 
 export type NotificationRow = {
   id: string;
-  kind: "comment_on_post" | "reply_to_comment";
+  kind: "comment_on_post" | "reply_to_comment" | "author_post";
   post_id: string | null;
   comment_id: string | null;
   read_at: string | null;
@@ -40,13 +40,32 @@ export type NotificationRow = {
   post_title: string | null;
 };
 
+export const BIO_MAX = 500;
+
+export type ContentDraft = {
+  id: string;
+  kind: "post" | "comment";
+  post_id: string | null;
+  title: string;
+  body: string;
+  sub_topic: string | null;
+  stake_hp: number | null;
+  unlock_rate_multiple: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export function isMissingForumSchema(message: string) {
   return (
     (message.includes("content_reactions") ||
       message.includes("saved_posts") ||
       message.includes("post_subscriptions") ||
       message.includes("notifications") ||
-      message.includes("research-media")) &&
+      message.includes("research-media") ||
+      message.includes("author_subscriptions") ||
+      message.includes("content_drafts") ||
+      message.includes("profiles.bio") ||
+      message.includes("column bio")) &&
     (message.includes("does not exist") ||
       message.includes("42P01") ||
       message.includes("42703") ||
@@ -335,6 +354,10 @@ export function notificationHref(item: NotificationRow) {
     return "/feed";
   }
 
+  if (item.comment_id) {
+    return researchCommentPath(item.post_id, item.comment_id);
+  }
+
   return researchPostPath(item.post_id);
 }
 
@@ -346,5 +369,114 @@ export function notificationCopy(item: NotificationRow) {
     return `${actor} replied to your comment on ${title}`;
   }
 
+  if (item.kind === "author_post") {
+    return `${actor} published ${title}`;
+  }
+
   return `${actor} commented on ${title}`;
+}
+
+export async function isAuthorFollowed(
+  supabase: SupabaseClient,
+  subscriberId: string,
+  authorId: string
+) {
+  const { data, error } = await supabase
+    .from("author_subscriptions")
+    .select("author_id")
+    .eq("subscriber_id", subscriberId)
+    .eq("author_id", authorId)
+    .maybeSingle();
+
+  return !error && Boolean(data);
+}
+
+export async function countAuthorFollowers(
+  supabase: SupabaseClient,
+  authorId: string
+) {
+  const { count, error } = await supabase
+    .from("author_subscriptions")
+    .select("author_id", { count: "exact", head: true })
+    .eq("author_id", authorId);
+
+  return error ? 0 : (count ?? 0);
+}
+
+export async function notifyAuthorFollowers(
+  supabase: SupabaseClient,
+  input: { actorId: string; postId: string }
+) {
+  const subs = await supabase
+    .from("author_subscriptions")
+    .select("subscriber_id")
+    .eq("author_id", input.actorId);
+
+  if (subs.error || !subs.data?.length) {
+    return;
+  }
+
+  await supabase.from("notifications").insert(
+    subs.data.map((row) => ({
+      user_id: row.subscriber_id as string,
+      actor_id: input.actorId,
+      kind: "author_post",
+      post_id: input.postId,
+    }))
+  );
+}
+
+export async function loadPostDrafts(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ContentDraft[]> {
+  const { data, error } = await supabase
+    .from("content_drafts")
+    .select(
+      "id, kind, post_id, title, body, sub_topic, stake_hp, unlock_rate_multiple, created_at, updated_at"
+    )
+    .eq("user_id", userId)
+    .eq("kind", "post")
+    .order("updated_at", { ascending: false });
+
+  return error ? [] : ((data ?? []) as ContentDraft[]);
+}
+
+export async function loadCommentDraft(
+  supabase: SupabaseClient,
+  userId: string,
+  postId: string
+): Promise<ContentDraft | null> {
+  const { data, error } = await supabase
+    .from("content_drafts")
+    .select(
+      "id, kind, post_id, title, body, sub_topic, stake_hp, unlock_rate_multiple, created_at, updated_at"
+    )
+    .eq("user_id", userId)
+    .eq("kind", "comment")
+    .eq("post_id", postId)
+    .maybeSingle();
+
+  return error || !data ? null : (data as ContentDraft);
+}
+
+export async function loadDraftById(
+  supabase: SupabaseClient,
+  userId: string,
+  draftId: string
+): Promise<ContentDraft | null> {
+  const { data, error } = await supabase
+    .from("content_drafts")
+    .select(
+      "id, kind, post_id, title, body, sub_topic, stake_hp, unlock_rate_multiple, created_at, updated_at"
+    )
+    .eq("user_id", userId)
+    .eq("id", draftId)
+    .maybeSingle();
+
+  return error || !data ? null : (data as ContentDraft);
+}
+
+export function searchPattern(query: string) {
+  return `%${query.trim().replace(/[%_]/g, "").slice(0, 80)}%`;
 }

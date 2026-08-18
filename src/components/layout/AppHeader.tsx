@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { LogoutButton } from "@/components/layout/LogoutButton";
 import { HpReadout } from "@/components/laniakea/HpReadout";
 import { NotificationMenu } from "@/components/laniakea/NotificationMenu";
+import { SearchBox } from "@/components/laniakea/SearchBox";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { feedSingleTopicHref, parseFeedTopics } from "@/lib/research/feed";
@@ -126,7 +127,22 @@ export function AppHeader({
         <div className="flex shrink-0 items-stretch">
           {isAuthenticated ? (
             <nav className="flex items-stretch">
+              <div className="hidden items-center px-2 lg:flex">
+                <SearchBox compact />
+              </div>
+              <Link
+                href="/search"
+                className={`${navClassName(isActivePath(pathname, "/search"))} lg:hidden`}
+              >
+                Search
+              </Link>
               <NotificationMenu items={notifications} unread={unreadCount} />
+              <Link
+                href="/drafts"
+                className={navClassName(isActivePath(pathname, "/drafts"))}
+              >
+                Drafts
+              </Link>
               <Link
                 href="/saved"
                 className={navClassName(isActivePath(pathname, "/saved"))}

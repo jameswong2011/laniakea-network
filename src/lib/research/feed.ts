@@ -23,6 +23,18 @@ export function researchPostPath(postId: string) {
   return `/feed/${postId}`;
 }
 
+export function researchCommentPath(postId: string, commentId: string) {
+  return `/feed/${postId}?comment=${commentId}`;
+}
+
+export function researchReplyPath(
+  postId: string,
+  commentId: string,
+  replyId: string
+) {
+  return `/feed/${postId}?comment=${commentId}&reply=${replyId}`;
+}
+
 export function researchComposePath() {
   return "/feed/new";
 }

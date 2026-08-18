@@ -4,14 +4,23 @@ import { PageFrame, PageHeading } from "@/components/layout/PageFrame";
 import { NewResearchForm } from "@/components/laniakea/NewResearchForm";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { requireUser } from "@/lib/auth/session";
+import { loadDraftById } from "@/lib/research/forum";
 import { resolveTier } from "@/types";
 
 export const metadata: Metadata = {
   title: "New Research Post",
 };
 
-export default async function NewResearchPage() {
-  const { profile } = await requireUser();
+export default async function NewResearchPage({
+  searchParams,
+}: PageProps<"/feed/new">) {
+  const { profile, supabase, userId } = await requireUser();
+  const draftId = (await searchParams).draft;
+  const draftValue = Array.isArray(draftId) ? draftId[0] : draftId;
+  const draft =
+    draftValue
+      ? await loadDraftById(supabase, userId, draftValue)
+      : null;
   const deskTier = resolveTier(profile?.tier) ?? "Bronze";
   const availableHp = profile?.current_hp ?? 0;
 
@@ -33,7 +42,11 @@ export default async function NewResearchPage() {
           </>
         }
       />
-      <NewResearchForm availableHp={availableHp} deskTier={deskTier} />
+      <NewResearchForm
+        availableHp={availableHp}
+        deskTier={deskTier}
+        draft={draft?.kind === "post" ? draft : null}
+      />
     </PageFrame>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { AuthorLink } from "@/components/laniakea/AuthorLink";
 import { CommentComposer } from "@/components/laniakea/CommentComposer";
+import { CopyPermalinkButton } from "@/components/laniakea/CopyPermalinkButton";
 import { EditBodyForm } from "@/components/laniakea/EditBodyForm";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
@@ -22,7 +23,11 @@ import {
   COMMENTS_SQL_POLICIES,
   COMMENTS_SQL_TABLES,
 } from "@/lib/research/comments-sql";
-import type { ReactionCount } from "@/lib/research/forum";
+import {
+  researchCommentPath,
+  researchReplyPath,
+} from "@/lib/research/feed";
+import type { ContentDraft, ReactionCount } from "@/lib/research/forum";
 import {
   COMMENT_BODY_MAX,
   REPLY_BODY_MAX,
@@ -56,6 +61,9 @@ export function CommentThread({
   viewerId,
   commentReactions,
   replyReactions,
+  focusCommentId = null,
+  focusReplyId = null,
+  commentDraft = null,
 }: {
   postId: string;
   comments: CommentThreadItem[];
@@ -69,10 +77,28 @@ export function CommentThread({
   viewerId: string;
   commentReactions: Record<string, ReactionCount[]>;
   replyReactions: Record<string, ReactionCount[]>;
+  focusCommentId?: string | null;
+  focusReplyId?: string | null;
+  commentDraft?: ContentDraft | null;
 }) {
   const [sort, setSort] = useState<"top" | "new">("top");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const canWrite = access === "full" && !postHunted;
+
+  useEffect(() => {
+    const targetId = focusReplyId
+      ? `reply-${focusReplyId}`
+      : focusCommentId
+        ? `comment-${focusCommentId}`
+        : null;
+
+    if (!targetId) {
+      return;
+    }
+
+    const node = document.getElementById(targetId);
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusCommentId, focusReplyId, comments]);
 
   const ordered = useMemo(() => {
     const next = [...comments];
@@ -136,6 +162,7 @@ export function CommentThread({
           postId={postId}
           availableHp={availableHp}
           canStake={canWrite}
+          draft={commentDraft}
           closedReason={
             postHunted
               ? "This post has been hunted. Comments are closed."
@@ -165,11 +192,17 @@ export function CommentThread({
         );
         const hidden = collapsed[comment.id];
         const isAuthor = comment.author_id === viewerId;
+        const focused =
+          comment.id === focusCommentId ||
+          comment.replies.some((reply) => reply.id === focusReplyId);
 
         return (
           <article
+            id={`comment-${comment.id}`}
             key={comment.id}
-            className={`border-b border-border border-l-2 px-4 py-4 last:border-b-0 ${healthSurface(state)}`}
+            className={`border-b border-border border-l-2 px-4 py-4 last:border-b-0 ${healthSurface(state)} ${
+              focused ? "bg-gain-muted/40" : ""
+            }`}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -185,6 +218,9 @@ export function CommentThread({
                   {comment.updated_at !== comment.created_at ? (
                     <span className="text-muted-foreground">edited</span>
                   ) : null}
+                  <CopyPermalinkButton
+                    path={researchCommentPath(postId, comment.id)}
+                  />
                   <button
                     type="button"
                     onClick={() =>
@@ -261,7 +297,13 @@ export function CommentThread({
                 </div>
                 <div className="mt-4 flex flex-col gap-4 border-l border-border pl-4">
                   {comment.replies.map((reply) => (
-                    <div key={reply.id} className="flex flex-col gap-2">
+                    <div
+                      id={`reply-${reply.id}`}
+                      key={reply.id}
+                      className={`flex flex-col gap-2 rounded-lg ${
+                        reply.id === focusReplyId ? "bg-gain-muted/50 p-2" : ""
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
                         {reply.author ? (
                           <TierBadge tier={reply.author.tier} />
@@ -273,6 +315,9 @@ export function CommentThread({
                         <span className="text-muted-foreground">
                           {format(new Date(reply.created_at), "d MMM yyyy")}
                         </span>
+                        <CopyPermalinkButton
+                          path={researchReplyPath(postId, comment.id, reply.id)}
+                        />
                       </div>
                       <MarkdownBody source={reply.body} />
                       {reply.author_id === viewerId ? (

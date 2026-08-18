@@ -5,7 +5,7 @@ import { isMissingInviteSchema } from "@/lib/research/invite";
 import type { Profile, RegistrationPath } from "@/types";
 
 const PROFILE_COLUMNS =
-  "id, username, display_name, role, tier, current_hp, utility_tokens, invited_by, account_code, registration_path, is_system, created_at, updated_at";
+  "id, username, display_name, role, tier, current_hp, utility_tokens, invited_by, account_code, registration_path, is_system, bio, created_at, updated_at";
 
 const PROFILE_COLUMNS_TOKENS =
   "id, username, display_name, role, tier, current_hp, utility_tokens, created_at, updated_at";
@@ -30,12 +30,14 @@ type ProfileRow = Omit<
   | "account_code"
   | "registration_path"
   | "is_system"
+  | "bio"
 > & {
   utility_tokens?: number | null;
   invited_by?: string | null;
   account_code?: string | null;
   registration_path?: string | null;
   is_system?: boolean | null;
+  bio?: string | null;
 };
 
 function asProfile(row: ProfileRow): Profile {
@@ -49,6 +51,7 @@ function asProfile(row: ProfileRow): Profile {
     account_code: row.account_code ?? null,
     registration_path: path,
     is_system: row.is_system ?? false,
+    bio: row.bio ?? null,
   };
 }
 
@@ -64,6 +67,20 @@ async function loadProfile(
 
   if (!withInvite.error) {
     return withInvite.data ? asProfile(withInvite.data as ProfileRow) : null;
+  }
+
+  if (withInvite.error.message.includes("bio")) {
+    const withoutBio = await supabase
+      .from("profiles")
+      .select(
+        "id, username, display_name, role, tier, current_hp, utility_tokens, invited_by, account_code, registration_path, is_system, created_at, updated_at"
+      )
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!withoutBio.error) {
+      return withoutBio.data ? asProfile(withoutBio.data as ProfileRow) : null;
+    }
   }
 
   const withTokens = withInvite.error.message.includes("invited_by")

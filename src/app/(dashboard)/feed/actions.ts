@@ -26,6 +26,7 @@ import {
   settleCommentsOnHuntedPost,
   settleHuntedPost,
 } from "@/lib/research/settlement-apply";
+import { notifyAuthorFollowers } from "@/lib/research/forum";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_STAKE,
@@ -210,6 +211,22 @@ export async function createResearchPost(
     subTopic,
     stakeHp
   );
+
+  const draftId = String(formData.get("draftId") ?? "");
+
+  if (draftId) {
+    await supabase
+      .from("content_drafts")
+      .delete()
+      .eq("id", draftId)
+      .eq("user_id", userId)
+      .eq("kind", "post");
+  }
+
+  await notifyAuthorFollowers(supabase, {
+    actorId: userId,
+    postId: post.id,
+  });
 
   refreshFeed();
 

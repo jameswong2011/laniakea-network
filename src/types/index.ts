@@ -139,6 +139,7 @@ export type Profile = {
   account_code: string | null;
   registration_path: RegistrationPath;
   is_system: boolean;
+  bio: string | null;
   created_at: string;
   updated_at: string;
 };

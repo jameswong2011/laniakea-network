@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { PageFrame, PageHeading } from "@/components/layout/PageFrame";
 import { AuthorLink } from "@/components/laniakea/AuthorLink";
+import { FollowAuthorButton } from "@/components/laniakea/FollowAuthorButton";
 import { CommentThread } from "@/components/laniakea/CommentThread";
 import { EditBodyForm } from "@/components/laniakea/EditBodyForm";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
@@ -22,7 +23,10 @@ import {
 import { VOTE_COST_HP } from "@/lib/research/economy";
 import { getResearchPostById, getViewerVotes, researchPostPath } from "@/lib/research/feed";
 import {
+  countAuthorFollowers,
+  isAuthorFollowed,
   isPostSubscribed,
+  loadCommentDraft,
   loadReactions,
   loadSavedPostIds,
 } from "@/lib/research/forum";
@@ -52,12 +56,18 @@ export async function generateMetadata({
   return { title: item?.title ?? "Research" };
 }
 
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function ResearchPostPage({
   params,
-}: {
-  params: Promise<{ postId: string }>;
-}) {
+  searchParams,
+}: PageProps<"/feed/[postId]">) {
   const { postId } = await params;
+  const query = await searchParams;
+  const focusCommentId = firstParam(query.comment) ?? null;
+  const focusReplyId = firstParam(query.reply) ?? null;
   const { supabase, userId, profile } = await requireUser();
   const deskTier = resolveTier(profile?.tier) ?? "Bronze";
   const { item, error } = await getResearchPostById(supabase, postId, {
@@ -143,7 +153,7 @@ export default async function ResearchPostPage({
   const replyIds = thread.comments.flatMap((comment) =>
     comment.replies.map((reply) => reply.id)
   );
-  const [postReactions, commentReactions, replyReactions, savedIds, subscribed] =
+  const [postReactions, commentReactions, replyReactions, savedIds, subscribed, commentDraft, following, followerCount] =
     await Promise.all([
       loadReactions(supabase, "post", [item.id], userId),
       loadReactions(
@@ -155,6 +165,11 @@ export default async function ResearchPostPage({
       loadReactions(supabase, "reply", replyIds, userId),
       loadSavedPostIds(supabase, userId, [item.id]),
       isPostSubscribed(supabase, userId, item.id),
+      loadCommentDraft(supabase, userId, item.id),
+      item.author_id === userId
+        ? Promise.resolve(false)
+        : isAuthorFollowed(supabase, userId, item.author_id),
+      countAuthorFollowers(supabase, item.author_id),
     ]);
   const availableHp = profile?.current_hp ?? 0;
 
@@ -245,6 +260,13 @@ export default async function ResearchPostPage({
                   {format(new Date(item.created_at), "d MMM yyyy")}
                   {item.updated_at !== item.created_at ? " · edited" : ""}
                 </span>
+                {item.author_id !== userId ? (
+                  <FollowAuthorButton
+                    authorId={item.author_id}
+                    following={following}
+                    followerCount={followerCount}
+                  />
+                ) : null}
               </div>
               <HealthMeter
                 currentHealth={item.current_health}
@@ -284,6 +306,9 @@ export default async function ResearchPostPage({
         viewerId={userId}
         commentReactions={commentReactions}
         replyReactions={replyReactions}
+        focusCommentId={focusCommentId}
+        focusReplyId={focusReplyId}
+        commentDraft={commentDraft}
       />
     </PageFrame>
   );
