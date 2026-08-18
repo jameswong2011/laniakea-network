@@ -6,6 +6,7 @@ import {
   type FeedActionState,
 } from "@/app/(dashboard)/feed/actions";
 import { voteOnComment } from "@/app/(dashboard)/feed/[postId]/actions";
+import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
 import { voteCostHp } from "@/lib/research/economy";
 import {
   VOTE_STRENGTH_MAX,
@@ -113,6 +114,9 @@ export function VoteControls({
         <p className="text-right font-data text-[10px] text-loss">
           {state.error}
         </p>
+      ) : null}
+      {state.voteScaleSql ? (
+        <CopyInviteButton value={state.voteScaleSql} label="Copy SQL" />
       ) : null}
     </form>
   );

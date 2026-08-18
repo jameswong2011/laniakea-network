@@ -24,6 +24,11 @@ import {
 } from "@/lib/research/forum";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
+  VOTE_SCALE_BLOCKED_MESSAGE,
+  VOTE_SCALE_SQL,
+  isVoteScaleBlocked,
+} from "@/lib/research/vote-scale-sql";
+import {
   COMMENT_BODY_MAX,
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
@@ -43,6 +48,7 @@ export type ThreadActionState = {
   error?: string;
   message?: string;
   stamp?: number;
+  voteScaleSql?: string;
 };
 
 const commentSchema = z.object({
@@ -366,6 +372,13 @@ export async function voteOnComment(
     if (voteError.code === "23505") {
       return {
         error: "You have already voted on this comment.",
+        stamp: Date.now(),
+      };
+    }
+    if (isVoteScaleBlocked(voteError)) {
+      return {
+        error: VOTE_SCALE_BLOCKED_MESSAGE,
+        voteScaleSql: VOTE_SCALE_SQL,
         stamp: Date.now(),
       };
     }

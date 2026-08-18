@@ -1,4 +1,8 @@
--- Allow up/down votes at conviction 1–5 (stored as ±1…±5).
+export const VOTE_SCALE_BLOCKED_MESSAGE =
+  "Vote scale 1–5 is blocked by the database check. Copy the vote-scale SQL, run it in the Supabase SQL editor, then try again.";
+
+export const VOTE_SCALE_SQL = `-- Vote scale 1–5 on posts and comments (stored as ±1…±5).
+-- Safe to re-run. Does not change Hunt / Ascent HP math.
 
 do $$
 declare
@@ -62,3 +66,13 @@ exception
   when duplicate_object then null;
 end
 $$;
+`;
+
+export function isVoteScaleBlocked(error: { code?: string; message?: string }) {
+  const message = error.message ?? "";
+  return (
+    message.includes("votes_value_check") ||
+    message.includes("comment_votes_value_check") ||
+    error.code === "23514"
+  );
+}

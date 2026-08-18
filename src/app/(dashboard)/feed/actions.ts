@@ -29,6 +29,11 @@ import {
 import { notifyAuthorFollowers } from "@/lib/research/forum";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
+  VOTE_SCALE_BLOCKED_MESSAGE,
+  VOTE_SCALE_SQL,
+  isVoteScaleBlocked,
+} from "@/lib/research/vote-scale-sql";
+import {
   HP_TRANSACTION_STAKE,
   HP_TRANSACTION_VOTE,
   RESEARCH_POST_STATUS_ARCHIVED,
@@ -47,6 +52,7 @@ export type FeedActionState = {
   error?: string;
   message?: string;
   stamp?: number;
+  voteScaleSql?: string;
 };
 
 const createPostSchema = z.object({
@@ -364,13 +370,10 @@ export async function voteOnPost(
     if (voteError.code === "23505") {
       return { error: "You have already voted on this post.", stamp: Date.now() };
     }
-    if (
-      voteError.message.includes("votes_value_check") ||
-      voteError.code === "23514"
-    ) {
+    if (isVoteScaleBlocked(voteError)) {
       return {
-        error:
-          "Vote scale 1–5 is blocked by the database check. Run the vote-scale SQL in Supabase, then try again.",
+        error: VOTE_SCALE_BLOCKED_MESSAGE,
+        voteScaleSql: VOTE_SCALE_SQL,
         stamp: Date.now(),
       };
     }
