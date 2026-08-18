@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     template: "%s · Laniakea Network",
   },
   description:
-    "Ranked investment research platform. Post research, earn Health Points, and climb from Bronze to Masters.",
+    "A two-sided floor for investment research. Analysts who should run a book, investors who should stop gambling.",
 };
 
 export const viewport: Viewport = {

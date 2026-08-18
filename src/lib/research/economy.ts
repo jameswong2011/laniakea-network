@@ -23,8 +23,26 @@ export function ascentLine(originalStake: number) {
 }
 
 export const PASSIVE_DRAIN_HP = 3;
-export const WEEKLY_CRON_SCHEDULE = "0 8 * * 1";
-export const WEEKLY_CRON_LABEL = "Monday 08:00 UTC";
+/** Vercel UTC slots that cover 09:30 America/New_York in EDT and EST. */
+export const WEEKLY_CRON_SCHEDULE = "30 13 * * 1";
+export const WEEKLY_CRON_SCHEDULE_EST = "30 14 * * 1";
+export const WEEKLY_CRON_TIMEZONE = "America/New_York";
+export const WEEKLY_CRON_LABEL = "Monday 09:30 New York";
+
+export function isWeeklyCronWindow(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: WEEKLY_CRON_TIMEZONE,
+    weekday: "short",
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const weekday = parts.find((part) => part.type === "weekday")?.value;
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value);
+
+  return weekday === "Mon" && hour === 9 && minute >= 30 && minute <= 34;
+}
 export const HP_PER_UTILITY_TOKEN = 10;
 export const DEFAULT_UTILITY_TOKENS = 100;
 export const BUY_HP_CAP = STARTING_HP;

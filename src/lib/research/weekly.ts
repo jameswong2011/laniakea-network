@@ -4,6 +4,7 @@ import {
   summarizeCalibration,
 } from "@/lib/research/calibration";
 import { runPassiveDrain } from "@/lib/research/drain";
+import { isWeeklyCronWindow } from "@/lib/research/economy";
 
 export type WeeklyMaintenanceSource = "cron" | "manual";
 
@@ -121,6 +122,18 @@ export async function runWeeklyMaintenanceTs(
   supabase: SupabaseClient,
   source: WeeklyMaintenanceSource
 ): Promise<WeeklyMaintenanceResult> {
+  if (source === "cron" && !isWeeklyCronWindow()) {
+    return {
+      skipped: true,
+      drained: 0,
+      drainSkipped: 0,
+      promoted: 0,
+      demoted: 0,
+      error: null,
+      source,
+    };
+  }
+
   if (source === "cron" && (await alreadyRanThisWeek(supabase))) {
     return {
       skipped: true,

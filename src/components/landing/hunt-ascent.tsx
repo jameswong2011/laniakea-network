@@ -72,16 +72,15 @@ export function HuntAscent() {
     <section id="arena" className="border-t border-border">
       <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 md:grid-cols-12 md:gap-10 md:px-8 md:py-28">
         <div className="md:col-span-5">
-          <p className="section-kicker">03 — Hunt / Ascent</p>
+          <p className="section-kicker">05 — The arena</p>
           <h2 className="mt-4 font-display text-2xl leading-title text-fg">
-            Settlement is continuous. Health at the vote is the multiplier.
+            A thesis lives until the room hunts it or lifts it.
           </h2>
           <p className="mt-5 max-w-md text-muted">
-            A note does not expire on a buzzer. The vote that takes health to
-            zero triggers a Hunt. The vote that takes it to five times stake
-            triggers an Ascent and freezes the book. Every prior vote is paid
-            from the pot, weighted by conviction and the health when it was
-            cast.
+            No buzzer. The vote that takes health to zero is a Hunt. The vote
+            that takes it to five times stake is an Ascent and freezes the
+            book. What you made is set by conviction and the health when you
+            voted — not by who shouted last.
           </p>
           <dl className="mt-8 space-y-5">
             <div>
@@ -89,9 +88,9 @@ export function HuntAscent() {
                 Hunt
               </dt>
               <dd className="mt-1 text-sm text-muted">
-                Pot is the stake plus every upvote. Shorts split it. Higher
-                health at the vote earns a larger multiple — late hunters near
-                the floor keep a 0.40 residual. Author and longs take nothing.
+                Shorts split the stake plus every upvote. Earlier shorts —
+                higher health — take more. The author and the longs take
+                nothing.
               </dd>
             </div>
             <div>
@@ -99,9 +98,8 @@ export function HuntAscent() {
                 Ascent
               </dt>
               <dd className="mt-1 text-sm text-muted">
-                Pot is every downvote. Longs target {longSharePct}%; the author
-                keeps the rest. Earlier longs — farther from the ceiling — earn
-                more. If raw long claims exceed the pot, longs take it all
+                Longs target {longSharePct}% of the downvote pot; the author
+                keeps the rest. Earlier longs take more. Over-claim is
                 pro-rata.
               </dd>
             </div>
@@ -187,14 +185,11 @@ export function HuntAscent() {
               </div>
             </div>
 
-            <pre className="mt-5 overflow-x-auto rounded-md bg-bg px-4 py-3 font-mono text-xs leading-relaxed text-muted">
-{`hunt   = max(0.40, 2.10 × (H / S)^1.35)
-ascent = max(0.18, 3.15 × (1 − H / 5S)^1.55)
-claim  = conviction × multiplier
-Hunt pot = S + upvote HP; shorts split, pro-rata if over
-Ascent pot = downvote HP; longs ${longSharePct}%, author the rest
-over-claim is pro-rata`}
-            </pre>
+            <p className="mt-5 text-xs leading-relaxed text-subtle">
+              Drag health to see a worked book: {WORKED_STAKE} HP stake,{" "}
+              {WORKED_CONVICTION} conviction. Multiples stay continuous from
+              floor to ceiling.
+            </p>
           </div>
         </div>
       </div>

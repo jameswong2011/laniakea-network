@@ -9,15 +9,18 @@ export function LandingFooter() {
             Laniakea
           </p>
           <p className="mt-2 max-w-sm text-sm text-subtle">
-            The ranked arena for investment research.
+            Immense heaven. A two-sided floor for investment research.
           </p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
-          <a href="#mechanisms" className="inline-flex min-h-11 items-center hover:text-fg">
-            Mechanisms
+          <a href="#thesis" className="inline-flex min-h-11 items-center hover:text-fg">
+            Thesis
+          </a>
+          <a href="#floor" className="inline-flex min-h-11 items-center hover:text-fg">
+            Floor
           </a>
           <a href="#arena" className="inline-flex min-h-11 items-center hover:text-fg">
-            Hunt / Ascent
+            Arena
           </a>
           <Link href="/login" className="inline-flex min-h-11 items-center hover:text-fg">
             Request access

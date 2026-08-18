@@ -14,26 +14,48 @@ import {
 } from "@/lib/research/settlement";
 import { SUB_TOPICS, VOTE_STRENGTH_MAX, VOTE_STRENGTH_MIN } from "@/types";
 
-export const LAYERS = [
+export const LANIAKEA_PRONUNCIATION = "lah-nee-ah-KAY-ah";
+
+export const AUDIENCES = [
   {
-    index: "01",
-    title: "HP Economy",
-    body: "The scarce inventory of attention and conviction. You buy it with mock tokens, stake it, and forfeit it. It is not a score.",
+    kicker: "The desk",
+    title: "Analysts who should run their own book",
+    body: "The 1-CIO / 3–10 PM / 10–50 analyst pyramid is about to invert. Models are becoming A+ public-market analysts — MCP to every data feed, agents that can pilot a machine. The people those seats no longer need are often the ones who can already underwrite a portfolio. We exist so they do not have to die in someone else’s org chart.",
   },
   {
-    index: "02",
-    title: "Content",
-    body: "Long-form notes and staked comments that live or die on a public health bar. Replies are like-only — no HP.",
+    kicker: "The tape",
+    title: "Investors who should stop gambling",
+    body: "Self-managed capital has been trained on technicals, options, and the casino. We want them looking over the shoulder of serious research instead — and paying, staking, and voting inside the allocation process, not cheering from a comment section.",
+  },
+] as const;
+
+export const FLOOR_TRAITS = [
+  {
+    title: "Long notes, not takes",
+    body: "Markdown, images, and threads. Comments can hunt and ascend. Direct replies stay light. Named reactions — Agree, Disagree, Detailed, Non-consensus, Informative — mark the work, not the author.",
   },
   {
-    index: "03",
-    title: "Ranking",
-    body: "Bronze to Masters, overall and per topic. The desk one tier above you is view-only unless you pay UTL. Further desks stay on the tape and can be unlocked per note. A sweep resets HP to 1000 in the new room.",
+    title: "Desks you have to earn",
+    body: "Bronze through Masters, overall and by topic. Same desk or below is a full seat. One tier above is view-only. Further desks stay locked until you unlock a note or climb.",
   },
   {
-    index: "04",
-    title: "Topics",
-    body: `${SUB_TOPICS.join(", ")}. Topic rank does not transfer. There is also an overall desk.`,
+    title: "A library, not just a firehose",
+    body: "Follow a desk. Save a thread. Search notes and comments. Draft before you stake. Public profiles so a book has a face.",
+  },
+] as const;
+
+export const INCENTIVE_POINTS = [
+  {
+    title: "Curation is the room",
+    body: "SumZero, Manual of Ideas, Value Investor Club never solved policing or why a top book would share. We do not hire a curator. The floor spends scarce HP to publish and to vote. Bad work dies in public. Good work climbs.",
+  },
+  {
+    title: "Skin in the thesis",
+    body: "A note opens at its stake. The crowd can hunt it to zero or lift it to five times that stake. Settlement is continuous — health at the moment you vote is the multiple. The author and the book share the outcome.",
+  },
+  {
+    title: "Rank is a room, not a badge",
+    body: "Weekly calibration, Monday 09:30 New York, promotes and demotes on HP inside each desk and resets the swept book to 1,000 HP. Topic books do not transfer. You cannot buy your way past Bronze’s restore cap.",
   },
 ] as const;
 
@@ -48,21 +70,19 @@ export const HP_RULES = [
     value: `1–${MAX_STAKE_HP} HP (default ${DEFAULT_COMMENT_STAKE_HP})`,
   },
   {
-    label: "Vote cost",
+    label: "Vote conviction",
     value: `${VOTE_STRENGTH_MIN}–${VOTE_STRENGTH_MAX} HP`,
   },
-  { label: "Open health", value: "1× stake" },
-  { label: "Hunt floor", value: "0" },
-  { label: "Ascent ceiling", value: `${ASCENT_MULTIPLE}× stake` },
-  { label: "Weekly drain", value: `${PASSIVE_DRAIN_HP} HP` },
+  { label: "Hunt / Ascent", value: `0 floor · ${ASCENT_MULTIPLE}× stake ceiling` },
+  { label: "Weekly drain", value: `${PASSIVE_DRAIN_HP} HP · Monday 09:30 NY` },
   { label: "Calibration reset", value: `${STARTING_HP} HP` },
   {
     label: "Buy HP",
     value: `Bronze only · restore to ${STARTING_HP}`,
   },
   {
-    label: "Desk unlock",
-    value: "1 / 5 / 25 / 200 UTL · 1–5× · 75% author",
+    label: "Topics",
+    value: `${SUB_TOPICS.length} books, overall plus per sector`,
   },
 ] as const;
 

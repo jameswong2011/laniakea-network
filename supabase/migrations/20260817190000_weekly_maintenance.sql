@@ -1,5 +1,7 @@
 -- Weekly 3 HP drain + quartile calibration.
--- Run once in the Supabase SQL editor. Schedules Monday 08:00 UTC via pg_cron
+-- Run once in the Supabase SQL editor. Schedules Monday 09:30 America/New_York
+-- via two UTC pg_cron slots (13:30 EDT / 14:30 EST). The function only runs
+-- inside that New York window.
 -- when the extension is available.
 
 create table if not exists public.weekly_maintenance_runs (
@@ -244,6 +246,17 @@ begin
 end;
 $$;
 
+create or replace function public.is_weekly_cron_window()
+returns boolean
+language sql
+stable
+as $$
+  select
+    extract(dow from timezone('America/New_York', now())) = 1
+    and extract(hour from timezone('America/New_York', now())) = 9
+    and extract(minute from timezone('America/New_York', now())) between 30 and 34;
+$$;
+
 create or replace function public.run_weekly_maintenance(p_source text default 'cron')
 returns jsonb
 language plpgsql
@@ -266,6 +279,16 @@ begin
       and p.role = 'admin'
   ) then
     raise exception 'admin only';
+  end if;
+
+  if p_source = 'cron' and not public.is_weekly_cron_window() then
+    return jsonb_build_object(
+      'skipped', true,
+      'drained', 0,
+      'drain_skipped', 0,
+      'promoted', 0,
+      'demoted', 0
+    );
   end if;
 
   week_start := date_trunc('week', timezone('utc', now())) at time zone 'utc';
@@ -394,19 +417,31 @@ $$;
 revoke all on function public.adjacent_tier(text, integer) from public;
 revoke all on function public.apply_book_calibration(text) from public;
 revoke all on function public.run_weekly_maintenance(text) from public;
+revoke all on function public.is_weekly_cron_window() from public;
 grant execute on function public.run_weekly_maintenance(text) to service_role;
 grant execute on function public.run_weekly_maintenance(text) to authenticated;
+grant execute on function public.is_weekly_cron_window() to service_role;
 
 do $$
 begin
   perform cron.unschedule(jobid)
   from cron.job
-  where jobname = 'laniakea-weekly-maintenance';
+  where jobname in (
+    'laniakea-weekly-maintenance',
+    'laniakea-weekly-maintenance-edt',
+    'laniakea-weekly-maintenance-est'
+  );
 
   perform cron.schedule(
-    'laniakea-weekly-maintenance',
-    '0 8 * * 1',
-    $cron$select public.run_weekly_maintenance('cron')$cron$
+    'laniakea-weekly-maintenance-edt',
+    '30 13 * * 1',
+    $cron$select public.run_weekly_maintenance('cron') where public.is_weekly_cron_window()$cron$
+  );
+
+  perform cron.schedule(
+    'laniakea-weekly-maintenance-est',
+    '30 14 * * 1',
+    $cron$select public.run_weekly_maintenance('cron') where public.is_weekly_cron_window()$cron$
   );
 exception
   when undefined_table then null;

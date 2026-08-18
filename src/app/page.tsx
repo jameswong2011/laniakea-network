@@ -1,20 +1,17 @@
 import type { Metadata } from "next";
+import { Floor } from "@/components/landing/floor";
 import { LandingFooter } from "@/components/landing/footer";
 import { LandingHeader } from "@/components/landing/header";
 import { Hero } from "@/components/landing/hero";
 import { HuntAscent } from "@/components/landing/hunt-ascent";
-import {
-  Close,
-  HpEconomy,
-  Layers,
-  NorthStar,
-} from "@/components/landing/mechanisms";
+import { Close, Rulebook } from "@/components/landing/mechanisms";
+import { Mission, Wave } from "@/components/landing/mission";
 import { getAuthContext } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
-  title: "The ranked arena for investment research",
+  title: "Open skies for investment research",
   description:
-    "Quality has a cost. Conviction has a score. The crowd settles the thesis.",
+    "Laniakea connects analysts who should run a book with investors who should stop gambling — a two-sided research floor where conviction has a cost.",
 };
 
 export default async function LandingPage() {
@@ -25,10 +22,11 @@ export default async function LandingPage() {
       <LandingHeader overHero isSignedIn={Boolean(userId)} />
       <main>
         <Hero />
-        <Layers />
-        <HpEconomy />
+        <Mission />
+        <Wave />
+        <Floor />
         <HuntAscent />
-        <NorthStar />
+        <Rulebook />
         <Close />
       </main>
       <LandingFooter />

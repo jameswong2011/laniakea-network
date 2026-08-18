@@ -42,10 +42,16 @@ export function LandingHeader({
 
       <nav className="hidden items-center gap-7 text-sm text-muted md:flex">
         <a
-          href="#mechanisms"
+          href="#thesis"
           className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
         >
-          Mechanisms
+          Thesis
+        </a>
+        <a
+          href="#floor"
+          className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
+        >
+          Floor
         </a>
         <a
           href="#arena"
