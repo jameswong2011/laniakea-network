@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
-import { getDeskAccess } from "@/lib/research/access";
+import { canWriteDesk } from "@/lib/research/access";
 import {
   DEFAULT_STAKE_HP,
   MAX_STAKE_HP,
@@ -12,6 +12,13 @@ import {
   voteCostHp,
   voteHealthDelta,
 } from "@/lib/research/economy";
+import {
+  DEFAULT_UNLOCK_RATE_MULTIPLE,
+  UNLOCK_RATE_MULTIPLE_MAX,
+  UNLOCK_RATE_MULTIPLE_MIN,
+  resolvePostDeskAccess,
+  resolveUnlockRateMultiple,
+} from "@/lib/research/unlock";
 import { researchPostPath } from "@/lib/research/feed";
 import { debitProfileHp, restoreProfileHp } from "@/lib/research/hp";
 import {
@@ -55,6 +62,17 @@ const createPostSchema = z.object({
     .int("Stake must be a whole number.")
     .min(1, "Stake at least 1 HP.")
     .max(MAX_STAKE_HP, `Stake at most ${MAX_STAKE_HP} HP.`),
+  unlockRateMultiple: z.coerce
+    .number()
+    .int("Unlock rate must be a whole number.")
+    .min(
+      UNLOCK_RATE_MULTIPLE_MIN,
+      `Unlock rate at least ${UNLOCK_RATE_MULTIPLE_MIN}×.`
+    )
+    .max(
+      UNLOCK_RATE_MULTIPLE_MAX,
+      `Unlock rate at most ${UNLOCK_RATE_MULTIPLE_MAX}×.`
+    ),
 });
 
 const voteSchema = z.object({
@@ -90,6 +108,8 @@ export async function createResearchPost(
     body: formData.get("body"),
     subTopic: formData.get("subTopic"),
     stakeHp: formData.get("stakeHp") ?? DEFAULT_STAKE_HP,
+    unlockRateMultiple:
+      formData.get("unlockRateMultiple") ?? DEFAULT_UNLOCK_RATE_MULTIPLE,
   });
 
   if (!parsed.success) {
@@ -100,13 +120,16 @@ export async function createResearchPost(
   }
 
   const { title, body, subTopic, stakeHp } = parsed.data;
+  const unlockRateMultiple = resolveUnlockRateMultiple(
+    parsed.data.unlockRateMultiple
+  );
   const debit = await debitProfileHp(supabase, userId, stakeHp);
 
   if (!debit.ok) {
     return { error: debit.error, stamp: Date.now() };
   }
 
-  const withStake = await supabase
+  const withUnlock = await supabase
     .from("research_posts")
     .insert({
       author_id: userId,
@@ -116,9 +139,28 @@ export async function createResearchPost(
       status: RESEARCH_POST_STATUS_LIVE,
       current_health: stakeHp,
       original_stake: stakeHp,
+      unlock_rate_multiple: unlockRateMultiple,
     })
     .select("id")
     .single();
+
+  const withStake =
+    withUnlock.error &&
+    withUnlock.error.message.includes("unlock_rate_multiple")
+      ? await supabase
+          .from("research_posts")
+          .insert({
+            author_id: userId,
+            title,
+            body,
+            sub_topic: subTopic,
+            status: RESEARCH_POST_STATUS_LIVE,
+            current_health: stakeHp,
+            original_stake: stakeHp,
+          })
+          .select("id")
+          .single()
+      : withUnlock;
 
   const postInsert =
     withStake.error && withStake.error.message.includes("original_stake")
@@ -253,15 +295,24 @@ export async function voteOnPost(
     .eq("id", post.author_id)
     .maybeSingle();
 
-  const access = getDeskAccess(
-    profile?.tier,
-    author?.tier,
-    profile?.role === "admin"
-  );
+  const access = await resolvePostDeskAccess(supabase, {
+    postId: post.id,
+    viewerId: userId,
+    viewerTier: profile?.tier,
+    authorTier: author?.tier,
+    isAdmin: profile?.role === "admin",
+  });
 
-  if (access !== "full") {
+  if (access === "hidden") {
     return {
-      error: "Higher-tier desks are view-only.",
+      error: "This desk is locked. Unlock it with UTL to read and engage.",
+      stamp: Date.now(),
+    };
+  }
+
+  if (!canWriteDesk(access)) {
+    return {
+      error: "Higher-tier desks are view-only until you unlock them.",
       stamp: Date.now(),
     };
   }

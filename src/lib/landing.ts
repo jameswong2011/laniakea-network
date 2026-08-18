@@ -28,7 +28,7 @@ export const LAYERS = [
   {
     index: "03",
     title: "Ranking",
-    body: "Bronze to Masters, overall and per topic. The desk one tier above you is view-only. Further desks are hidden.",
+    body: "Bronze to Masters, overall and per topic. The desk one tier above you is view-only unless you pay UTL. Further desks stay on the tape and can be unlocked per note. A sweep resets HP to 1000 in the new room.",
   },
   {
     index: "04",
@@ -55,6 +55,11 @@ export const HP_RULES = [
   { label: "Hunt floor", value: "0" },
   { label: "Ascent ceiling", value: `${ASCENT_MULTIPLE}× stake` },
   { label: "Weekly drain", value: `${PASSIVE_DRAIN_HP} HP` },
+  { label: "Calibration reset", value: `${STARTING_HP} HP` },
+  {
+    label: "Desk unlock",
+    value: "1 / 5 / 25 / 200 UTL · 1–5× · 75% author",
+  },
 ] as const;
 
 export const WORKED_STAKE = 100;

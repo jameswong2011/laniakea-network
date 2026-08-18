@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
-import { getDeskAccess } from "@/lib/research/access";
+import { canWriteDesk } from "@/lib/research/access";
+import { resolvePostDeskAccess } from "@/lib/research/unlock";
 import {
   DEFAULT_COMMENT_STAKE_HP,
   MAX_STAKE_HP,
@@ -108,7 +109,7 @@ async function insertLedger(
 async function loadVisiblePost(
   supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
   postId: string,
-  viewer: { tier?: string | null; role?: string | null }
+  viewer: { id?: string | null; tier?: string | null; role?: string | null }
 ) {
   const { data: post, error } = await supabase
     .from("research_posts")
@@ -126,14 +127,20 @@ async function loadVisiblePost(
     .eq("id", post.author_id)
     .maybeSingle();
 
-  const access = getDeskAccess(
-    viewer.tier,
-    author?.tier,
-    viewer.role === "admin"
-  );
+  const access = await resolvePostDeskAccess(supabase, {
+    postId,
+    viewerId: viewer.id,
+    viewerTier: viewer.tier,
+    authorTier: author?.tier,
+    isAdmin: viewer.role === "admin",
+  });
 
   if (access === "hidden") {
-    return { post: null, access: null, error: "Post was not found." };
+    return {
+      post: null,
+      access: null,
+      error: "This desk is locked. Unlock it with UTL to read and engage.",
+    };
   }
 
   return { post, access, error: null };
@@ -164,8 +171,11 @@ export async function createComment(
     return { error: visible.error ?? "Post was not found.", stamp: Date.now() };
   }
 
-  if (visible.access !== "full") {
-    return { error: "Higher-tier desks are view-only.", stamp: Date.now() };
+  if (!canWriteDesk(visible.access)) {
+    return {
+      error: "Higher-tier desks are view-only until you unlock them.",
+      stamp: Date.now(),
+    };
   }
 
   if (visible.post.status === RESEARCH_POST_STATUS_ARCHIVED) {
@@ -272,8 +282,11 @@ export async function voteOnComment(
     return { error: visible.error ?? "Post was not found.", stamp: Date.now() };
   }
 
-  if (visible.access !== "full") {
-    return { error: "Higher-tier desks are view-only.", stamp: Date.now() };
+  if (!canWriteDesk(visible.access)) {
+    return {
+      error: "Higher-tier desks are view-only until you unlock them.",
+      stamp: Date.now(),
+    };
   }
 
   if (visible.post.status === RESEARCH_POST_STATUS_ARCHIVED) {
@@ -483,6 +496,13 @@ export async function createReply(
 
   if (visible.error || !visible.post) {
     return { error: visible.error ?? "Post was not found.", stamp: Date.now() };
+  }
+
+  if (!canWriteDesk(visible.access)) {
+    return {
+      error: "Higher-tier desks are view-only until you unlock them.",
+      stamp: Date.now(),
+    };
   }
 
   const { data: comment } = await supabase

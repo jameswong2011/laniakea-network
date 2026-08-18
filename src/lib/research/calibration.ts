@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { STARTING_HP } from "@/lib/research/economy";
 import { getSubtopicRanks } from "@/lib/research/subtopic-ranks";
 import {
   HP_TRANSACTION_CALIBRATION,
@@ -12,6 +13,8 @@ import {
 
 export const CALIBRATION_QUARTILE = 0.25;
 export const CALIBRATION_BAND = CALIBRATION_QUARTILE;
+/** Fresh stack after a promote or demote. HP does not travel between desks. */
+export const CALIBRATION_RESET_HP = STARTING_HP;
 
 export type CalibrationScope = "overall" | SubTopic;
 
@@ -158,6 +161,7 @@ export async function applyCalibration(
       .from("profiles")
       .update({
         tier: move.to,
+        current_hp: CALIBRATION_RESET_HP,
         updated_at: now,
       })
       .eq("id", move.id);
@@ -182,6 +186,7 @@ export async function applySubtopicCalibration(
       .from("subtopic_ranks")
       .update({
         tier: move.to,
+        current_hp: CALIBRATION_RESET_HP,
         updated_at: now,
       })
       .eq("user_id", move.id)
@@ -199,7 +204,7 @@ export function calibrationLogDescription(move: CalibrationMove) {
   const verb = move.direction === "up" ? "promoted" : "demoted";
   const book = move.scope === "overall" ? "overall" : move.scope;
 
-  return `Calibration ${book}: ${verb} ${move.from} → ${move.to} (HP ${move.hp})`;
+  return `Calibration ${book}: ${verb} ${move.from} → ${move.to} (reset ${move.hp} → ${CALIBRATION_RESET_HP} HP)`;
 }
 
 export async function recordCalibrationLogs(
@@ -213,7 +218,7 @@ export async function recordCalibrationLogs(
   const { error } = await supabase.from("hp_transactions").insert(
     moves.map((move) => ({
       user_id: move.id,
-      amount: 0,
+      amount: CALIBRATION_RESET_HP - move.hp,
       type: HP_TRANSACTION_CALIBRATION,
       description: calibrationLogDescription(move),
     }))

@@ -110,8 +110,8 @@ export default async function RankingPage({
         title={selectedTopic ? `${selectedTopic} Ranking` : "Ranking"}
         description={
           selectedTopic
-            ? `Topic book by ${selectedTopic} HP. Overall desk is shown for context. Calibration moves the top and bottom ${quartilePct}% each week (${WEEKLY_CRON_LABEL}).`
-            : `Overall book by current HP. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time.`
+            ? `Topic book by ${selectedTopic} HP. Overall desk is shown for context. Calibration moves the top and bottom ${quartilePct}% each week (${WEEKLY_CRON_LABEL}) and resets swept desks to 1000 HP.`
+            : `Overall book by current HP. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time, and resets swept desks to 1000 HP.`
         }
         meta={
           <>

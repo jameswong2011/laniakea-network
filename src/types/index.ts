@@ -157,6 +157,7 @@ export type ResearchPost = {
   current_health: number;
   original_stake: number;
   sub_topic: SubTopic | string;
+  unlock_rate_multiple: number;
   created_at: string;
   updated_at: string;
 };
@@ -166,13 +167,23 @@ export type ResearchPostAuthor = Pick<
   "id" | "username" | "display_name" | "tier"
 >;
 
-export type FeedAccess = "full" | "view_only";
+export type FeedAccess = "full" | "view_only" | "hidden";
+
+export type UnlockQuote = {
+  steps: number;
+  baseTokens: number;
+  multiple: number;
+  tokens: number;
+  authorShare: number;
+  burned: number;
+};
 
 export type ResearchFeedItem = ResearchPost & {
   author: ResearchPostAuthor | null;
   authorTopicTier: Tier | null;
   deskTier: Tier | null;
   access: FeedAccess;
+  unlockQuote: UnlockQuote | null;
   commentCount?: number;
 };
 

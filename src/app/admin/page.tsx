@@ -21,8 +21,10 @@ import {
   COMMENTS_SQL_POLICIES,
   COMMENTS_SQL_TABLES,
 } from "@/lib/research/comments-sql";
+import { calibrationHpResetSql } from "@/lib/research/calibration-sql";
 import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
 import { EXPAND_SUBTOPICS_SQL } from "@/lib/research/subtopics-sql";
+import { POST_UNLOCK_SQL } from "@/lib/research/unlock-sql";
 import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
 import { getLatestWeeklyRun } from "@/lib/research/weekly";
 import { requireAdmin } from "@/lib/auth/session";
@@ -166,6 +168,29 @@ export default async function AdminPage() {
             {weeklyMaintenanceSql()}
           </pre>
         ) : null}
+      </Panel>
+
+      <Panel>
+        <PanelHeader label="Calibration HP reset" meta="1000 HP" />
+        <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
+          Needed so pg_cron sweeps reset HP to 1000. The in-app calibrator
+          already does this. Safe to re-run.
+        </p>
+        <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+          {calibrationHpResetSql()}
+        </pre>
+      </Panel>
+
+      <Panel>
+        <PanelHeader label="Desk unlock" meta="UTL" />
+        <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
+          Needed so a lower desk can pay UTL to read and engage a higher note.
+          Author sets 1–5× the 1 / 5 / 25 / 200 book. 75% to the author, 25%
+          burned. Safe to re-run.
+        </p>
+        <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+          {POST_UNLOCK_SQL}
+        </pre>
       </Panel>
 
       <Panel>

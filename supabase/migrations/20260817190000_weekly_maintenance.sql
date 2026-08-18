@@ -139,6 +139,7 @@ begin
     update public.profiles p
     set
       tier = m.to_tier,
+      current_hp = 1000,
       updated_at = now()
     from weekly_cal_moves m
     where p.id = m.id;
@@ -206,6 +207,7 @@ begin
     update public.subtopic_ranks r
     set
       tier = m.to_tier,
+      current_hp = 1000,
       updated_at = now()
     from weekly_cal_moves m
     where r.user_id = m.id
@@ -222,10 +224,10 @@ begin
     insert into public.hp_transactions (user_id, amount, type, description)
     select
       id,
-      0,
+      1000 - current_hp,
       'calibration',
       format(
-        'Calibration %s: %s %s → %s (HP %s)',
+        'Calibration %s: %s %s → %s (reset %s → 1000 HP)',
         p_scope,
         case when direction = 'up' then 'promoted' else 'demoted' end,
         from_tier,

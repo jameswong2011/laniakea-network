@@ -7,8 +7,10 @@ import { CommentThread } from "@/components/laniakea/CommentThread";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
+import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
 import { requireUser } from "@/lib/auth/session";
+import { canOpenDesk, deskAccessLabel } from "@/lib/research/access";
 import {
   getCommentThread,
   getViewerCommentVotes,
@@ -50,9 +52,11 @@ export default async function ResearchPostPage({
   const { supabase, userId, profile } = await requireUser();
   const deskTier = resolveTier(profile?.tier) ?? "Bronze";
   const { item, error } = await getResearchPostById(supabase, postId, {
+    userId,
     tier: deskTier,
     isAdmin: profile?.role === "admin",
   });
+  const availableTokens = profile?.utility_tokens ?? 0;
 
   if (error) {
     return (
@@ -66,6 +70,58 @@ export default async function ResearchPostPage({
 
   if (!item) {
     notFound();
+  }
+
+  const locked = !canOpenDesk(item.access);
+  const accessLabel = deskAccessLabel(item.access, item.deskTier);
+
+  if (locked) {
+    return (
+      <PageFrame>
+        <PageHeading
+          kicker="Thread"
+          title={item.title}
+          description="This desk is locked. Pay UTL to read and engage, or earn the tier."
+          meta={
+            <Link
+              href="/feed"
+              className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase hover:text-foreground"
+            >
+              Back to feed
+            </Link>
+          }
+        />
+        <article className="border border-border bg-panel px-2.5 py-4">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            <SubTopicBadge topic={item.sub_topic} />
+            {accessLabel ? (
+              <span className="inline-flex h-6 items-center border border-border bg-panel-elevated px-1.5 font-data text-[9px] tracking-[0.12em] text-muted-foreground uppercase">
+                {accessLabel}
+              </span>
+            ) : null}
+          </div>
+          {item.body ? (
+            <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
+              {item.body}
+            </p>
+          ) : null}
+          {item.unlockQuote ? (
+            <UnlockPostButton
+              postId={item.id}
+              access={item.access}
+              quote={item.unlockQuote}
+              availableTokens={availableTokens}
+              layout="block"
+            />
+          ) : (
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              Earn {item.deskTier ? TIER_LABELS[item.deskTier] : "this desk"} to
+              open it.
+            </p>
+          )}
+        </article>
+      </PageFrame>
+    );
   }
 
   const viewerVotes = await getViewerVotes(supabase, userId, [item.id]);
@@ -108,16 +164,26 @@ export default async function ResearchPostPage({
                   Hunted
                 </span>
               ) : null}
-              {item.access === "view_only" ? (
+              {accessLabel ? (
                 <span className="inline-flex h-6 items-center border border-warning/40 bg-warning-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-warning uppercase">
-                  View only
-                  {item.deskTier ? ` · ${TIER_LABELS[item.deskTier]} desk` : ""}
+                  {accessLabel}
                 </span>
               ) : null}
             </div>
             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
               {item.body}
             </p>
+            {item.unlockQuote ? (
+              <div className="mt-3">
+                <UnlockPostButton
+                  postId={item.id}
+                  access={item.access}
+                  quote={item.unlockQuote}
+                  availableTokens={availableTokens}
+                  layout="block"
+                />
+              </div>
+            ) : null}
           </div>
           <HealthMeter
             currentHealth={item.current_health}

@@ -3,24 +3,16 @@ import Link from "next/link";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
+import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
-import { researchPostPath } from "@/lib/research/feed";
+import { canOpenDesk, canWriteDesk, deskAccessLabel } from "@/lib/research/access";
+import { researchExcerpt, researchPostPath } from "@/lib/research/feed";
 import { getPostHealthState, isAscendedStatus } from "@/lib/research/health";
 import {
   RESEARCH_POST_STATUS_LIVE,
   TIER_LABELS,
   type ResearchFeedItem,
 } from "@/types";
-
-function excerpt(body: string, max = 220) {
-  const compact = body.replace(/\s+/g, " ").trim();
-
-  if (compact.length <= max) {
-    return compact;
-  }
-
-  return `${compact.slice(0, max).trimEnd()}…`;
-}
 
 function healthSurface(state: ReturnType<typeof getPostHealthState>) {
   if (state === "dying") {
@@ -39,11 +31,13 @@ export function ResearchFeed({
   viewerVotes,
   canVote,
   availableHp,
+  availableTokens,
 }: {
   items: ResearchFeedItem[];
   viewerVotes: Record<string, number>;
   canVote: boolean;
   availableHp: number;
+  availableTokens: number;
 }) {
   if (items.length === 0) {
     return (
@@ -62,6 +56,10 @@ export function ResearchFeed({
           item.current_health,
           item.original_stake
         );
+        const open = canOpenDesk(item.access);
+        const write = canWriteDesk(item.access);
+        const accessLabel = deskAccessLabel(item.access, item.deskTier);
+        const href = researchPostPath(item.id);
 
         return (
           <article
@@ -77,37 +75,59 @@ export function ResearchFeed({
                       Ascended
                     </span>
                   ) : null}
-                  {item.access === "view_only" ? (
-                    <span className="inline-flex h-6 items-center border border-warning/40 bg-warning-muted px-1.5 font-data text-[9px] tracking-[0.12em] text-warning uppercase">
-                      View only
-                      {item.deskTier ? ` · ${TIER_LABELS[item.deskTier]} desk` : ""}
+                  {accessLabel ? (
+                    <span
+                      className={`inline-flex h-6 items-center border px-1.5 font-data text-[9px] tracking-[0.12em] uppercase ${
+                        item.access === "hidden"
+                          ? "border-border bg-panel-elevated text-muted-foreground"
+                          : "border-warning/40 bg-warning-muted text-warning"
+                      }`}
+                    >
+                      {accessLabel}
                     </span>
                   ) : null}
                 </div>
                 <h2 className="text-[13px] font-medium tracking-tight text-foreground">
-                  <Link
-                    href={researchPostPath(item.id)}
-                    className="hover:text-gain"
-                  >
-                    {item.title}
-                  </Link>
+                  {open ? (
+                    <Link href={href} className="hover:text-gain">
+                      {item.title}
+                    </Link>
+                  ) : (
+                    <span>{item.title}</span>
+                  )}
                 </h2>
-                <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
-                  <Link
-                    href={researchPostPath(item.id)}
-                    className="hover:text-foreground"
-                  >
-                    {excerpt(item.body)}
-                  </Link>
-                </p>
-                <p className="mt-1.5 font-data text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
-                  <Link
-                    href={researchPostPath(item.id)}
-                    className="hover:text-foreground"
-                  >
-                    {item.commentCount ?? 0} comments · Open thread
-                  </Link>
-                </p>
+                {item.body ? (
+                  <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+                    {open ? (
+                      <Link href={href} className="hover:text-foreground">
+                        {researchExcerpt(item.body)}
+                      </Link>
+                    ) : (
+                      researchExcerpt(item.body)
+                    )}
+                  </p>
+                ) : null}
+                {open ? (
+                  <p className="mt-1.5 font-data text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
+                    <Link href={href} className="hover:text-foreground">
+                      {item.commentCount ?? 0} comments · Open thread
+                    </Link>
+                  </p>
+                ) : (
+                  <p className="mt-1.5 font-data text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
+                    {item.commentCount ?? 0} comments · Locked
+                  </p>
+                )}
+                {item.unlockQuote ? (
+                  <div className="mt-2">
+                    <UnlockPostButton
+                      postId={item.id}
+                      access={item.access}
+                      quote={item.unlockQuote}
+                      availableTokens={availableTokens}
+                    />
+                  </div>
+                ) : null}
               </div>
               <HealthMeter
                 currentHealth={item.current_health}
@@ -137,16 +157,18 @@ export function ResearchFeed({
                 currentVote={viewerVotes[item.id] ?? null}
                 canVote={
                   canVote &&
-                  item.access === "full" &&
+                  write &&
                   item.status === RESEARCH_POST_STATUS_LIVE
                 }
                 availableHp={availableHp}
                 lockReason={
                   isAscendedStatus(item.status)
                     ? "Ascended"
-                    : item.access === "view_only"
-                      ? "View only"
-                      : undefined
+                    : item.access === "hidden"
+                      ? "Locked"
+                      : item.access === "view_only"
+                        ? "View only"
+                        : undefined
                 }
               />
             </div>

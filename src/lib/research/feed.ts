@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDeskAccess } from "@/lib/research/access";
 import {
+  loadViewerUnlockIds,
+  quoteDeskUnlock,
+  resolveUnlockRateMultiple,
+  withPaidUnlock,
+} from "@/lib/research/unlock";
+import {
   RESEARCH_POST_STATUS_ASCENDED,
   RESEARCH_POST_STATUS_LIVE,
   SUB_TOPICS,
@@ -19,6 +25,16 @@ export function researchPostPath(postId: string) {
 
 export function researchComposePath() {
   return "/feed/new";
+}
+
+export function researchExcerpt(body: string, max = 220) {
+  const compact = body.replace(/\s+/g, " ").trim();
+
+  if (compact.length <= max) {
+    return compact;
+  }
+
+  return `${compact.slice(0, max).trimEnd()}…`;
 }
 
 /** null = every sub-topic (the default). */
@@ -87,13 +103,26 @@ export function itemMatchesFeedTopics(
 }
 
 const POST_COLUMNS =
+  "id, author_id, title, body, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
+
+const POST_COLUMNS_WITHOUT_UNLOCK =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, created_at, updated_at";
 
 const FEED_STATUSES = [RESEARCH_POST_STATUS_LIVE, RESEARCH_POST_STATUS_ASCENDED];
 
-type RawPost = Omit<ResearchPost, "sub_topic" | "original_stake"> & {
+type FeedViewer = {
+  userId?: string;
+  tier?: string | null;
+  isAdmin?: boolean;
+};
+
+type RawPost = Omit<
+  ResearchPost,
+  "sub_topic" | "original_stake" | "unlock_rate_multiple"
+> & {
   sub_topic?: string;
   original_stake?: number | null;
+  unlock_rate_multiple?: number | null;
 };
 
 function normalizePosts(rows: RawPost[] | null): ResearchPost[] {
@@ -102,6 +131,7 @@ function normalizePosts(rows: RawPost[] | null): ResearchPost[] {
     sub_topic: post.sub_topic ?? "",
     original_stake: post.original_stake ?? post.current_health ?? 0,
     current_health: post.current_health ?? 0,
+    unlock_rate_multiple: resolveUnlockRateMultiple(post.unlock_rate_multiple),
   }));
 }
 
@@ -148,43 +178,54 @@ async function loadAuthorMeta(
 
 function toFeedItem(
   post: ResearchPost,
-  viewer: { tier?: string | null; isAdmin?: boolean } | undefined,
+  viewer: FeedViewer | undefined,
   authorsById: Map<string, ResearchPostAuthor>,
-  topicTiers: Map<string, ReturnType<typeof resolveTier>>
+  topicTiers: Map<string, ReturnType<typeof resolveTier>>,
+  unlocked: boolean
 ): ResearchFeedItem | null {
   const topic = resolveSubTopic(post.sub_topic);
   const author = authorsById.get(post.author_id) ?? null;
   const deskTier = resolveTier(author?.tier);
-  const access = getDeskAccess(
-    viewer?.tier,
-    author?.tier,
-    viewer?.isAdmin ?? false
+  const access = withPaidUnlock(
+    getDeskAccess(viewer?.tier, author?.tier, viewer?.isAdmin ?? false),
+    unlocked
   );
-
-  if (access === "hidden") {
-    return null;
-  }
+  const unlockQuote =
+    access === "full"
+      ? null
+      : quoteDeskUnlock(viewer?.tier, author?.tier, post.unlock_rate_multiple);
 
   return {
     ...post,
+    body: access === "hidden" ? researchExcerpt(post.body) : post.body,
     author,
     authorTopicTier: topic
       ? (topicTiers.get(`${post.author_id}:${topic}`) ?? deskTier)
       : deskTier,
     deskTier,
     access,
+    unlockQuote,
   };
 }
 
 export async function getLiveResearchFeed(
   supabase: SupabaseClient,
-  viewer?: { tier?: string | null; isAdmin?: boolean }
+  viewer?: FeedViewer
 ): Promise<{ items: ResearchFeedItem[]; error: string | null }> {
-  const withTopic = await supabase
+  const withUnlock = await supabase
     .from("research_posts")
     .select(POST_COLUMNS)
     .in("status", FEED_STATUSES)
     .order("created_at", { ascending: false });
+
+  const withTopic =
+    withUnlock.error && withUnlock.error.message.includes("unlock_rate_multiple")
+      ? await supabase
+          .from("research_posts")
+          .select(POST_COLUMNS_WITHOUT_UNLOCK)
+          .in("status", FEED_STATUSES)
+          .order("created_at", { ascending: false })
+      : withUnlock;
 
   const withoutStake =
     withTopic.error && withTopic.error.message.includes("original_stake")
@@ -219,10 +260,21 @@ export async function getLiveResearchFeed(
     supabase,
     [...new Set(posts.map((post) => post.author_id))]
   );
+  const unlockIds = await loadViewerUnlockIds(
+    supabase,
+    viewer?.userId,
+    posts.map((post) => post.id)
+  );
 
   return {
     items: posts.flatMap((post) => {
-      const item = toFeedItem(post, viewer, authorsById, topicTiers);
+      const item = toFeedItem(
+        post,
+        viewer,
+        authorsById,
+        topicTiers,
+        unlockIds.has(post.id)
+      );
       return item ? [item] : [];
     }),
     error: null,
@@ -232,13 +284,22 @@ export async function getLiveResearchFeed(
 export async function getResearchPostById(
   supabase: SupabaseClient,
   postId: string,
-  viewer?: { tier?: string | null; isAdmin?: boolean }
+  viewer?: FeedViewer
 ): Promise<{ item: ResearchFeedItem | null; error: string | null }> {
-  const withStake = await supabase
+  const withUnlock = await supabase
     .from("research_posts")
     .select(POST_COLUMNS)
     .eq("id", postId)
     .maybeSingle();
+
+  const withStake =
+    withUnlock.error && withUnlock.error.message.includes("unlock_rate_multiple")
+      ? await supabase
+          .from("research_posts")
+          .select(POST_COLUMNS_WITHOUT_UNLOCK)
+          .eq("id", postId)
+          .maybeSingle()
+      : withUnlock;
 
   const postRead =
     withStake.error && withStake.error.message.includes("original_stake")
@@ -269,9 +330,20 @@ export async function getResearchPostById(
   const { authorsById, topicTiers } = await loadAuthorMeta(supabase, [
     post.author_id,
   ]);
+  const unlockIds = await loadViewerUnlockIds(
+    supabase,
+    viewer?.userId,
+    [post.id]
+  );
 
   return {
-    item: toFeedItem(post, viewer, authorsById, topicTiers),
+    item: toFeedItem(
+      post,
+      viewer,
+      authorsById,
+      topicTiers,
+      unlockIds.has(post.id)
+    ),
     error: null,
   };
 }

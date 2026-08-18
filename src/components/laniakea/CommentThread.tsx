@@ -86,7 +86,11 @@ export function CommentThread({
           closedReason={
             postHunted
               ? "This post has been hunted. Comments are closed."
-              : undefined
+              : access === "view_only"
+                ? "View only. Unlock this note with UTL to comment."
+                : access === "hidden"
+                  ? "This desk is locked. Unlock it with UTL to engage."
+                  : undefined
           }
         />
       )}
@@ -203,7 +207,9 @@ export function CommentThread({
                   </div>
                 </div>
               ))}
-              <ReplyComposer postId={postId} commentId={comment.id} />
+              {access === "full" ? (
+                <ReplyComposer postId={postId} commentId={comment.id} />
+              ) : null}
             </div>
           </article>
         );

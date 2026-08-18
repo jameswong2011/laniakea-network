@@ -28,6 +28,7 @@ export default async function FeedPage({
   const { supabase, userId, profile } = await requireUser();
   const deskTier = resolveTier(profile?.tier) ?? "Bronze";
   const { items, error } = await getLiveResearchFeed(supabase, {
+    userId,
     tier: deskTier,
     isAdmin: profile?.role === "admin",
   });
@@ -54,7 +55,7 @@ export default async function FeedPage({
       <PageHeading
         kicker="Market"
         title="Research Feed"
-        description="Open a thread to read, vote, and comment."
+        description="Open a thread to read, vote, and comment. Lower desks can unlock a higher note with UTL."
         meta={
           <>
             <TierBadge tier={deskTier} size="md" />
@@ -87,6 +88,7 @@ export default async function FeedPage({
           viewerVotes={viewerVotes}
           canVote={availableHp >= VOTE_COST_HP}
           availableHp={availableHp}
+          availableTokens={profile?.utility_tokens ?? 0}
         />
       )}
     </PageFrame>

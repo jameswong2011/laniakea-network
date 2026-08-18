@@ -50,7 +50,7 @@ export function signedLedgerAmount(type: string, amount: number) {
   }
 
   if (type === HP_TRANSACTION_CALIBRATION) {
-    return 0;
+    return amount;
   }
 
   return amount;

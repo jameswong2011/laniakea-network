@@ -1,4 +1,4 @@
-import { TIER_RANK, resolveTier, type Tier } from "@/types";
+import { TIER_LABELS, TIER_RANK, resolveTier, type Tier } from "@/types";
 
 export type DeskAccess = "full" | "view_only" | "hidden";
 
@@ -47,4 +47,26 @@ export function getDeskAccess(
   }
 
   return "hidden";
+}
+
+export function canOpenDesk(access: DeskAccess) {
+  return access === "full" || access === "view_only";
+}
+
+export function canWriteDesk(access: DeskAccess) {
+  return access === "full";
+}
+
+export function deskAccessLabel(access: DeskAccess, deskTier?: Tier | null) {
+  const desk = deskTier ? ` · ${TIER_LABELS[deskTier]} desk` : "";
+
+  if (access === "view_only") {
+    return `View only${desk}`;
+  }
+
+  if (access === "hidden") {
+    return `Locked${desk}`;
+  }
+
+  return null;
 }
