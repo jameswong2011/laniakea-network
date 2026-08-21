@@ -204,68 +204,59 @@ export function CommentThread({
               focused ? "bg-gain-muted/40" : ""
             }`}
           >
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
-                  {comment.author ? <TierBadge tier={comment.author.tier} /> : null}
-                  <AuthorLink
-                    username={comment.author?.username}
-                    displayName={comment.author?.display_name}
-                    avatarUrl={comment.author?.avatar_url}
-                  />
-                  <span className="text-muted-foreground">
-                    {format(new Date(comment.created_at), "d MMM yyyy")}
-                  </span>
-                  {comment.updated_at !== comment.created_at ? (
-                    <span className="text-muted-foreground">edited</span>
-                  ) : null}
-                  <CopyPermalinkButton
-                    path={researchCommentPath(postId, comment.id)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCollapsed((current) => ({
-                        ...current,
-                        [comment.id]: !hidden,
-                      }))
-                    }
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {hidden ? "Expand" : "Collapse"}
-                  </button>
-                </div>
-                {hidden ? (
-                  <p className="text-[13px] text-muted-foreground">
-                    {comment.replies.length} hidden{" "}
-                    {comment.replies.length === 1 ? "reply" : "replies"}
-                  </p>
-                ) : (
-                  <>
-                    <MarkdownBody source={comment.body} />
-                    {isAuthor ? (
-                      <EditBodyForm
-                        kind="comment"
-                        postId={postId}
-                        targetId={comment.id}
-                        initialBody={comment.body}
-                        maxLength={COMMENT_BODY_MAX}
-                      />
-                    ) : null}
-                  </>
-                )}
-              </div>
-              {hidden ? null : (
-                <HealthMeter
-                  currentHealth={comment.current_health}
-                  originalStake={comment.original_stake}
-                  status={comment.status}
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                {comment.author ? <TierBadge tier={comment.author.tier} /> : null}
+                <AuthorLink
+                  username={comment.author?.username}
+                  displayName={comment.author?.display_name}
+                  avatarUrl={comment.author?.avatar_url}
                 />
+                <span className="text-muted-foreground">
+                  {format(new Date(comment.created_at), "d MMM yyyy")}
+                </span>
+                {comment.updated_at !== comment.created_at ? (
+                  <span className="text-muted-foreground">edited</span>
+                ) : null}
+                <CopyPermalinkButton
+                  path={researchCommentPath(postId, comment.id)}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCollapsed((current) => ({
+                      ...current,
+                      [comment.id]: !hidden,
+                    }))
+                  }
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {hidden ? "Expand" : "Collapse"}
+                </button>
+              </div>
+              {hidden ? (
+                <p className="text-[13px] text-muted-foreground">
+                  {comment.replies.length} hidden{" "}
+                  {comment.replies.length === 1 ? "reply" : "replies"}
+                </p>
+              ) : (
+                <>
+                  <MarkdownBody source={comment.body} />
+                  {isAuthor ? (
+                    <EditBodyForm
+                      kind="comment"
+                      postId={postId}
+                      targetId={comment.id}
+                      initialBody={comment.body}
+                      maxLength={COMMENT_BODY_MAX}
+                    />
+                  ) : null}
+                </>
               )}
             </div>
             {hidden ? null : (
               <>
-                <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                <div className="mt-3 flex flex-col gap-3">
                   <ReactionBar
                     targetType="comment"
                     targetId={comment.id}
@@ -273,28 +264,35 @@ export function CommentThread({
                     counts={commentReactions[comment.id] ?? []}
                     canReact={access === "full"}
                   />
-                  <VoteControls
-                    postId={postId}
-                    commentId={comment.id}
-                    currentVote={viewerVotes[comment.id] ?? null}
-                    canVote={
-                      canVote &&
-                      canWrite &&
-                      comment.status === RESEARCH_POST_STATUS_LIVE
-                    }
-                    availableHp={availableHp}
-                    lockReason={
-                      isAscendedStatus(comment.status)
-                        ? "Ascended"
-                        : isHuntedStatus(comment.status)
-                          ? "Hunted"
-                          : isRefundedStatus(comment.status)
-                            ? "Refunded"
-                            : access === "view_only"
-                              ? "View only"
-                              : undefined
-                    }
-                  />
+                  <div className="flex items-end justify-between gap-3 border-t border-border pt-3">
+                    <VoteControls
+                      postId={postId}
+                      commentId={comment.id}
+                      currentVote={viewerVotes[comment.id] ?? null}
+                      canVote={
+                        canVote &&
+                        canWrite &&
+                        comment.status === RESEARCH_POST_STATUS_LIVE
+                      }
+                      availableHp={availableHp}
+                      lockReason={
+                        isAscendedStatus(comment.status)
+                          ? "Ascended"
+                          : isHuntedStatus(comment.status)
+                            ? "Hunted"
+                            : isRefundedStatus(comment.status)
+                              ? "Refunded"
+                              : access === "view_only"
+                                ? "View only"
+                                : undefined
+                      }
+                    />
+                    <HealthMeter
+                      currentHealth={comment.current_health}
+                      originalStake={comment.original_stake}
+                      status={comment.status}
+                    />
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-col gap-4 border-l border-border pl-4">
                   {comment.replies.map((reply) => (

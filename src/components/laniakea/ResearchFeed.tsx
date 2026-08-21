@@ -54,27 +54,38 @@ export function ResearchFeed({
             key={item.id}
             className={`rounded-xl border border-border border-l-[3px] bg-panel px-4 py-4 ${deskAccessRailClass(item.access)}`}
           >
-            <div className="flex items-start gap-4">
-              <VoteControls
-                postId={item.id}
-                currentVote={viewerVotes[item.id] ?? null}
-                canVote={
-                  canVote &&
-                  write &&
-                  item.status === RESEARCH_POST_STATUS_LIVE
-                }
-                availableHp={availableHp}
-                lockReason={
-                  isAscendedStatus(item.status)
-                    ? "Ascended"
-                    : item.access === "hidden"
-                      ? "Locked"
-                      : item.access === "view_only"
-                        ? "View only"
-                        : undefined
-                }
-              />
-              <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start">
+              <div className="order-2 flex items-end justify-between gap-3 border-t border-border pt-3 md:order-1 md:block md:border-t-0 md:pt-0">
+                <VoteControls
+                  postId={item.id}
+                  currentVote={viewerVotes[item.id] ?? null}
+                  canVote={
+                    canVote &&
+                    write &&
+                    item.status === RESEARCH_POST_STATUS_LIVE
+                  }
+                  availableHp={availableHp}
+                  lockReason={
+                    isAscendedStatus(item.status)
+                      ? "Ascended"
+                      : item.access === "hidden"
+                        ? "Locked"
+                        : item.access === "view_only"
+                          ? "View only"
+                          : undefined
+                  }
+                />
+                {open ? (
+                  <div className="md:hidden">
+                    <HealthMeter
+                      currentHealth={item.current_health}
+                      originalStake={item.original_stake}
+                      status={item.status}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div className="order-1 min-w-0 flex-1 md:order-2">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <SubTopicBadge topic={item.sub_topic} />
                   {item.deskTier ? (
@@ -145,11 +156,13 @@ export function ResearchFeed({
                       saved={savedIds.has(item.id)}
                       sharePath={href}
                     />
-                    <HealthMeter
-                      currentHealth={item.current_health}
-                      originalStake={item.original_stake}
-                      status={item.status}
-                    />
+                    <div className="hidden md:block">
+                      <HealthMeter
+                        currentHealth={item.current_health}
+                        originalStake={item.original_stake}
+                        status={item.status}
+                      />
+                    </div>
                   </div>
                 ) : null}
               </div>

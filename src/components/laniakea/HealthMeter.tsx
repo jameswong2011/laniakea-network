@@ -62,7 +62,7 @@ export function HealthMeter({
         : healthTone(state);
 
   return (
-    <div className="flex w-[9.5rem] shrink-0 flex-col gap-1">
+    <div className="flex w-[8.75rem] shrink-0 flex-col gap-1 sm:w-[9.5rem]">
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-data text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
           Health Points

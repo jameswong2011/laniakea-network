@@ -192,27 +192,36 @@ export default async function ResearchPostPage({
       <article
         className={`rounded-xl border border-border border-l-[3px] bg-panel px-5 py-5 ${deskAccessRailClass(item.access)}`}
       >
-        <div className="flex items-start gap-5">
-          <VoteControls
-            postId={item.id}
-            currentVote={viewerVotes[item.id] ?? null}
-            canVote={
-              availableHp >= VOTE_COST_HP &&
-              item.access === "full" &&
-              item.status === RESEARCH_POST_STATUS_LIVE
-            }
-            availableHp={availableHp}
-            lockReason={
-              isAscendedStatus(item.status)
-                ? "Ascended"
-                : isHuntedStatus(item.status)
-                  ? "Hunted"
-                  : item.access === "view_only"
-                    ? "View only"
-                    : undefined
-            }
-          />
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start">
+          <div className="order-2 flex items-end justify-between gap-3 border-t border-border pt-3 md:order-1 md:block md:border-t-0 md:pt-0">
+            <VoteControls
+              postId={item.id}
+              currentVote={viewerVotes[item.id] ?? null}
+              canVote={
+                availableHp >= VOTE_COST_HP &&
+                item.access === "full" &&
+                item.status === RESEARCH_POST_STATUS_LIVE
+              }
+              availableHp={availableHp}
+              lockReason={
+                isAscendedStatus(item.status)
+                  ? "Ascended"
+                  : isHuntedStatus(item.status)
+                    ? "Hunted"
+                    : item.access === "view_only"
+                      ? "View only"
+                      : undefined
+              }
+            />
+            <div className="md:hidden">
+              <HealthMeter
+                currentHealth={item.current_health}
+                originalStake={item.original_stake}
+                status={item.status}
+              />
+            </div>
+          </div>
+          <div className="order-1 min-w-0 flex-1 md:order-2">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <SubTopicBadge topic={item.sub_topic} />
               {item.deskTier ? (
@@ -272,11 +281,13 @@ export default async function ResearchPostPage({
                   />
                 ) : null}
               </div>
-              <HealthMeter
-                currentHealth={item.current_health}
-                originalStake={item.original_stake}
-                status={item.status}
-              />
+              <div className="hidden md:block">
+                <HealthMeter
+                  currentHealth={item.current_health}
+                  originalStake={item.original_stake}
+                  status={item.status}
+                />
+              </div>
             </div>
             <div className="mt-4 flex flex-col gap-3">
               <ReactionBar

@@ -50,7 +50,7 @@ export function VoteControls({
   const cost = voteCostHp(strength);
 
   return (
-    <form action={action} className="flex w-[9.5rem] flex-col items-end gap-1">
+    <form action={action} className="flex w-[8.75rem] shrink-0 flex-col items-end gap-1 sm:w-[9.5rem]">
       <input type="hidden" name="postId" value={postId} />
       {commentId ? (
         <input type="hidden" name="commentId" value={commentId} />
