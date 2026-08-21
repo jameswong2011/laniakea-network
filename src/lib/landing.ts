@@ -41,7 +41,7 @@ export const AUDIENCES = [
 export const FLOOR_TRAITS = [
   {
     title: "Long notes, not takes",
-    body: "Markdown, images, and threads. Comments can hunt and ascend. Direct replies stay light. Named reactions — Agree, Disagree, Detailed, Non-consensus, Informative — mark the work, not the author.",
+    body: "Markdown, images, and threads. Comments can hunt and ascend. Direct replies stay light. Named reactions — Agree, Disagree, Detailed, Non-consensus, Informative, Funny — mark the work, not the author.",
   },
   {
     title: "Desks you have to earn",

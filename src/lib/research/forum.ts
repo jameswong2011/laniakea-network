@@ -7,6 +7,7 @@ export const REACTION_KEYS = [
   "detailed",
   "non_consensus",
   "informative",
+  "funny",
 ] as const;
 
 export type ReactionKey = (typeof REACTION_KEYS)[number];
@@ -18,6 +19,7 @@ export const REACTION_LABELS: Record<ReactionKey, string> = {
   detailed: "Detailed",
   non_consensus: "Non-consensus",
   informative: "Informative",
+  funny: "Funny",
 };
 
 export type ReactionCount = {
