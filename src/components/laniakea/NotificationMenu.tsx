@@ -33,7 +33,7 @@ export function NotificationMenu({
         ) : null}
       </button>
       {open ? (
-        <div className="absolute top-full right-0 z-30 mt-1 w-80 rounded-xl border border-border bg-panel p-2 shadow-lg">
+        <div className="absolute top-full right-0 z-30 mt-1 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-border bg-panel p-2 shadow-lg">
           <div className="mb-2 flex items-center justify-between px-1">
             <p className="text-[13px] font-medium text-foreground">Inbox</p>
             {unread > 0 ? (
