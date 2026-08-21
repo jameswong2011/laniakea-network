@@ -1,5 +1,6 @@
 -- One-shot: empty the tape. Keeps profiles, HP, UTL, invites, weekly history.
 -- Safe to re-run (no-op on an empty tape). Hunt / Ascent math is unchanged.
+-- Every DELETE has a WHERE so the Supabase SQL editor will accept it.
 
 create or replace function public.wipe_forum_content()
 returns jsonb
@@ -19,67 +20,67 @@ begin
     raise exception 'Admin only';
   end if;
 
-  delete from public.content_reactions;
-  delete from public.content_drafts;
+  delete from public.content_reactions where true;
+  delete from public.content_drafts where true;
   get diagnostics v_drafts = row_count;
-  delete from public.subtopic_ranks;
+  delete from public.subtopic_ranks where true;
 
   begin
-    delete from public.comment_reply_likes;
+    delete from public.comment_reply_likes where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.comment_replies;
+    delete from public.comment_replies where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.comment_votes;
+    delete from public.comment_votes where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.research_comments;
+    delete from public.research_comments where true;
     get diagnostics v_comments = row_count;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.votes;
+    delete from public.votes where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.post_unlocks;
+    delete from public.post_unlocks where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.saved_posts;
+    delete from public.saved_posts where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.post_subscriptions;
+    delete from public.post_subscriptions where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.notifications;
+    delete from public.notifications where true;
   exception
     when undefined_table then null;
   end;
 
-  delete from public.research_posts;
+  delete from public.research_posts where true;
   get diagnostics v_posts = row_count;
 
   update public.hp_transactions
@@ -109,66 +110,66 @@ declare
   v_posts integer := 0;
   v_comments integer := 0;
 begin
-  delete from public.content_reactions;
-  delete from public.content_drafts;
-  delete from public.subtopic_ranks;
+  delete from public.content_reactions where true;
+  delete from public.content_drafts where true;
+  delete from public.subtopic_ranks where true;
 
   begin
-    delete from public.comment_reply_likes;
+    delete from public.comment_reply_likes where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.comment_replies;
+    delete from public.comment_replies where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.comment_votes;
+    delete from public.comment_votes where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.research_comments;
+    delete from public.research_comments where true;
     get diagnostics v_comments = row_count;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.votes;
+    delete from public.votes where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.post_unlocks;
+    delete from public.post_unlocks where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.saved_posts;
+    delete from public.saved_posts where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.post_subscriptions;
+    delete from public.post_subscriptions where true;
   exception
     when undefined_table then null;
   end;
 
   begin
-    delete from public.notifications;
+    delete from public.notifications where true;
   exception
     when undefined_table then null;
   end;
 
-  delete from public.research_posts;
+  delete from public.research_posts where true;
   get diagnostics v_posts = row_count;
 
   update public.hp_transactions
