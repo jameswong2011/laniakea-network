@@ -45,6 +45,6 @@ $$;
 
 -- If pg_cron already installed run_weekly_maintenance, re-apply
 -- supabase/migrations/20260817190000_weekly_maintenance.sql after this
--- so the SQL calibrator walks the same 27 books. App calibration already
+-- so the SQL calibrator walks the same topic list. App calibration already
 -- uses SUB_TOPICS.
 `;

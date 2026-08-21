@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SUB_TOPICS, type SubTopic } from "@/types";
+import { SUB_TOPICS, VAULT_SUB_TOPICS, isVaultSubTopic, type SubTopic } from "@/types";
 
 function tabClassName(active: boolean) {
   return `flex h-7 items-center px-2.5 font-data text-[10px] tracking-[0.12em] uppercase ${
@@ -19,7 +19,16 @@ export function RankingTopicNav({
       <Link href="/ranking" className={tabClassName(selected === null)}>
         Overall
       </Link>
-      {SUB_TOPICS.map((topic) => (
+      {VAULT_SUB_TOPICS.map((topic) => (
+        <Link
+          key={topic}
+          href={`/ranking?topic=${encodeURIComponent(topic)}`}
+          className={tabClassName(selected === topic)}
+        >
+          {topic}
+        </Link>
+      ))}
+      {SUB_TOPICS.filter((topic) => !isVaultSubTopic(topic)).map((topic) => (
         <Link
           key={topic}
           href={`/ranking?topic=${encodeURIComponent(topic)}`}

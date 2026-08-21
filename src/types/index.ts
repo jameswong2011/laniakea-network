@@ -66,6 +66,25 @@ export function compareTierThenHp(
   return (a.username ?? a.user_id ?? "").localeCompare(b.username ?? b.user_id ?? "");
 }
 
+/**
+ * Vault slices. These are not on the original 27-book tape.
+ * They split Technology / Software / Semiconductors / Energy the way
+ * /Users/alexcohen/InvestmentVault actually files work.
+ */
+export const VAULT_SUB_TOPICS = [
+  "AI Compute",
+  "AI Infrastructure",
+  "Datacenter Power",
+  "Vertical Software",
+  "Digital Media",
+  "Semi Equipment",
+  "Memory",
+  "Advanced Packaging",
+  "Foundry",
+  "Photonics",
+] as const;
+export type VaultSubTopic = (typeof VAULT_SUB_TOPICS)[number];
+
 export const SUB_TOPICS = [
   "Healthcare",
   "Biotech",
@@ -73,8 +92,18 @@ export const SUB_TOPICS = [
   "Insurance",
   "Payments",
   "Technology",
+  "AI Compute",
+  "AI Infrastructure",
+  "Datacenter Power",
   "Software",
+  "Vertical Software",
+  "Digital Media",
   "Semiconductors",
+  "Semi Equipment",
+  "Memory",
+  "Advanced Packaging",
+  "Foundry",
+  "Photonics",
   "Cybersecurity",
   "Consumer",
   "Autos",
@@ -104,8 +133,18 @@ export const SUB_TOPIC_CODES: Record<SubTopic, string> = {
   Insurance: "INSR",
   Payments: "PAYM",
   Technology: "TECH",
+  "AI Compute": "AICP",
+  "AI Infrastructure": "AINF",
+  "Datacenter Power": "DCPW",
   Software: "SOFT",
+  "Vertical Software": "VMSW",
+  "Digital Media": "DMED",
   Semiconductors: "SEMI",
+  "Semi Equipment": "SEQP",
+  Memory: "MEMR",
+  "Advanced Packaging": "PKGE",
+  Foundry: "FDRY",
+  Photonics: "PHOT",
   Cybersecurity: "CYBR",
   Consumer: "CNSM",
   Autos: "AUTO",
@@ -126,6 +165,10 @@ export const SUB_TOPIC_CODES: Record<SubTopic, string> = {
   Quant: "QANT",
   "Private Markets": "PRIV",
 };
+
+export function isVaultSubTopic(value: string): value is VaultSubTopic {
+  return (VAULT_SUB_TOPICS as readonly string[]).includes(value);
+}
 
 export function isSubTopic(value: string): value is SubTopic {
   return (SUB_TOPICS as readonly string[]).includes(value);

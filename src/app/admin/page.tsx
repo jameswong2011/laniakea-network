@@ -15,6 +15,12 @@ import { WeeklyMaintenanceButton } from "@/components/laniakea/WeeklyMaintenance
 import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
 import { DEMO_SEED_WRITE_SQL } from "@/lib/research/demo-sql";
 import { FORUM_WIPE_SQL } from "@/lib/research/forum-wipe-sql";
+import { EXPAND_SUBTOPICS_SQL } from "@/lib/research/subtopics-sql";
+import {
+  VAULT_BOOK_BLURBS,
+  VAULT_CATALOG,
+  VAULT_THESES,
+} from "@/lib/research/vault-catalog";
 import {
   PASSIVE_DRAIN_HP,
   WEEKLY_CRON_LABEL,
@@ -29,7 +35,7 @@ import { getLatestWeeklyRun } from "@/lib/research/weekly";
 import { loadRevenueTotals } from "@/lib/research/invite";
 import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
 import { requireAdmin } from "@/lib/auth/session";
-import { resolveTier, type Profile } from "@/types";
+import { VAULT_SUB_TOPICS, resolveTier, type Profile } from "@/types";
 import { format, subDays } from "date-fns";
 
 export const metadata: Metadata = {
@@ -160,6 +166,44 @@ export default async function AdminPage() {
         </div>
         <pre className="max-h-40 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
           {FORUM_WIPE_SQL}
+        </pre>
+      </Panel>
+
+      <Panel>
+        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Vault books
+            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Ten new rooms split Technology, Software, Semiconductors, and
+              Energy the way the InvestmentVault files work.{" "}
+              {VAULT_THESES.length} theses, {VAULT_CATALOG.length} vault files
+              mapped. Paste the topic SQL once so publish does not bounce.
+            </p>
+          </div>
+          <CopyInviteButton value={EXPAND_SUBTOPICS_SQL} label="SQL" />
+        </div>
+        <div className="flex flex-col">
+          {VAULT_SUB_TOPICS.map((topic) => (
+            <div
+              key={topic}
+              className="flex items-baseline justify-between gap-4 border-b border-border px-2.5 py-2 last:border-b-0"
+            >
+              <div className="min-w-0">
+                <p className="text-[13px] text-foreground">{topic}</p>
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                  {VAULT_BOOK_BLURBS[topic]}
+                </p>
+              </div>
+              <p className="shrink-0 font-data text-[11px] text-muted-foreground tabular-nums">
+                {VAULT_CATALOG.filter((entry) => entry.topic === topic).length}
+              </p>
+            </div>
+          ))}
+        </div>
+        <pre className="max-h-32 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+          {EXPAND_SUBTOPICS_SQL}
         </pre>
       </Panel>
 
