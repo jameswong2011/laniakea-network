@@ -15,7 +15,7 @@ import { profilePath, type NotificationRow } from "@/lib/research/forum";
 import { SUB_TOPIC_CODES, type Profile, type SubTopic } from "@/types";
 
 function navClassName(active: boolean) {
-  return `flex h-full shrink-0 items-center px-3 text-[13px] ${
+  return `flex h-full shrink-0 items-center whitespace-nowrap px-3 text-[13px] ${
     active
       ? "text-foreground shadow-[inset_0_-2px_0_0_var(--gain)]"
       : "text-muted-foreground hover:text-foreground"

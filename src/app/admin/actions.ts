@@ -97,28 +97,51 @@ export async function updateProfile(
     };
   }
 
-  const { data, error } = await context.supabase
-    .from("profiles")
-    .update({
-      role,
-      tier,
-      current_hp,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select("id")
-    .maybeSingle();
+  const viaRpc = await context.supabase.rpc("admin_update_profile", {
+    p_id: id,
+    p_role: role,
+    p_tier: tier,
+    p_current_hp: current_hp,
+  });
 
-  if (error) {
-    return { error: error.message, stamp: Date.now() };
-  }
-
-  if (!data) {
+  if (
+    viaRpc.error &&
+    !viaRpc.error.message.includes("admin_update_profile") &&
+    !viaRpc.error.message.includes("42883") &&
+    !viaRpc.error.message.includes("does not exist")
+  ) {
     return {
-      error:
-        "Save did not apply. RLS is blocking writes to other profiles. Run the demo-seed SQL on Admin, then try again.",
+      error: viaRpc.error.message
+        .replace(/^ERROR:\s*/i, "")
+        .replace(/\s+CONTEXT:[\s\S]*$/, ""),
       stamp: Date.now(),
     };
+  }
+
+  if (viaRpc.error) {
+    const { data, error } = await context.supabase
+      .from("profiles")
+      .update({
+        role,
+        tier,
+        current_hp,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      return { error: error.message, stamp: Date.now() };
+    }
+
+    if (!data) {
+      return {
+        error:
+          "Save did not apply. RLS is blocking writes to other profiles. Paste the Admin write SQL above the profile list, then try again.",
+        stamp: Date.now(),
+      };
+    }
   }
 
   revalidatePath("/admin");

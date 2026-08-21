@@ -16,7 +16,7 @@ export type VaultEntry = {
   ticker?: string;
 };
 
-/** The ten books that exist because the vault does, not because GICS does. */
+/** Vault slices that exist because the vault does, not because GICS does. */
 export const VAULT_BOOK_BLURBS: Record<VaultSubTopic, string> = {
   "AI Compute":
     "Accelerators and the CUDA / custom-XPU debate. NVDA, AMD, Cerebras, Arm, Astera.",
@@ -24,8 +24,6 @@ export const VAULT_BOOK_BLURBS: Record<VaultSubTopic, string> = {
     "Neoclouds, GPU rental, enterprise storage, and the capex stack around the cluster.",
   "Datacenter Power":
     "800VDC, cooling, modular conversion, fuel cells. Vertiv, Vicor, Bloom.",
-  "Vertical Software":
-    "Workflow, ERP, construction, logistics, industrial IoT. ServiceNow through Samsara.",
   "Digital Media":
     "Social, ads, streaming, gaming, edtech, commerce. The consumer internet tape.",
   "Semi Equipment":
@@ -104,13 +102,13 @@ export const VAULT_THESES: VaultEntry[] = [
   thesis("VRT - Vertiv Holdings.md", "VRT", "Vertiv Holdings", "Datacenter Power"),
   thesis("VICR - Vicor Corporation.md", "VICR", "Vicor Corporation", "Datacenter Power"),
   thesis("BE - Bloom Energy.md", "BE", "Bloom Energy", "Datacenter Power"),
-  thesis("NOW - ServiceNow.md", "NOW", "ServiceNow", "Vertical Software"),
-  thesis("INTU - Intuit.md", "INTU", "Intuit", "Vertical Software"),
-  thesis("CSU - Constellation Software.md", "CSU", "Constellation Software", "Vertical Software"),
-  thesis("PCOR - Procore Technologies.md", "PCOR", "Procore Technologies", "Vertical Software"),
-  thesis("WTC - WiseTech Global.md", "WTC", "WiseTech Global", "Vertical Software"),
-  thesis("PLTR - Palantir.md", "PLTR", "Palantir", "Vertical Software"),
-  thesis("IOT - Samsara.md", "IOT", "Samsara", "Vertical Software"),
+  thesis("NOW - ServiceNow.md", "NOW", "ServiceNow", "Software"),
+  thesis("INTU - Intuit.md", "INTU", "Intuit", "Software"),
+  thesis("CSU - Constellation Software.md", "CSU", "Constellation Software", "Software"),
+  thesis("PCOR - Procore Technologies.md", "PCOR", "Procore Technologies", "Software"),
+  thesis("WTC - WiseTech Global.md", "WTC", "WiseTech Global", "Software"),
+  thesis("PLTR - Palantir.md", "PLTR", "Palantir", "Software"),
+  thesis("IOT - Samsara.md", "IOT", "Samsara", "Software"),
   thesis("META - Meta.md", "META", "Meta", "Digital Media"),
   thesis("APP - AppLovin.md", "APP", "AppLovin", "Digital Media"),
   thesis("PINS - Pinterest.md", "PINS", "Pinterest", "Digital Media"),
@@ -173,7 +171,7 @@ export const VAULT_MACROS: VaultEntry[] = [
     kind: "macro",
     file: "Macro & Technology/Agentic Internet.md",
     title: "Agentic Internet",
-    topic: "Vertical Software",
+    topic: "Software",
   },
   {
     kind: "macro",
@@ -226,11 +224,11 @@ export const VAULT_SECTORS: VaultEntry[] = [
   { kind: "sector", file: "Sectors/Data Center Power & Cooling.md", title: "Data Center Power & Cooling", topic: "Datacenter Power" },
   { kind: "sector", file: "Sectors/Modular Power Conversion Components.md", title: "Modular Power Conversion Components", topic: "Datacenter Power" },
   { kind: "sector", file: "Sectors/Natural Gas Fuel Cells.md", title: "Natural Gas Fuel Cells", topic: "Datacenter Power" },
-  { kind: "sector", file: "Sectors/@Vertical Market Software.md", title: "Vertical Market Software", topic: "Vertical Software" },
-  { kind: "sector", file: "Sectors/Enterprise Workflow AI & Automation.md", title: "Enterprise Workflow AI & Automation", topic: "Vertical Software" },
-  { kind: "sector", file: "Sectors/Accounting & ERP Software.md", title: "Accounting & ERP Software", topic: "Vertical Software" },
-  { kind: "sector", file: "Sectors/Building & Construction Software.md", title: "Building & Construction Software", topic: "Vertical Software" },
-  { kind: "sector", file: "Sectors/Logistics & Supply Chain Software.md", title: "Logistics & Supply Chain Software", topic: "Vertical Software" },
+  { kind: "sector", file: "Sectors/@Vertical Market Software.md", title: "Vertical Market Software", topic: "Software" },
+  { kind: "sector", file: "Sectors/Enterprise Workflow AI & Automation.md", title: "Enterprise Workflow AI & Automation", topic: "Software" },
+  { kind: "sector", file: "Sectors/Accounting & ERP Software.md", title: "Accounting & ERP Software", topic: "Software" },
+  { kind: "sector", file: "Sectors/Building & Construction Software.md", title: "Building & Construction Software", topic: "Software" },
+  { kind: "sector", file: "Sectors/Logistics & Supply Chain Software.md", title: "Logistics & Supply Chain Software", topic: "Software" },
   { kind: "sector", file: "Sectors/Social Platforms & Digital Advertising.md", title: "Social Platforms & Digital Advertising", topic: "Digital Media" },
   { kind: "sector", file: "Sectors/Mobile Advertising Technology.md", title: "Mobile Advertising Technology", topic: "Digital Media" },
   { kind: "sector", file: "Sectors/E-commerce Infrastructure.md", title: "E-commerce Infrastructure", topic: "Digital Media" },

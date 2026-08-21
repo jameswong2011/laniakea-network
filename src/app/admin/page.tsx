@@ -13,6 +13,7 @@ import { WipeForumButton } from "@/components/laniakea/WipeForumButton";
 import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
 import { WeeklyMaintenanceButton } from "@/components/laniakea/WeeklyMaintenanceButton";
 import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
+import { ADMIN_PROFILE_WRITE_SQL } from "@/lib/research/admin-write-sql";
 import { DEMO_SEED_WRITE_SQL } from "@/lib/research/demo-sql";
 import { FORUM_WIPE_SQL } from "@/lib/research/forum-wipe-sql";
 import { EXPAND_SUBTOPICS_SQL } from "@/lib/research/subtopics-sql";
@@ -176,7 +177,7 @@ export default async function AdminPage() {
               Vault books
             </p>
             <p className="mt-1 text-[12px] text-muted-foreground">
-              Ten new rooms split Technology, Software, Semiconductors, and
+              Nine rooms split Technology, Software, Semiconductors, and
               Energy the way the InvestmentVault files work.{" "}
               {VAULT_THESES.length} theses, {VAULT_CATALOG.length} vault files
               mapped. Paste the topic SQL once so publish does not bounce.
@@ -253,7 +254,21 @@ export default async function AdminPage() {
       </Panel>
 
       <Panel>
-        <PanelHeader label="Profiles" meta={profiles.length} />
+        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Profiles
+            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Edit role, tier, and HP on any desk. If Save does nothing, paste
+              the Admin write SQL once — it does not reset demo catalog HP.
+            </p>
+          </div>
+          <CopyInviteButton value={ADMIN_PROFILE_WRITE_SQL} label="SQL" />
+        </div>
+        <pre className="max-h-32 overflow-auto border-b border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+          {ADMIN_PROFILE_WRITE_SQL}
+        </pre>
         {error ? (
           <p className="px-2.5 py-3 font-data text-[12px] text-loss">
             {error.message}
