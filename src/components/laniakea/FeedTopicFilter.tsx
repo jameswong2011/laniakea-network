@@ -1,42 +1,13 @@
 import Link from "next/link";
 import { feedTopicHref, feedTopicsHref } from "@/lib/research/feed";
-import {
-  SUB_TOPICS,
-  VAULT_SUB_TOPICS,
-  isVaultSubTopic,
-  type SubTopic,
-} from "@/types";
+import { SUB_TOPICS, VAULT_SUB_TOPICS, isVaultSubTopic, type SubTopic } from "@/types";
 
 function chipClassName(active: boolean) {
-  return `flex h-7 items-center truncate px-2 text-left text-[12px] ${
+  return `inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-[12px] ${
     active
       ? "bg-muted text-foreground"
       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
   }`;
-}
-
-function TopicGrid({
-  topics,
-  selected,
-  active,
-}: {
-  topics: readonly SubTopic[];
-  selected: SubTopic[] | null;
-  active: SubTopic[];
-}) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
-      {topics.map((topic) => (
-        <Link
-          key={topic}
-          href={feedTopicHref(selected, topic)}
-          className={chipClassName(active.includes(topic))}
-        >
-          {topic}
-        </Link>
-      ))}
-    </div>
-  );
 }
 
 export function FeedTopicFilter({
@@ -49,26 +20,40 @@ export function FeedTopicFilter({
   const broad = SUB_TOPICS.filter((topic) => !isVaultSubTopic(topic));
 
   return (
-    <nav className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
+    <nav className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Link href="/feed" className={chipClassName(allSelected)}>
           All
         </Link>
+        {VAULT_SUB_TOPICS.map((topic) => (
+          <Link
+            key={topic}
+            href={feedTopicHref(selected, topic)}
+            className={chipClassName(active.includes(topic))}
+          >
+            {topic}
+          </Link>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {broad.map((topic) => (
+          <Link
+            key={topic}
+            href={feedTopicHref(selected, topic)}
+            className={chipClassName(active.includes(topic))}
+          >
+            {topic}
+          </Link>
+        ))}
         {allSelected ? null : (
           <Link
             href={feedTopicsHref([...SUB_TOPICS])}
-            className="text-[12px] text-muted-foreground hover:text-foreground"
+            className="ml-auto text-[12px] text-muted-foreground hover:text-foreground"
           >
             Reset
           </Link>
         )}
       </div>
-      <TopicGrid
-        topics={VAULT_SUB_TOPICS}
-        selected={selected}
-        active={active}
-      />
-      <TopicGrid topics={broad} selected={selected} active={active} />
     </nav>
   );
 }
