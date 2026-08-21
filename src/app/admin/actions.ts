@@ -298,3 +298,51 @@ export async function seedDemoDataset(
     stamp: Date.now(),
   };
 }
+
+export async function wipeForumContent(
+  _prevState: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const { supabase } = await requireAdmin();
+
+  if (String(formData.get("confirm") ?? "").trim() !== "WIPE") {
+    return {
+      error: "Type WIPE to empty the tape.",
+      stamp: Date.now(),
+    };
+  }
+
+  const { data, error } = await supabase.rpc("wipe_forum_content");
+
+  revalidatePath("/admin");
+  revalidatePath("/feed");
+  revalidatePath("/ranking");
+  revalidatePath("/dashboard");
+  revalidatePath("/saved");
+  revalidatePath("/search");
+  revalidatePath("/drafts");
+
+  if (error) {
+    const missing =
+      error.message.includes("wipe_forum_content") ||
+      error.message.includes("42883") ||
+      error.message.includes("does not exist");
+
+    return {
+      error: missing
+        ? "Wipe function is missing. Paste the wipe SQL in the Supabase editor, then click Wipe tape."
+        : error.message.replace(/^ERROR:\s*/i, "").replace(/\s+CONTEXT:[\s\S]*$/, ""),
+      stamp: Date.now(),
+    };
+  }
+
+  const counts =
+    data && typeof data === "object"
+      ? (data as { posts?: number; comments?: number; drafts?: number })
+      : {};
+
+  return {
+    message: `Tape emptied. Posts ${counts.posts ?? 0} · comments ${counts.comments ?? 0} · drafts ${counts.drafts ?? 0}. Desks, HP, UTL, and invites are unchanged.`,
+    stamp: Date.now(),
+  };
+}

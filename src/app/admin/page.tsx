@@ -9,9 +9,12 @@ import { AdminProfileEditor } from "@/components/laniakea/AdminProfileEditor";
 import { PassiveDrainButton } from "@/components/laniakea/PassiveDrainButton";
 import { SeedDemoDataButton } from "@/components/laniakea/SeedDemoDataButton";
 import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
+import { WipeForumButton } from "@/components/laniakea/WipeForumButton";
+import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
 import { WeeklyMaintenanceButton } from "@/components/laniakea/WeeklyMaintenanceButton";
 import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
 import { DEMO_SEED_WRITE_SQL } from "@/lib/research/demo-sql";
+import { FORUM_WIPE_SQL } from "@/lib/research/forum-wipe-sql";
 import {
   PASSIVE_DRAIN_HP,
   WEEKLY_CRON_LABEL,
@@ -135,6 +138,29 @@ export default async function AdminPage() {
             {DEMO_SEED_WRITE_SQL}
           </pre>
         ) : null}
+      </Panel>
+
+      <Panel>
+        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+              Wipe tape
+            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Deletes every note, comment, vote, reaction, draft, save, unlock,
+              and topic book. Desks, overall HP, UTL, and invites stay. Do not
+              click Seed Demo Data afterwards if you want the floor empty.
+              Paste the SQL once so the wipe function exists, then type WIPE.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <CopyInviteButton value={FORUM_WIPE_SQL} label="SQL" />
+            <WipeForumButton />
+          </div>
+        </div>
+        <pre className="max-h-40 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+          {FORUM_WIPE_SQL}
+        </pre>
       </Panel>
 
       <Panel>
