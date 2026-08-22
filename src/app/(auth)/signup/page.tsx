@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PageFrame, PageHeading, Panel } from "@/components/layout/PageFrame";
 import { AuthForm } from "@/components/laniakea/AuthForm";
+import { generateDisplayName } from "@/lib/auth/profile-name";
 import { createClient } from "@/lib/supabase/server";
 import {
   isInviteCodeFormat,
@@ -55,7 +56,11 @@ export default async function SignupPage({
         }
       />
       <Panel className="p-2.5">
-        <AuthForm mode="signup" inviteCode={inviteCode} />
+        <AuthForm
+          mode="signup"
+          inviteCode={inviteCode}
+          initialDisplayName={generateDisplayName()}
+        />
       </Panel>
     </PageFrame>
   );

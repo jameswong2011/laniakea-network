@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { login, signup, type AuthFormState } from "@/lib/auth/actions";
+import { generateDisplayName } from "@/lib/auth/profile-name";
 
 type AuthFormProps = {
   mode: "login" | "signup";
   inviteCode?: string;
+  initialDisplayName?: string;
 };
 
 const initialState: AuthFormState = {};
+
+const inputClassName =
+  "h-8 w-full border border-border bg-panel-elevated px-2.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring";
 
 function Field({
   id,
@@ -52,7 +57,7 @@ function Field({
         title={title}
         placeholder={placeholder}
         aria-describedby={hintId}
-        className="h-8 w-full border border-border bg-panel-elevated px-2.5 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring"
+        className={inputClassName}
       />
       {hint ? (
         <p id={hintId} className="font-data text-[10px] text-muted-foreground">
@@ -63,7 +68,60 @@ function Field({
   );
 }
 
-export function AuthForm({ mode, inviteCode = "" }: AuthFormProps) {
+function SignupNameFields({ initialDisplayName }: { initialDisplayName?: string }) {
+  const [displayName, setDisplayName] = useState(initialDisplayName ?? "");
+
+  return (
+    <>
+      <Field
+        id="username"
+        label="Username"
+        autoComplete="username"
+        placeholder="vale_hart"
+        pattern="[A-Za-z0-9_]+"
+        title="Username cannot contain spaces. Use letters, numbers, and underscores only."
+        hint="Login handle. Letters, numbers, and underscores only."
+      />
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="displayName"
+          className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
+        >
+          Display name
+        </label>
+        <div className="flex gap-1.5">
+          <input
+            id="displayName"
+            name="displayName"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            autoComplete="nickname"
+            required
+            placeholder="Quiet Desk 4821"
+            aria-describedby="displayName-hint"
+            className={inputClassName}
+          />
+          <button
+            type="button"
+            onClick={() => setDisplayName(generateDisplayName())}
+            className="h-8 shrink-0 border border-border bg-secondary px-2.5 text-[12px] text-foreground hover:bg-muted"
+          >
+            Reroll
+          </button>
+        </div>
+        <p id="displayName-hint" className="font-data text-[10px] text-muted-foreground">
+          Shown on the forum. Reroll or type your own.
+        </p>
+      </div>
+    </>
+  );
+}
+
+export function AuthForm({
+  mode,
+  inviteCode = "",
+  initialDisplayName,
+}: AuthFormProps) {
   const action = mode === "login" ? login : signup;
   const [state, formAction, pending] = useActionState(action, initialState);
   const isSignup = mode === "signup";
@@ -71,18 +129,7 @@ export function AuthForm({ mode, inviteCode = "" }: AuthFormProps) {
   return (
     <form action={formAction} className="flex flex-col gap-3">
       {isSignup ? (
-        <>
-          <Field
-            id="username"
-            label="Username"
-            autoComplete="username"
-            placeholder="vale_hart"
-            pattern="[A-Za-z0-9_]+"
-            title="Username cannot contain spaces. Use letters, numbers, and underscores only."
-            hint="Cannot contain spaces. Letters, numbers, and underscores only."
-          />
-          <Field id="displayName" label="Display Name" autoComplete="name" />
-        </>
+        <SignupNameFields initialDisplayName={initialDisplayName} />
       ) : null}
       <Field
         id="email"
@@ -110,7 +157,7 @@ export function AuthForm({ mode, inviteCode = "" }: AuthFormProps) {
             defaultValue={inviteCode}
             placeholder="LANI-XXXX-XXXX"
             autoComplete="off"
-            className="h-8 w-full border border-border bg-panel-elevated px-2.5 font-data text-[13px] text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring"
+            className={`${inputClassName} font-data`}
           />
           <p className="font-data text-[10px] text-muted-foreground">
             Optional. Public signup starts Bronze. A valid code starts you on

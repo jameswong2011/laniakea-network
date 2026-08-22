@@ -5,6 +5,24 @@ const profileValues = DEMO_USERS.map((user) => {
   return `  ('${user.username}', '${name}', '${user.role}', '${user.tier}', ${user.current_hp})`;
 }).join(",\n");
 
+const displayNameValues = DEMO_USERS.map((user) => {
+  const name = user.display_name.replace(/'/g, "''");
+  return `  ('${user.username}', '${name}')`;
+}).join(",\n");
+
+export const DEMO_DISPLAY_NAMES_SQL = `-- Forum names only. Does not change HP, tier, or login usernames.
+update public.profiles as p
+set
+  display_name = v.display_name,
+  updated_at = now()
+from (
+  values
+${displayNameValues}
+) as v(username, display_name)
+where p.username = v.username
+  and p.role is distinct from 'admin';
+`;
+
 export const DEMO_SEED_WRITE_SQL = `-- Let the signed-in admin write other desks, then apply the demo catalog.
 -- Run once in the Supabase SQL editor, then click Seed Demo Data again.
 

@@ -7,9 +7,11 @@ import {
   withPaidUnlock,
 } from "@/lib/research/unlock";
 import {
+  RESEARCH_POST_STATUS_ARCHIVED,
   RESEARCH_POST_STATUS_ASCENDED,
   RESEARCH_POST_STATUS_LIVE,
   SUB_TOPICS,
+  TIERS,
   resolveSubTopic,
   resolveTier,
   type ResearchFeedItem,
@@ -17,6 +19,7 @@ import {
   type ResearchPostAuthor,
   type SubTopic,
   type SubtopicRank,
+  type Tier,
 } from "@/types";
 
 export function researchPostPath(postId: string) {
@@ -77,37 +80,220 @@ export function parseFeedTopics(
   return selected;
 }
 
-export function feedTopicHref(selected: SubTopic[] | null, toggle: SubTopic) {
+export const FEED_STATUSES = ["battleground", "ascended", "hunted"] as const;
+export type FeedStatus = (typeof FEED_STATUSES)[number];
+
+export const FEED_STATUS_LABELS: Record<FeedStatus, string> = {
+  battleground: "Battleground",
+  ascended: "Ascended",
+  hunted: "Hunted",
+};
+
+/** Main tape: live fights plus ascended. Hunted is opt-in. */
+export const DEFAULT_FEED_STATUSES: FeedStatus[] = [
+  "battleground",
+  "ascended",
+];
+
+export function resolveFeedStatus(
+  value: string | null | undefined
+): FeedStatus | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return FEED_STATUSES.find((status) => status === normalized) ?? null;
+}
+
+export function feedStatusOf(status: string | null | undefined): FeedStatus | null {
+  if (status === RESEARCH_POST_STATUS_LIVE) {
+    return "battleground";
+  }
+
+  if (status === RESEARCH_POST_STATUS_ASCENDED) {
+    return "ascended";
+  }
+
+  if (status === RESEARCH_POST_STATUS_ARCHIVED) {
+    return "hunted";
+  }
+
+  return null;
+}
+
+function sameStatuses(left: FeedStatus[], right: FeedStatus[]) {
+  return (
+    left.length === right.length && left.every((status) => right.includes(status))
+  );
+}
+
+/** null = battleground + ascended (the default tape). */
+export function parseFeedStatuses(
+  statusParam: string | string[] | undefined
+): FeedStatus[] | null {
+  if (statusParam == null) {
+    return null;
+  }
+
+  const values = Array.isArray(statusParam) ? statusParam : [statusParam];
+  const selected = values
+    .map((value) => resolveFeedStatus(value))
+    .filter((status): status is FeedStatus => Boolean(status));
+
+  if (selected.length === 0) {
+    return [];
+  }
+
+  if (sameStatuses(selected, DEFAULT_FEED_STATUSES)) {
+    return null;
+  }
+
+  return selected;
+}
+
+function activeFeedStatuses(selected: FeedStatus[] | null) {
+  return selected ?? DEFAULT_FEED_STATUSES;
+}
+
+/** null = every research tier (the default). */
+export function parseFeedTiers(
+  tierParam: string | string[] | undefined
+): Tier[] | null {
+  if (tierParam == null) {
+    return null;
+  }
+
+  const values = Array.isArray(tierParam) ? tierParam : [tierParam];
+  const selected = values
+    .map((value) => resolveTier(value))
+    .filter((tier): tier is Tier => Boolean(tier));
+
+  if (selected.length === 0) {
+    return [];
+  }
+
+  if (selected.length === TIERS.length) {
+    return null;
+  }
+
+  return selected;
+}
+
+export function feedHref({
+  topics = null,
+  tiers = null,
+  statuses = null,
+}: {
+  topics?: SubTopic[] | null;
+  tiers?: Tier[] | null;
+  statuses?: FeedStatus[] | null;
+} = {}) {
+  const params = new URLSearchParams();
+  const topicFilter =
+    topics == null || topics.length === SUB_TOPICS.length ? null : topics;
+  const tierFilter = tiers == null || tiers.length === TIERS.length ? null : tiers;
+  const statusFilter =
+    statuses == null || sameStatuses(statuses, DEFAULT_FEED_STATUSES)
+      ? null
+      : statuses;
+
+  if (topicFilter) {
+    if (topicFilter.length === 0) {
+      params.append("topic", "");
+    } else {
+      for (const topic of SUB_TOPICS) {
+        if (topicFilter.includes(topic)) {
+          params.append("topic", topic);
+        }
+      }
+    }
+  }
+
+  if (tierFilter) {
+    if (tierFilter.length === 0) {
+      params.append("tier", "");
+    } else {
+      for (const tier of TIERS) {
+        if (tierFilter.includes(tier)) {
+          params.append("tier", tier);
+        }
+      }
+    }
+  }
+
+  if (statusFilter) {
+    if (statusFilter.length === 0) {
+      params.append("status", "");
+    } else {
+      for (const status of FEED_STATUSES) {
+        if (statusFilter.includes(status)) {
+          params.append("status", status);
+        }
+      }
+    }
+  }
+
+  const query = params.toString();
+  return query ? `/feed?${query}` : "/feed";
+}
+
+export function feedTopicHref(
+  selected: SubTopic[] | null,
+  toggle: SubTopic,
+  tiers: Tier[] | null = null,
+  statuses: FeedStatus[] | null = null
+) {
   const current = selected ?? [...SUB_TOPICS];
   const next = current.includes(toggle)
     ? current.filter((topic) => topic !== toggle)
     : [...current, toggle];
 
-  return feedTopicsHref(next);
+  return feedHref({ topics: next, tiers, statuses });
+}
+
+export function feedTierHref(
+  selected: Tier[] | null,
+  toggle: Tier,
+  topics: SubTopic[] | null = null,
+  statuses: FeedStatus[] | null = null
+) {
+  const current = selected ?? [...TIERS];
+  const next = current.includes(toggle)
+    ? current.filter((tier) => tier !== toggle)
+    : [...current, toggle];
+
+  return feedHref({ topics, tiers: next, statuses });
+}
+
+export function feedStatusHref(
+  selected: FeedStatus[] | null,
+  toggle: FeedStatus,
+  topics: SubTopic[] | null = null,
+  tiers: Tier[] | null = null
+) {
+  const current = activeFeedStatuses(selected);
+  const next = current.includes(toggle)
+    ? current.filter((status) => status !== toggle)
+    : [...current, toggle];
+
+  return feedHref({ topics, tiers, statuses: next });
 }
 
 export function feedSingleTopicHref(topic: SubTopic) {
-  return feedTopicsHref([topic]);
+  return feedHref({ topics: [topic] });
 }
 
-export function feedTopicsHref(selected: SubTopic[]) {
-  if (selected.length === 0) {
-    return "/feed?topic=";
-  }
+export function feedSingleTierHref(tier: Tier) {
+  return feedHref({ tiers: [tier] });
+}
 
-  if (selected.length === SUB_TOPICS.length) {
-    return "/feed";
-  }
-
-  const params = new URLSearchParams();
-
-  for (const topic of SUB_TOPICS) {
-    if (selected.includes(topic)) {
-      params.append("topic", topic);
-    }
-  }
-
-  return `/feed?${params.toString()}`;
+export function feedTopicsHref(
+  selected: SubTopic[],
+  tiers: Tier[] | null = null,
+  statuses: FeedStatus[] | null = null
+) {
+  return feedHref({ topics: selected, tiers, statuses });
 }
 
 export function itemMatchesFeedTopics(
@@ -122,13 +308,36 @@ export function itemMatchesFeedTopics(
   return Boolean(topic && selected.includes(topic));
 }
 
+export function itemMatchesFeedTiers(
+  item: Pick<ResearchFeedItem, "deskTier">,
+  selected: Tier[] | null
+) {
+  if (selected == null) {
+    return true;
+  }
+
+  return Boolean(item.deskTier && selected.includes(item.deskTier));
+}
+
+export function itemMatchesFeedStatuses(
+  item: Pick<ResearchPost, "status">,
+  selected: FeedStatus[] | null
+) {
+  const outcome = feedStatusOf(item.status);
+  return Boolean(outcome && activeFeedStatuses(selected).includes(outcome));
+}
+
 const POST_COLUMNS =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
 
 const POST_COLUMNS_WITHOUT_UNLOCK =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, created_at, updated_at";
 
-const FEED_STATUSES = [RESEARCH_POST_STATUS_LIVE, RESEARCH_POST_STATUS_ASCENDED];
+const FEED_POST_STATUSES = [
+  RESEARCH_POST_STATUS_LIVE,
+  RESEARCH_POST_STATUS_ASCENDED,
+  RESEARCH_POST_STATUS_ARCHIVED,
+];
 
 type FeedViewer = {
   userId?: string;
@@ -243,7 +452,7 @@ export async function getLiveResearchFeed(
   const withUnlock = await supabase
     .from("research_posts")
     .select(POST_COLUMNS)
-    .in("status", FEED_STATUSES)
+    .in("status", FEED_POST_STATUSES)
     .order("created_at", { ascending: false });
 
   const withTopic =
@@ -251,7 +460,7 @@ export async function getLiveResearchFeed(
       ? await supabase
           .from("research_posts")
           .select(POST_COLUMNS_WITHOUT_UNLOCK)
-          .in("status", FEED_STATUSES)
+          .in("status", FEED_POST_STATUSES)
           .order("created_at", { ascending: false })
       : withUnlock;
 
@@ -262,7 +471,7 @@ export async function getLiveResearchFeed(
           .select(
             "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at"
           )
-          .in("status", FEED_STATUSES)
+          .in("status", FEED_POST_STATUSES)
           .order("created_at", { ascending: false })
       : withTopic;
 

@@ -21,7 +21,7 @@ export type DemoPostSeed = {
 export const DEMO_USERS: DemoUserSeed[] = [
   {
     username: "demo_vale_hart",
-    display_name: "Vale Hart",
+    display_name: "Quiet Ledger 4821",
     tier: "Bronze",
     role: "member",
     current_hp: 52,
@@ -29,7 +29,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_nara_quinn",
-    display_name: "Nara Quinn",
+    display_name: "Lucid Desk 7314",
     tier: "Bronze",
     role: "member",
     current_hp: 74,
@@ -37,7 +37,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_elio_voss",
-    display_name: "Elio Voss",
+    display_name: "Swift Vault 1908",
     tier: "Bronze",
     role: "elite",
     current_hp: 91,
@@ -45,7 +45,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_kira_moss",
-    display_name: "Kira Moss",
+    display_name: "Crisp Note 5642",
     tier: "Bronze",
     role: "member",
     current_hp: 63,
@@ -53,7 +53,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_mira_chen",
-    display_name: "Mira Chen",
+    display_name: "Hidden Thesis 8830",
     tier: "Silver",
     role: "member",
     current_hp: 124,
@@ -61,7 +61,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_jonas_reed",
-    display_name: "Jonas Reed",
+    display_name: "Stark Signal 2176",
     tier: "Silver",
     role: "member",
     current_hp: 158,
@@ -69,7 +69,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_priya_shah",
-    display_name: "Priya Shah",
+    display_name: "Keen Spread 6409",
     tier: "Silver",
     role: "elite",
     current_hp: 181,
@@ -77,7 +77,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_rafael_dunn",
-    display_name: "Rafael Dunn",
+    display_name: "Calm Folio 3591",
     tier: "Silver",
     role: "member",
     current_hp: 146,
@@ -85,7 +85,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_owen_blake",
-    display_name: "Owen Blake",
+    display_name: "Prime Stack 9044",
     tier: "Gold",
     role: "member",
     current_hp: 236,
@@ -93,7 +93,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_sasha_kline",
-    display_name: "Sasha Kline",
+    display_name: "Rare Draft 1287",
     tier: "Gold",
     role: "member",
     current_hp: 279,
@@ -101,7 +101,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_helen_ortiz",
-    display_name: "Helen Ortiz",
+    display_name: "Solid Curve 7753",
     tier: "Gold",
     role: "elite",
     current_hp: 318,
@@ -109,7 +109,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_amina_cole",
-    display_name: "Amina Cole",
+    display_name: "Vivid Thread 4016",
     tier: "Gold",
     role: "member",
     current_hp: 254,
@@ -117,7 +117,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_marcus_dale",
-    display_name: "Marcus Dale",
+    display_name: "Silent Rail 6288",
     tier: "Platinum",
     role: "member",
     current_hp: 372,
@@ -125,7 +125,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_yuna_park",
-    display_name: "Yuna Park",
+    display_name: "Brisk Paper 2560",
     tier: "Platinum",
     role: "member",
     current_hp: 448,
@@ -133,7 +133,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_theo_nilsen",
-    display_name: "Theo Nilsen",
+    display_name: "Noble Range 8193",
     tier: "Platinum",
     role: "elite",
     current_hp: 511,
@@ -141,7 +141,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_lev_okada",
-    display_name: "Lev Okada",
+    display_name: "Wry Quote 3475",
     tier: "Platinum",
     role: "member",
     current_hp: 401,
@@ -149,7 +149,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_irene_wahl",
-    display_name: "Irene Wahl",
+    display_name: "Amber Gate 5902",
     tier: "Masters",
     role: "member",
     current_hp: 646,
@@ -157,7 +157,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_cyrus_ade",
-    display_name: "Cyrus Ade",
+    display_name: "Tight Mark 1628",
     tier: "Masters",
     role: "member",
     current_hp: 762,
@@ -165,7 +165,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_lina_moreau",
-    display_name: "Lina Moreau",
+    display_name: "Vast Flow 9341",
     tier: "Masters",
     role: "elite",
     current_hp: 891,
@@ -173,7 +173,7 @@ export const DEMO_USERS: DemoUserSeed[] = [
   },
   {
     username: "demo_nora_weiss",
-    display_name: "Nora Weiss",
+    display_name: "Curious Tape 2784",
     tier: "Masters",
     role: "elite",
     current_hp: 704,

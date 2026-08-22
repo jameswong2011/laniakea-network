@@ -14,7 +14,10 @@ import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
 import { WeeklyMaintenanceButton } from "@/components/laniakea/WeeklyMaintenanceButton";
 import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
 import { ADMIN_PROFILE_WRITE_SQL } from "@/lib/research/admin-write-sql";
-import { DEMO_SEED_WRITE_SQL } from "@/lib/research/demo-sql";
+import {
+  DEMO_DISPLAY_NAMES_SQL,
+  DEMO_SEED_WRITE_SQL,
+} from "@/lib/research/demo-sql";
 import { FORUM_WIPE_SQL } from "@/lib/research/forum-wipe-sql";
 import { EXPAND_SUBTOPICS_SQL } from "@/lib/research/subtopics-sql";
 import { VAULT_CATALOG, VAULT_THESES } from "@/lib/research/vault-catalog";
@@ -65,6 +68,13 @@ export default async function AdminPage() {
   const demoStillBronze =
     demoProfiles.length > 0 &&
     demoProfiles.every((profile) => resolveTier(profile.tier) === "Bronze");
+  const catalogNameByUsername = new Map(
+    DEMO_USERS.map((user) => [user.username, user.display_name])
+  );
+  const demoNamesStale = demoProfiles.some(
+    (profile) =>
+      catalogNameByUsername.get(profile.username) !== profile.display_name
+  );
 
   const weekly = await getLatestWeeklyRun(supabase);
   const now = new Date();
@@ -144,12 +154,28 @@ export default async function AdminPage() {
                 once, then click Seed Demo Data again.
               </p>
             ) : null}
+            {demoNamesStale ? (
+              <p className="mt-1.5 text-[12px] text-warning">
+                Demo desks still have the old human names. Paste the display
+                name SQL once. It does not change HP or login usernames.
+              </p>
+            ) : null}
           </div>
-          <SeedDemoDataButton />
+          <div className="flex flex-col items-end gap-1">
+            {demoNamesStale ? (
+              <CopyInviteButton value={DEMO_DISPLAY_NAMES_SQL} label="Names SQL" />
+            ) : null}
+            <SeedDemoDataButton />
+          </div>
         </div>
         {demoStillBronze ? (
           <pre className="max-h-48 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
             {DEMO_SEED_WRITE_SQL}
+          </pre>
+        ) : null}
+        {demoNamesStale ? (
+          <pre className="max-h-40 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {DEMO_DISPLAY_NAMES_SQL}
           </pre>
         ) : null}
       </Panel>

@@ -13,7 +13,7 @@ import {
   deskAccessRailClass,
 } from "@/lib/research/access";
 import { researchExcerpt, researchPostPath } from "@/lib/research/feed";
-import { isAscendedStatus } from "@/lib/research/health";
+import { isAscendedStatus, isHuntedStatus } from "@/lib/research/health";
 import {
   RESEARCH_POST_STATUS_LIVE,
   type ResearchFeedItem,
@@ -37,7 +37,9 @@ export function ResearchFeed({
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-panel px-5 py-10">
-        <p className="text-[15px] text-muted-foreground">No live research yet.</p>
+        <p className="text-[15px] text-muted-foreground">
+          No notes in this filter.
+        </p>
       </div>
     );
   }
@@ -68,11 +70,13 @@ export function ResearchFeed({
                   lockReason={
                     isAscendedStatus(item.status)
                       ? "Ascended"
-                      : item.access === "hidden"
-                        ? "Locked"
-                        : item.access === "view_only"
-                          ? "View only"
-                          : undefined
+                      : isHuntedStatus(item.status)
+                        ? "Hunted"
+                        : item.access === "hidden"
+                          ? "Locked"
+                          : item.access === "view_only"
+                            ? "View only"
+                            : undefined
                   }
                 />
                 {open ? (
@@ -97,6 +101,11 @@ export function ResearchFeed({
                   {isAscendedStatus(item.status) ? (
                     <span className="rounded-full bg-gain-muted px-2 py-0.5 text-[11px] text-gain">
                       Ascended
+                    </span>
+                  ) : null}
+                  {isHuntedStatus(item.status) ? (
+                    <span className="rounded-full bg-loss-muted px-2 py-0.5 text-[11px] text-loss">
+                      Hunted
                     </span>
                   ) : null}
                 </div>

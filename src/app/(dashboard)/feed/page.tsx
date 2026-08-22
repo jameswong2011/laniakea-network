@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageFrame, PageHeading } from "@/components/layout/PageFrame";
+import { FeedStatusFilter } from "@/components/laniakea/FeedStatusFilter";
+import { FeedTierFilter } from "@/components/laniakea/FeedTierFilter";
 import { FeedTopicFilter } from "@/components/laniakea/FeedTopicFilter";
 import { ResearchFeed } from "@/components/laniakea/ResearchFeed";
 import { TierBadge } from "@/components/laniakea/TierBadge";
@@ -8,9 +10,14 @@ import { requireUser } from "@/lib/auth/session";
 import { getCommentCounts } from "@/lib/research/comments";
 import { VOTE_COST_HP } from "@/lib/research/economy";
 import {
+  FEED_STATUS_LABELS,
   getLiveResearchFeed,
   getViewerVotes,
+  itemMatchesFeedStatuses,
+  itemMatchesFeedTiers,
   itemMatchesFeedTopics,
+  parseFeedStatuses,
+  parseFeedTiers,
   parseFeedTopics,
   researchComposePath,
 } from "@/lib/research/feed";
@@ -24,8 +31,11 @@ export const metadata: Metadata = {
 export default async function FeedPage({
   searchParams,
 }: PageProps<"/feed">) {
-  const { topic: topicParam } = await searchParams;
+  const { topic: topicParam, tier: tierParam, status: statusParam } =
+    await searchParams;
   const selectedTopics = parseFeedTopics(topicParam);
+  const selectedTiers = parseFeedTiers(tierParam);
+  const selectedStatuses = parseFeedStatuses(statusParam);
   const { supabase, userId, profile } = await requireUser();
   const deskTier = resolveTier(profile?.tier) ?? "Bronze";
   const { items, error } = await getLiveResearchFeed(supabase, {
@@ -33,8 +43,11 @@ export default async function FeedPage({
     tier: deskTier,
     isAdmin: profile?.role === "admin",
   });
-  const visibleItems = items.filter((item) =>
-    itemMatchesFeedTopics(item, selectedTopics)
+  const visibleItems = items.filter(
+    (item) =>
+      itemMatchesFeedTopics(item, selectedTopics) &&
+      itemMatchesFeedTiers(item, selectedTiers) &&
+      itemMatchesFeedStatuses(item, selectedStatuses)
   );
   const viewerVotes = await getViewerVotes(
     supabase,
@@ -61,14 +74,22 @@ export default async function FeedPage({
       <PageHeading
         kicker="Market"
         title={
-          selectedTopics?.length === 1 ? selectedTopics[0] : "Main Feed"
+          selectedTopics?.length === 1 && selectedTiers?.length === 1
+            ? `${selectedTiers[0]} · ${selectedTopics[0]}`
+            : selectedTopics?.length === 1
+              ? selectedTopics[0]
+              : selectedTiers?.length === 1
+                ? `${selectedTiers[0]} desks`
+                : selectedStatuses?.length === 1
+                  ? FEED_STATUS_LABELS[selectedStatuses[0]]
+                  : "Main Feed"
         }
         description="Read, vote, and comment. Lower desks can unlock a higher note with UTL."
         meta={
           <>
             <TierBadge tier={deskTier} size="md" />
             <span className="text-[13px] text-muted-foreground">
-              {feedItems.length} live
+              {feedItems.length} notes
             </span>
             <Link
               href={researchComposePath()}
@@ -80,7 +101,23 @@ export default async function FeedPage({
         }
       />
 
-      <FeedTopicFilter selected={selectedTopics} />
+      <div className="flex flex-col gap-2">
+        <FeedStatusFilter
+          selectedStatuses={selectedStatuses}
+          selectedTopics={selectedTopics}
+          selectedTiers={selectedTiers}
+        />
+        <FeedTierFilter
+          selectedTiers={selectedTiers}
+          selectedTopics={selectedTopics}
+          selectedStatuses={selectedStatuses}
+        />
+        <FeedTopicFilter
+          selected={selectedTopics}
+          selectedTiers={selectedTiers}
+          selectedStatuses={selectedStatuses}
+        />
+      </div>
 
       {error ? (
         <p className="rounded-xl border border-border bg-panel px-4 py-3 text-[14px] text-loss">
@@ -89,6 +126,14 @@ export default async function FeedPage({
       ) : selectedTopics?.length === 0 ? (
         <p className="rounded-xl border border-border bg-panel px-5 py-8 text-[15px] text-muted-foreground">
           Select at least one sub-topic.
+        </p>
+      ) : selectedTiers?.length === 0 ? (
+        <p className="rounded-xl border border-border bg-panel px-5 py-8 text-[15px] text-muted-foreground">
+          Select at least one research tier.
+        </p>
+      ) : selectedStatuses?.length === 0 ? (
+        <p className="rounded-xl border border-border bg-panel px-5 py-8 text-[15px] text-muted-foreground">
+          Select battleground, ascended, or hunted.
         </p>
       ) : (
         <ResearchFeed

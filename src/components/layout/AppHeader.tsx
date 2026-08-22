@@ -10,7 +10,14 @@ import { SearchBox } from "@/components/laniakea/SearchBox";
 import { DeskAvatar } from "@/components/laniakea/DeskAvatar";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { TokenReadout } from "@/components/laniakea/TokenReadout";
-import { feedSingleTopicHref, parseFeedTopics } from "@/lib/research/feed";
+import { FeedStatusFilter } from "@/components/laniakea/FeedStatusFilter";
+import { FeedTierFilter } from "@/components/laniakea/FeedTierFilter";
+import {
+  feedSingleTopicHref,
+  parseFeedStatuses,
+  parseFeedTiers,
+  parseFeedTopics,
+} from "@/lib/research/feed";
 import { profilePath, type NotificationRow } from "@/lib/research/forum";
 import type { Profile, SubTopic } from "@/types";
 
@@ -40,11 +47,23 @@ function AuthenticatedLeftNav({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const topicParam = searchParams.getAll("topic");
+  const tierParam = searchParams.getAll("tier");
+  const statusParam = searchParams.getAll("status");
   const selectedTopics = parseFeedTopics(
     topicParam.length > 0 ? topicParam : undefined
   );
+  const selectedTiers = parseFeedTiers(
+    tierParam.length > 0 ? tierParam : undefined
+  );
+  const selectedStatuses = parseFeedStatuses(
+    statusParam.length > 0 ? statusParam : undefined
+  );
   const onFeed = pathname === "/feed" || pathname.startsWith("/feed/");
-  const mainFeedActive = onFeed && selectedTopics == null;
+  const mainFeedActive =
+    onFeed &&
+    selectedTopics == null &&
+    selectedTiers == null &&
+    selectedStatuses == null;
 
   return (
     <nav className="hidden min-w-0 flex-1 items-stretch overflow-x-auto md:flex">
@@ -78,11 +97,23 @@ function MobilePrimaryNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const topicParam = searchParams.getAll("topic");
+  const tierParam = searchParams.getAll("tier");
+  const statusParam = searchParams.getAll("status");
   const selectedTopics = parseFeedTopics(
     topicParam.length > 0 ? topicParam : undefined
   );
+  const selectedTiers = parseFeedTiers(
+    tierParam.length > 0 ? tierParam : undefined
+  );
+  const selectedStatuses = parseFeedStatuses(
+    statusParam.length > 0 ? statusParam : undefined
+  );
   const onFeed = pathname === "/feed" || pathname.startsWith("/feed/");
-  const mainFeedActive = onFeed && selectedTopics == null;
+  const mainFeedActive =
+    onFeed &&
+    selectedTopics == null &&
+    selectedTiers == null &&
+    selectedStatuses == null;
 
   return (
     <nav className="flex h-10 items-stretch overflow-x-auto border-t border-border md:hidden">
@@ -96,6 +127,49 @@ function MobilePrimaryNav() {
         Ranking
       </Link>
     </nav>
+  );
+}
+
+function HeaderMenuFilters() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const onFeed = pathname === "/feed";
+  const topicParam = searchParams.getAll("topic");
+  const tierParam = searchParams.getAll("tier");
+  const statusParam = searchParams.getAll("status");
+  const selectedTopics = onFeed
+    ? parseFeedTopics(topicParam.length > 0 ? topicParam : undefined)
+    : null;
+  const selectedTiers = onFeed
+    ? parseFeedTiers(tierParam.length > 0 ? tierParam : undefined)
+    : null;
+  const selectedStatuses = onFeed
+    ? parseFeedStatuses(statusParam.length > 0 ? statusParam : undefined)
+    : null;
+
+  return (
+    <div className="flex flex-col gap-3 border-b border-border px-3 py-2.5">
+      <div>
+        <p className="mb-1.5 font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+          Feed by outcome
+        </p>
+        <FeedStatusFilter
+          selectedStatuses={selectedStatuses}
+          selectedTopics={selectedTopics}
+          selectedTiers={selectedTiers}
+        />
+      </div>
+      <div>
+        <p className="mb-1.5 font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+          Feed by tier
+        </p>
+        <FeedTierFilter
+          selectedTiers={selectedTiers}
+          selectedTopics={selectedTopics}
+          selectedStatuses={selectedStatuses}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -161,6 +235,9 @@ function HeaderMenu({
               <TokenReadout value={profile.utility_tokens} />
             </div>
           ) : null}
+          <Suspense fallback={null}>
+            <HeaderMenuFilters />
+          </Suspense>
           <nav className="flex flex-col py-1">
             {items.map((item) => (
               <Link
