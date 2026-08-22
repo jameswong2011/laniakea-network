@@ -405,7 +405,6 @@ export async function voteOnPost(
     .eq("id", postId);
 
   if (healthError) {
-    refreshFeed();
     return {
       error:
         healthError.message.includes("status") ||
@@ -425,7 +424,6 @@ export async function voteOnPost(
   });
 
   if (txError) {
-    refreshFeed();
     return {
       error: `Vote recorded, but HP transaction failed: ${txError.message}`,
       stamp: Date.now(),
@@ -443,7 +441,6 @@ export async function voteOnPost(
     );
 
     if (topic.error) {
-      refreshFeed();
       return {
         error: `Vote recorded, but topic rank failed: ${topic.error}`,
         stamp: Date.now(),
@@ -455,7 +452,6 @@ export async function voteOnPost(
     const settled = await settleHuntedPost(supabase, postId, originalStake);
 
     if (settled.error) {
-      refreshFeed();
       return {
         error: `Note hunted, but bounty failed: ${settled.error}`,
         stamp: Date.now(),
@@ -465,14 +461,12 @@ export async function voteOnPost(
     const comments = await settleCommentsOnHuntedPost(supabase, postId);
 
     if (comments.error) {
-      refreshFeed();
       return {
         error: `Note hunted, but comment cascade failed: ${comments.error}`,
         stamp: Date.now(),
       };
     }
 
-    refreshFeed();
     return {
       message:
         "Note hunted. Losing comments settled; winning comments refunded vote HP.",
@@ -489,20 +483,17 @@ export async function voteOnPost(
     );
 
     if (settled.error) {
-      refreshFeed();
       return {
         error: `Note ascended, but harvest failed: ${settled.error}`,
         stamp: Date.now(),
       };
     }
 
-    refreshFeed();
     return {
       message: "Note ascended. Downvote HP harvested for early ups and the author.",
       stamp: Date.now(),
     };
   }
 
-  refreshFeed();
   return { message: "Vote recorded.", stamp: Date.now() };
 }

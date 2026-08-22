@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   voteOnPost,
   type FeedActionState,
@@ -8,13 +8,13 @@ import {
 import { voteOnComment } from "@/app/(dashboard)/feed/[postId]/actions";
 import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
 import { voteCostHp } from "@/lib/research/economy";
+import { useSilentRefresh } from "@/lib/ui/silent-refresh";
 import {
   VOTE_STRENGTH_MAX,
   VOTE_STRENGTH_MIN,
+  signedVoteValue,
   voteStrength,
 } from "@/types";
-
-const initialState: FeedActionState = {};
 
 const buttonClassName =
   "h-6 border px-2 font-data text-[10px] tracking-[0.12em] uppercase disabled:opacity-40";
@@ -34,31 +34,65 @@ export function VoteControls({
   availableHp: number;
   lockReason?: string;
 }) {
-  const [state, action, pending] = useActionState(
-    commentId ? voteOnComment : voteOnPost,
-    initialState
-  );
+  const refresh = useSilentRefresh();
+  const inflight = useRef(false);
   const maxStrength = Math.min(
     VOTE_STRENGTH_MAX,
     Math.max(VOTE_STRENGTH_MIN, availableHp)
   );
-  const [strength, setStrength] = useState(() =>
-    Math.min(3, maxStrength)
-  );
-  const locked = pending || currentVote !== null || !canVote;
-  const recorded = currentVote !== null ? voteStrength(currentVote) : null;
+  const [strength, setStrength] = useState(() => Math.min(3, maxStrength));
+  const [recordedVote, setRecordedVote] = useState(currentVote);
+  const [state, setState] = useState<FeedActionState>({});
+
+  useEffect(() => {
+    if (currentVote !== null) {
+      setRecordedVote(currentVote);
+    }
+  }, [currentVote]);
+
+  const locked = recordedVote !== null || !canVote || inflight.current;
+  const recorded = recordedVote !== null ? voteStrength(recordedVote) : null;
   const cost = voteCostHp(strength);
 
+  async function cast(direction: "up" | "down") {
+    if (recordedVote !== null || !canVote || inflight.current) {
+      return;
+    }
+
+    inflight.current = true;
+    const value = signedVoteValue(direction, strength);
+    setRecordedVote(value);
+    setState({});
+
+    const form = new FormData();
+    form.set("postId", postId);
+    form.set("direction", direction);
+    form.set("strength", String(strength));
+
+    if (commentId) {
+      form.set("commentId", commentId);
+    }
+
+    const result = commentId
+      ? await voteOnComment({}, form)
+      : await voteOnPost({}, form);
+
+    if (result.error) {
+      inflight.current = false;
+      setRecordedVote(currentVote);
+      setState(result);
+      return;
+    }
+
+    setState(result);
+    refresh();
+  }
+
   return (
-    <form action={action} className="flex w-[8.75rem] shrink-0 flex-col items-end gap-1 sm:w-[9.5rem]">
-      <input type="hidden" name="postId" value={postId} />
-      {commentId ? (
-        <input type="hidden" name="commentId" value={commentId} />
-      ) : null}
+    <div className="flex w-[8.75rem] shrink-0 flex-col items-end gap-1 sm:w-[9.5rem]">
       <div className="flex w-full items-center gap-1.5">
         <input
           type="range"
-          name="strength"
           min={VOTE_STRENGTH_MIN}
           max={locked ? VOTE_STRENGTH_MAX : maxStrength}
           step={1}
@@ -77,12 +111,11 @@ export function VoteControls({
       </div>
       <div className="flex items-center gap-1">
         <button
-          type="submit"
-          name="direction"
-          value="up"
+          type="button"
           disabled={locked}
+          onClick={() => void cast("up")}
           className={`${buttonClassName} ${
-            currentVote !== null && currentVote > 0
+            recordedVote !== null && recordedVote > 0
               ? "border-gain text-gain"
               : "border-border text-muted-foreground hover:text-foreground"
           }`}
@@ -90,12 +123,11 @@ export function VoteControls({
           Up
         </button>
         <button
-          type="submit"
-          name="direction"
-          value="down"
+          type="button"
           disabled={locked}
+          onClick={() => void cast("down")}
           className={`${buttonClassName} ${
-            currentVote !== null && currentVote < 0
+            recordedVote !== null && recordedVote < 0
               ? "border-loss text-loss"
               : "border-border text-muted-foreground hover:text-foreground"
           }`}
@@ -104,8 +136,8 @@ export function VoteControls({
         </button>
       </div>
       <p className="font-data text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-        {currentVote !== null
-          ? `${currentVote > 0 ? "Up" : "Down"} ${recorded}`
+        {recordedVote !== null
+          ? `${recordedVote > 0 ? "Up" : "Down"} ${recorded}`
           : canVote
             ? `${cost} HP`
             : lockReason ?? `Need ${VOTE_STRENGTH_MIN} HP`}
@@ -118,6 +150,6 @@ export function VoteControls({
       {state.voteScaleSql ? (
         <CopyInviteButton value={state.voteScaleSql} label="Copy SQL" />
       ) : null}
-    </form>
+    </div>
   );
 }

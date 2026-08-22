@@ -105,7 +105,11 @@ export async function creditProfileHp(
   }
 
   if (!updated) {
-    return { ok: false, error: "HP changed. Try again." };
+    return {
+      ok: false,
+      error:
+        "Could not credit this desk. Paste the settlement apply SQL, then open the hunted note again.",
+    };
   }
 
   return {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   togglePostSubscription,
   toggleSavedPost,
 } from "@/app/(dashboard)/forum/actions";
+import { useSilentRefresh } from "@/lib/ui/silent-refresh";
 
 export function PostToolbar({
   postId,
@@ -17,7 +18,20 @@ export function PostToolbar({
   subscribed?: boolean | null;
   sharePath: string;
 }) {
+  const refresh = useSilentRefresh();
+  const saveLock = useRef(false);
+  const followLock = useRef(false);
   const [copied, setCopied] = useState(false);
+  const [isSaved, setIsSaved] = useState(saved);
+  const [isSubscribed, setIsSubscribed] = useState(subscribed);
+
+  useEffect(() => {
+    setIsSaved(saved);
+  }, [saved]);
+
+  useEffect(() => {
+    setIsSubscribed(subscribed);
+  }, [subscribed]);
 
   async function copyLink() {
     const url =
@@ -34,21 +48,53 @@ export function PostToolbar({
     }
   }
 
+  async function toggleSave() {
+    if (saveLock.current) {
+      return;
+    }
+
+    saveLock.current = true;
+    const previous = isSaved;
+    setIsSaved(!previous);
+    const form = new FormData();
+    form.set("postId", postId);
+    await toggleSavedPost(form);
+    saveLock.current = false;
+    refresh();
+  }
+
+  async function toggleFollow() {
+    if (isSubscribed == null || followLock.current) {
+      return;
+    }
+
+    followLock.current = true;
+    const previous = isSubscribed;
+    setIsSubscribed(!previous);
+    const form = new FormData();
+    form.set("postId", postId);
+    await togglePostSubscription(form);
+    followLock.current = false;
+    refresh();
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-      <form action={toggleSavedPost}>
-        <input type="hidden" name="postId" value={postId} />
-        <button type="submit" className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground">
-          {saved ? "Saved" : "Save"}
+      <button
+        type="button"
+        onClick={() => void toggleSave()}
+        className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+      >
+        {isSaved ? "Saved" : "Save"}
+      </button>
+      {isSubscribed == null ? null : (
+        <button
+          type="button"
+          onClick={() => void toggleFollow()}
+          className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+        >
+          {isSubscribed ? "Following" : "Follow thread"}
         </button>
-      </form>
-      {subscribed == null ? null : (
-        <form action={togglePostSubscription}>
-          <input type="hidden" name="postId" value={postId} />
-          <button type="submit" className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground">
-            {subscribed ? "Following" : "Follow thread"}
-          </button>
-        </form>
       )}
       <button
         type="button"

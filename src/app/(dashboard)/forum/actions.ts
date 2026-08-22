@@ -50,7 +50,7 @@ export async function toggleReaction(formData: FormData) {
     return;
   }
 
-  const { targetType, targetId, reaction, postId } = parsed.data;
+  const { targetType, targetId, reaction } = parsed.data;
   const existing = await supabase
     .from("content_reactions")
     .select("id")
@@ -74,8 +74,6 @@ export async function toggleReaction(formData: FormData) {
       return;
     }
   }
-
-  refreshSocial(postId);
 }
 
 export async function toggleSavedPost(formData: FormData) {
@@ -110,8 +108,6 @@ export async function toggleSavedPost(formData: FormData) {
       post_id: postId,
     });
   }
-
-  refreshSocial(postId);
 }
 
 export async function togglePostSubscription(formData: FormData) {
@@ -146,8 +142,6 @@ export async function togglePostSubscription(formData: FormData) {
       post_id: postId,
     });
   }
-
-  refreshSocial(postId);
 }
 
 export async function markNotificationsRead() {
@@ -299,10 +293,6 @@ export async function toggleAuthorFollow(formData: FormData) {
       author_id: authorId,
     });
   }
-
-  revalidatePath("/feed");
-  revalidatePath("/dashboard");
-  revalidatePath("/u", "layout");
 }
 
 export async function updateBio(

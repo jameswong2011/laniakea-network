@@ -410,7 +410,6 @@ export async function voteOnComment(
     .eq("id", commentId);
 
   if (healthError) {
-    refreshThread(postId);
     return {
       error: `Vote recorded, but health update failed: ${healthError.message}`,
       stamp: Date.now(),
@@ -427,7 +426,6 @@ export async function voteOnComment(
   });
 
   if (txError) {
-    refreshThread(postId);
     return {
       error: `Vote recorded, but HP transaction failed: ${txError.message}`,
       stamp: Date.now(),
@@ -445,7 +443,6 @@ export async function voteOnComment(
     );
 
     if (topic.error) {
-      refreshThread(postId);
       return {
         error: `Vote recorded, but topic rank failed: ${topic.error}`,
         stamp: Date.now(),
@@ -462,14 +459,12 @@ export async function voteOnComment(
     );
 
     if (settled.error) {
-      refreshThread(postId);
       return {
         error: `Comment hunted, but bounty failed: ${settled.error}`,
         stamp: Date.now(),
       };
     }
 
-    refreshThread(postId);
     return {
       message: "Comment hunted. Stake and ups paid to downvoters by timing.",
       stamp: Date.now(),
@@ -486,14 +481,12 @@ export async function voteOnComment(
     );
 
     if (settled.error) {
-      refreshThread(postId);
       return {
         error: `Comment ascended, but harvest failed: ${settled.error}`,
         stamp: Date.now(),
       };
     }
 
-    refreshThread(postId);
     return {
       message:
         "Comment ascended. Downvote HP harvested for early ups and the author.",
@@ -501,7 +494,6 @@ export async function voteOnComment(
     };
   }
 
-  refreshThread(postId);
   return { message: "Vote recorded.", stamp: Date.now() };
 }
 
@@ -646,6 +638,5 @@ export async function toggleReplyLike(
     };
   }
 
-  refreshThread(postId);
   return { stamp: Date.now() };
 }

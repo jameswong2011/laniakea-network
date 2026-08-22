@@ -26,6 +26,7 @@ import {
   COMMENTS_SQL_POLICIES,
   COMMENTS_SQL_TABLES,
 } from "@/lib/research/comments-sql";
+import { SETTLEMENT_APPLY_SQL } from "@/lib/research/settlement-apply-sql";
 import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
 import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
 import { getLatestWeeklyRun } from "@/lib/research/weekly";
@@ -77,6 +78,16 @@ export default async function AdminPage() {
     .select("original_stake")
     .limit(1);
   const settlementReady = !stakeProbe.error;
+  const applyProbe = await supabase.rpc("settle_hunted_post", {
+    p_post_id: "00000000-0000-4000-8000-000000000000",
+  });
+  const applyReady =
+    !applyProbe.error ||
+    !(
+      applyProbe.error.message.includes("42883") ||
+      applyProbe.error.message.includes("does not exist") ||
+      applyProbe.error.message.includes("schema cache")
+    );
   const commentsProbe = await supabase
     .from("research_comments")
     .select("id")
@@ -311,6 +322,26 @@ export default async function AdminPage() {
           </p>
           <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
             {SETTLEMENT_SQL}
+          </pre>
+        </Panel>
+      )}
+
+      {applyReady ? null : (
+        <Panel>
+          <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
+            <div>
+              <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+                Settlement apply
+              </p>
+              <p className="mt-1 text-[12px] text-warning">
+                Hunt archived the note, then bounty could not credit desks.
+                Paste this once, then open the hunted note again.
+              </p>
+            </div>
+            <CopyInviteButton value={SETTLEMENT_APPLY_SQL} label="SQL" />
+          </div>
+          <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
+            {SETTLEMENT_APPLY_SQL}
           </pre>
         </Panel>
       )}

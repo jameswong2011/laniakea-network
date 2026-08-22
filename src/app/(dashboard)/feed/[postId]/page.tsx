@@ -23,6 +23,7 @@ import {
 } from "@/lib/research/comments";
 import { VOTE_COST_HP } from "@/lib/research/economy";
 import { getResearchPostById, getViewerVotes, researchPostPath } from "@/lib/research/feed";
+import { resumeFrozenPostSettlement } from "@/lib/research/settlement-apply";
 import {
   countAuthorFollowers,
   isAuthorFollowed,
@@ -172,6 +173,7 @@ export default async function ResearchPostPage({
       countAuthorFollowers(supabase, item.author_id),
     ]);
   const availableHp = profile?.current_hp ?? 0;
+  const resume = await resumeFrozenPostSettlement(supabase, item);
 
   return (
     <PageFrame>
@@ -188,6 +190,12 @@ export default async function ResearchPostPage({
           </Link>
         }
       />
+
+      {resume.error ? (
+        <p className="rounded-xl border border-border bg-panel px-4 py-3 text-[14px] text-warning">
+          Note is closed, but bounty is still unpaid. {resume.error}
+        </p>
+      ) : null}
 
       <article
         className={`rounded-xl border border-border border-l-[3px] bg-panel px-5 py-5 ${deskAccessRailClass(item.access)}`}

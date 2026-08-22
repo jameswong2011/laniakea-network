@@ -1,3 +1,5 @@
+import { SETTLEMENT_APPLY_SQL } from "@/lib/research/settlement-apply-sql";
+
 export const SETTLEMENT_SQL = `-- Post economics: original stake, ascended status, health_at_vote, hunt/ascent ledger.
 -- Continuous settlement: no discrete claim tiers. Run once in the Supabase SQL editor.
 
@@ -92,4 +94,6 @@ exception
   when duplicate_object then null;
 end
 $$;
+
+${SETTLEMENT_APPLY_SQL}
 `;

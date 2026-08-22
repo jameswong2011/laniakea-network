@@ -18,6 +18,22 @@ import {
   voteStrength,
 } from "@/types";
 
+function isMissingSettleFn(message: string) {
+  return (
+    message.includes("42883") ||
+    message.includes("does not exist") ||
+    message.includes("schema cache")
+  );
+}
+
+function settleSqlHint(error: string) {
+  if (isMissingSettleFn(error)) {
+    return `Bounty apply SQL is missing. ${error}`;
+  }
+
+  return error;
+}
+
 function formatMultiplier(multiplier: number | null) {
   if (multiplier == null) {
     return null;
@@ -130,6 +146,16 @@ export async function settleHuntedPost(
   postId: string,
   originalStake: number
 ) {
+  const rpc = await supabase.rpc("settle_hunted_post", { p_post_id: postId });
+
+  if (!rpc.error) {
+    return { error: null };
+  }
+
+  if (!isMissingSettleFn(rpc.error.message)) {
+    return { error: settleSqlHint(rpc.error.message) };
+  }
+
   const loaded = await loadSettlementVotes(supabase, postId);
 
   if (loaded.error) {
@@ -151,6 +177,16 @@ export async function settleAscendedPost(
   authorId: string,
   originalStake: number
 ) {
+  const rpc = await supabase.rpc("settle_ascended_post", { p_post_id: postId });
+
+  if (!rpc.error) {
+    return { error: null };
+  }
+
+  if (!isMissingSettleFn(rpc.error.message)) {
+    return { error: settleSqlHint(rpc.error.message) };
+  }
+
   const loaded = await loadSettlementVotes(supabase, postId);
 
   if (loaded.error) {
@@ -199,6 +235,19 @@ export async function settleHuntedComment(
   postId: string,
   originalStake: number
 ) {
+  const rpc = await supabase.rpc("settle_hunted_comment", {
+    p_comment_id: commentId,
+    p_post_id: postId,
+  });
+
+  if (!rpc.error) {
+    return { error: null };
+  }
+
+  if (!isMissingSettleFn(rpc.error.message)) {
+    return { error: settleSqlHint(rpc.error.message) };
+  }
+
   const loaded = await loadCommentSettlementVotes(supabase, commentId);
 
   if (loaded.error) {
@@ -221,6 +270,19 @@ export async function settleAscendedComment(
   authorId: string,
   originalStake: number
 ) {
+  const rpc = await supabase.rpc("settle_ascended_comment", {
+    p_comment_id: commentId,
+    p_post_id: postId,
+  });
+
+  if (!rpc.error) {
+    return { error: null };
+  }
+
+  if (!isMissingSettleFn(rpc.error.message)) {
+    return { error: settleSqlHint(rpc.error.message) };
+  }
+
   const loaded = await loadCommentSettlementVotes(supabase, commentId);
 
   if (loaded.error) {
@@ -464,6 +526,38 @@ export async function settleCommentsOnHuntedPost(
     if (frozen.error) {
       return frozen;
     }
+  }
+
+  return { error: null };
+}
+
+export async function resumeFrozenPostSettlement(
+  supabase: SupabaseClient,
+  post: {
+    id: string;
+    status: string;
+    author_id: string;
+    original_stake?: number;
+    current_health?: number;
+  }
+) {
+  const stake =
+    typeof post.original_stake === "number"
+      ? post.original_stake
+      : (post.current_health ?? 0);
+
+  if (post.status === RESEARCH_POST_STATUS_ARCHIVED) {
+    const hunted = await settleHuntedPost(supabase, post.id, stake);
+
+    if (hunted.error) {
+      return hunted;
+    }
+
+    return settleCommentsOnHuntedPost(supabase, post.id);
+  }
+
+  if (post.status === RESEARCH_POST_STATUS_ASCENDED) {
+    return settleAscendedPost(supabase, post.id, post.author_id, stake);
   }
 
   return { error: null };
