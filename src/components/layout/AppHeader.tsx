@@ -148,27 +148,17 @@ function HeaderMenuFilters() {
     : null;
 
   return (
-    <div className="flex flex-col gap-3 border-b border-border px-3 py-2.5">
-      <div>
-        <p className="mb-1.5 font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-          Feed by outcome
-        </p>
-        <FeedStatusFilter
-          selectedStatuses={selectedStatuses}
-          selectedTopics={selectedTopics}
-          selectedTiers={selectedTiers}
-        />
-      </div>
-      <div>
-        <p className="mb-1.5 font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-          Feed by tier
-        </p>
-        <FeedTierFilter
-          selectedTiers={selectedTiers}
-          selectedTopics={selectedTopics}
-          selectedStatuses={selectedStatuses}
-        />
-      </div>
+    <div className="flex flex-col gap-2 border-b border-border px-3 py-2.5">
+      <FeedStatusFilter
+        selectedStatuses={selectedStatuses}
+        selectedTopics={selectedTopics}
+        selectedTiers={selectedTiers}
+      />
+      <FeedTierFilter
+        selectedTiers={selectedTiers}
+        selectedTopics={selectedTopics}
+        selectedStatuses={selectedStatuses}
+      />
     </div>
   );
 }

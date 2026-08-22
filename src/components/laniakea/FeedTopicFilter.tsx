@@ -1,48 +1,63 @@
-import Link from "next/link";
+import { FeedFilterChip, FeedFilterGroup } from "@/components/laniakea/FeedFilterChip";
 import { feedHref, feedTopicHref, type FeedStatus } from "@/lib/research/feed";
 import { SUB_TOPICS, type SubTopic, type Tier } from "@/types";
-
-function chipClassName(active: boolean) {
-  return `inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-[12px] ${
-    active
-      ? "bg-muted text-foreground"
-      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-  }`;
-}
 
 export function FeedTopicFilter({
   selected,
   selectedTiers = null,
   selectedStatuses = null,
+  onSelect,
 }: {
   selected: SubTopic[] | null;
   selectedTiers?: Tier[] | null;
   selectedStatuses?: FeedStatus[] | null;
+  onSelect?: (href: string) => void;
 }) {
   const allSelected = selected == null;
   const active = selected ?? [...SUB_TOPICS];
 
   return (
-    <nav aria-label="Research topic" className="flex flex-wrap items-center gap-1.5">
-      <Link
-        href={feedHref({
-          topics: null,
-          tiers: selectedTiers,
-          statuses: selectedStatuses,
-        })}
-        className={chipClassName(allSelected)}
-      >
-        All
-      </Link>
-      {SUB_TOPICS.map((topic) => (
-        <Link
-          key={topic}
-          href={feedTopicHref(selected, topic, selectedTiers, selectedStatuses)}
-          className={chipClassName(active.includes(topic))}
+    <FeedFilterGroup
+      label="Sector"
+      hint="Book the note was filed under."
+      tone="sector"
+    >
+      <nav aria-label="Research sector" className="flex flex-wrap items-center gap-1">
+        <FeedFilterChip
+          href={feedHref({
+            topics: null,
+            tiers: selectedTiers,
+            statuses: selectedStatuses,
+          })}
+          active={allSelected}
+          onSelect={onSelect}
+          className={`inline-flex h-7 shrink-0 items-center px-2 text-[12px] underline-offset-4 ${
+            allSelected
+              ? "text-foreground underline"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
         >
-          {topic}
-        </Link>
-      ))}
-    </nav>
+          All sectors
+        </FeedFilterChip>
+        {SUB_TOPICS.map((topic) => {
+          const on = active.includes(topic);
+          return (
+            <FeedFilterChip
+              key={topic}
+              href={feedTopicHref(selected, topic, selectedTiers, selectedStatuses)}
+              active={on}
+              onSelect={onSelect}
+              className={`inline-flex h-7 shrink-0 items-center px-2 text-[12px] underline-offset-4 ${
+                on
+                  ? "text-foreground underline"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {topic}
+            </FeedFilterChip>
+          );
+        })}
+      </nav>
+    </FeedFilterGroup>
   );
 }

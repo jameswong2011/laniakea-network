@@ -180,6 +180,54 @@ export function parseFeedTiers(
   return selected;
 }
 
+export type FeedQuery = {
+  topics: SubTopic[] | null;
+  tiers: Tier[] | null;
+  statuses: FeedStatus[] | null;
+};
+
+export function parseFeedQueryFromSearch(search: string | URLSearchParams): FeedQuery {
+  const params =
+    typeof search === "string"
+      ? new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
+      : search;
+
+  return {
+    topics: params.has("topic")
+      ? parseFeedTopics(params.getAll("topic"))
+      : null,
+    tiers: params.has("tier") ? parseFeedTiers(params.getAll("tier")) : null,
+    statuses: params.has("status")
+      ? parseFeedStatuses(params.getAll("status"))
+      : null,
+  };
+}
+
+export function parseFeedQueryFromHref(href: string): FeedQuery {
+  const url = new URL(href, "https://laniakea.local");
+  return parseFeedQueryFromSearch(url.searchParams);
+}
+
+export function feedHeadingTitle(query: FeedQuery) {
+  if (query.topics?.length === 1 && query.tiers?.length === 1) {
+    return `${query.tiers[0]} · ${query.topics[0]}`;
+  }
+
+  if (query.topics?.length === 1) {
+    return query.topics[0];
+  }
+
+  if (query.tiers?.length === 1) {
+    return `${query.tiers[0]} desks`;
+  }
+
+  if (query.statuses?.length === 1) {
+    return FEED_STATUS_LABELS[query.statuses[0]];
+  }
+
+  return "Main Feed";
+}
+
 export function feedHref({
   topics = null,
   tiers = null,
