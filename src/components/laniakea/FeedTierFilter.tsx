@@ -1,6 +1,6 @@
 import { FeedFilterChip, FeedFilterGroup } from "@/components/laniakea/FeedFilterChip";
 import { feedHref, feedTierHref, type FeedStatus } from "@/lib/research/feed";
-import { TIER_CODES, TIERS, type SubTopic, type Tier } from "@/types";
+import { TIER_LABELS, TIERS, type SubTopic, type Tier } from "@/types";
 
 const TIER_TONE: Record<Tier, { on: string; off: string }> = {
   Bronze: {
@@ -79,7 +79,7 @@ export function FeedTierFilter({
                 on ? TIER_TONE[tier].on : TIER_TONE[tier].off
               }`}
             >
-              {TIER_CODES[tier]}
+              {TIER_LABELS[tier]}
             </FeedFilterChip>
           );
         })}
