@@ -72,15 +72,15 @@ export function HuntAscent() {
     <section id="arena" className="border-t border-border">
       <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 md:grid-cols-12 md:gap-10 md:px-8 md:py-28">
         <div className="md:col-span-5">
-          <p className="section-kicker">03 — The arena</p>
+          <p className="section-kicker">How a note is judged</p>
           <h2 className="mt-4 font-display text-2xl leading-title text-fg">
-            A thesis lives until the room hunts it or lifts it.
+            Health decides Hunt and Ascent.
           </h2>
           <p className="mt-5 max-w-md text-muted">
-            No buzzer. The vote that takes health to zero is a Hunt. The vote
-            that takes it to five times stake is an Ascent and freezes the
-            book. What you made is set by conviction and the health when you
-            voted — not by who shouted last.
+            The vote that takes health to zero is a Hunt. The vote that takes
+            it to five times stake is an Ascent and freezes the book. Creators
+            stake and judge. Investors see which notes are still live or have
+            ascended.
           </p>
           <dl className="mt-8 space-y-5">
             <div>

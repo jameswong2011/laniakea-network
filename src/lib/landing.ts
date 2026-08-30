@@ -2,8 +2,6 @@ import {
   ASCENT_MULTIPLE,
   DEFAULT_COMMENT_STAKE_HP,
   DEFAULT_STAKE_HP,
-  MAX_STAKE_HP,
-  PASSIVE_DRAIN_HP,
   STARTING_HP,
 } from "@/lib/research/economy";
 import {
@@ -13,136 +11,90 @@ import {
   huntMultiplier,
 } from "@/lib/research/settlement";
 import {
-  INVITE_PURCHASE_UTL,
-  REFERRAL_MAX_DEPTH,
   SIGNUP_INVITE_GRANT,
   UNLOCK_CREATOR_SHARE_PCT,
-  splitResidual,
-  unlockCreatorShare,
-  walkReferralKeeps,
 } from "@/lib/research/referral";
-import { SUB_TOPICS, VOTE_STRENGTH_MAX, VOTE_STRENGTH_MIN } from "@/types";
+import { TIERS, VOTE_STRENGTH_MAX, VOTE_STRENGTH_MIN } from "@/types";
 
 export const LANIAKEA_PRONUNCIATION = "lah-nee-ah-KAY-ah";
 
-export const AUDIENCES = [
+export const PROBLEM = {
+  kicker: "The use case",
+  title: "Investment research is gated. The people who can still generate alpha have no public floor.",
+  lead: "Gatekeepers funnel capital into gatherers. Analysts who can already run a book walk a compliance gauntlet and raise from short-horizon, misinformed money. By the time a fund is raised, the capacity that made it worth raising is often gone. There is still no efficient way to put providers of capital in the same room as managers of capital.",
+  close:
+    "Rooms like SumZero and Value Investor Club never solved the two tests that matter: who decides what is good, and why a great book would post. Laniakea does not hire a curator. Writers pay Health Points to publish and to judge. Individual investors read the tape and unlock the rooms above them.",
+} as const;
+
+export const SEATS = [
   {
-    kicker: "The desk",
-    title: "Analysts who should run their own book",
-    body: "The 1-CIO / 3–10 PM / 10–50 analyst pyramid is about to invert. Models are becoming A+ public-market analysts — MCP to every data feed, agents that can pilot a machine. The people those seats no longer need are often the ones who can already underwrite a portfolio. We exist so they do not have to die in someone else’s org chart.",
+    id: "write",
+    kicker: "Write",
+    title: "Content creators",
+    lede: "Analysts, PMs, and researchers who post and judge. You originate notes and stake HP on them.",
+    points: [
+      {
+        title: "Speech costs HP",
+        body: `Publish a note (default ${DEFAULT_STAKE_HP} HP) or a comment (default ${DEFAULT_COMMENT_STAKE_HP}). That stake is the opening health. Vote with conviction ${VOTE_STRENGTH_MIN}–${VOTE_STRENGTH_MAX}. You cannot vote your own work.`,
+      },
+      {
+        title: "The room settles in public",
+        body: `Health to zero is a Hunt — shorts are paid. Health to ${ASCENT_MULTIPLE}× stake is an Ascent — longs and the author harvest. Earlier conviction takes more of the pot.`,
+      },
+      {
+        title: "Rank is a room you can lose",
+        body: `${TIERS.join(" → ")}. Same room or below is a full seat. Monday calibration promotes and demotes the top and bottom quartile. You cannot buy past Bronze’s restore cap.`,
+      },
+      {
+        title: "Unlocks pay the author",
+        body: `When someone below your room unlocks a note, you take ${UNLOCK_CREATOR_SHARE_PCT}% in UTL. Invite residual walks the rest up the line that brought them in.`,
+      },
+    ],
   },
   {
-    kicker: "The tape",
-    title: "Investors who should stop gambling",
-    body: "Self-managed capital has been trained on technicals, options, and the casino. We want them looking over the shoulder of serious research instead — and paying, staking, and voting inside the allocation process, not cheering from a comment section.",
+    id: "read",
+    kicker: "Read",
+    title: "Individual investors",
+    lede: "Self-managed investors who read the research. You do not have to originate.",
+    points: [
+      {
+        title: "The tape is the same",
+        body: "Your room and below is free to read in full. One room above is view-only. Further rooms stay locked until you unlock that note.",
+      },
+      {
+        title: "Pay per note",
+        body: "Unlock is one UTL purchase per note. Follow a desk. Save a thread. Search the library. Hunted notes leave the default tape.",
+      },
+      {
+        title: "Judgment is optional",
+        body: "Reading does not spend HP. If you want to vote or comment on a note you can see, you spend like anyone else. Most readers will not.",
+      },
+      {
+        title: "Invite-only access",
+        body: `Public signup starts Bronze with ${STARTING_HP} HP. A code snapshots the inviter’s room at redeem. Unlocking does not promote you. You stay in your room unless you also write and judge.`,
+      },
+    ],
   },
 ] as const;
 
-export const FLOOR_TRAITS = [
+export const FLOOR_RULES = [
   {
-    title: "Long notes, not takes",
-    body: "Markdown, images, and threads. Comments can hunt and ascend. Direct replies stay light. Named reactions — Agree, Disagree, Detailed, Non-consensus, Informative, Funny — mark the work, not the author.",
+    title: "Five rooms, one tape",
+    body: "Bronze through Masters is the wallet. Topic books are participation scores on the same Monday clock. Hidden notes are a locked card with an unlock quote — not a 404.",
   },
   {
-    title: "Desks you have to earn",
-    body: "Bronze through Masters, overall and by topic. Same desk or below is a full seat. One tier above is view-only. Further desks stay locked until you unlock a note or climb.",
+    title: "HP is inventory, not a score",
+    body: `You start with ${STARTING_HP} HP. You spend it to publish, comment, and vote. Idle desks lose a little every Monday. Masters can cash HP into UTL. Bronze can restore HP, never past the grant.`,
   },
   {
-    title: "A library, not just a firehose",
-    body: "Follow a desk. Save a thread. Search notes and comments. Draft before you stake. Public profiles so a book has a face.",
-  },
-] as const;
-
-export const INCENTIVE_POINTS = [
-  {
-    title: "Curation is the room",
-    body: "SumZero, Manual of Ideas, Value Investor Club never solved policing or why a top book would share. We do not hire a curator. The floor spends scarce HP to publish and to vote. Bad work dies in public. Good work climbs.",
+    title: "Notes settle in public",
+    body: `A note opens at its stake. The crowd can hunt it to zero or lift it to ${ASCENT_MULTIPLE}×. Settlement is continuous from the health at the moment you voted.`,
   },
   {
-    title: "Skin in the thesis",
-    body: "A note opens at its stake. The crowd can hunt it to zero or lift it to five times that stake. Settlement is continuous — health at the moment you vote is the multiple. The author and the book share the outcome.",
-  },
-  {
-    title: "Rank is a room, not a badge",
-    body: "Weekly calibration, Monday 09:30 New York, promotes and demotes on HP inside each desk and resets the swept book to 1,000 HP. Topic books do not transfer. You cannot buy your way past Bronze’s restore cap.",
+    title: "The floor is invite-only",
+    body: `Every desk gets ${SIGNUP_INVITE_GRANT} codes. Extra codes cost UTL. Elite desks mint without a cap. Residual on UTL spends walks the invite line. HP spends do not.`,
   },
 ] as const;
-
-export const HP_RULES = [
-  { label: "Starting grant", value: `${STARTING_HP} HP` },
-  {
-    label: "Publish stake",
-    value: `1–${MAX_STAKE_HP} HP (default ${DEFAULT_STAKE_HP})`,
-  },
-  {
-    label: "Comment stake",
-    value: `1–${MAX_STAKE_HP} HP (default ${DEFAULT_COMMENT_STAKE_HP})`,
-  },
-  {
-    label: "Vote conviction",
-    value: `${VOTE_STRENGTH_MIN}–${VOTE_STRENGTH_MAX} HP`,
-  },
-  { label: "Hunt / Ascent", value: `0 floor · ${ASCENT_MULTIPLE}× stake ceiling` },
-  { label: "Weekly drain", value: `${PASSIVE_DRAIN_HP} HP · Monday 09:30 NY` },
-  { label: "Calibration reset", value: `${STARTING_HP} HP` },
-  {
-    label: "Buy HP",
-    value: `Bronze only · restore to ${STARTING_HP}`,
-  },
-  {
-    label: "Topics",
-    value: `${SUB_TOPICS.length} books, overall plus per sector`,
-  },
-] as const;
-
-export const REFERRAL_STEPS = [
-  {
-    title: "A code starts the line",
-    body: `Public signup starts Bronze. An invite snapshots the inviter’s overall tier at redeem and does not follow them later. Every desk gets ${SIGNUP_INVITE_GRANT} codes. Members buy extras for ${INVITE_PURCHASE_UTL} UTL. Elite desks mint without a cap.`,
-  },
-  {
-    title: "Only UTL spends feed the chain",
-    body: `Unlock a note, buy a code, or restore HP. Publish, vote, comment, and the weekly drain stay HP — they do not pay anyone upline. Cash-out credits UTL, so it does not split either.`,
-  },
-  {
-    title: "The poster takes first, then the leftover halves",
-    body: `Unlocks send ${UNLOCK_CREATOR_SHARE_PCT}% to the author. Buying a code or restoring HP has no creator. Half of what remains is the referral pool. The other half burns. The odd token burns.`,
-  },
-  {
-    title: "Each ancestor keeps half of what reaches them",
-    body: `The walk climbs invited-by, ${REFERRAL_MAX_DEPTH} desks max, no cycles. Keep half, pass the rest. The odd token moves up. Whatever is left at the top of the chain or past depth ${REFERRAL_MAX_DEPTH} is dust. The last desk does not keep the remainder.`,
-  },
-] as const;
-
-const WORKED_REFERRAL_CHAIN = ["C", "B", "A"] as const;
-
-function quoteReferralSpend(gross: number, creatorShare: number) {
-  const residual = Math.max(0, gross - creatorShare);
-  const { referralPool, platformBurn } = splitResidual(residual);
-  const { keeps, dust } = walkReferralKeeps(
-    [...WORKED_REFERRAL_CHAIN],
-    referralPool
-  );
-
-  return {
-    gross,
-    creatorShare,
-    residual,
-    referralPool,
-    platformBurn,
-    dust,
-    keeps: keeps.map((row) => ({
-      desk: WORKED_REFERRAL_CHAIN[row.depth - 1] ?? `D${row.depth}`,
-      amount: row.amount,
-    })),
-  };
-}
-
-export const WORKED_INVITE_REFERRAL = quoteReferralSpend(INVITE_PURCHASE_UTL, 0);
-export const WORKED_UNLOCK_REFERRAL = quoteReferralSpend(
-  100,
-  unlockCreatorShare(100)
-);
 
 export const WORKED_STAKE = 100;
 export const WORKED_CONVICTION = 5;

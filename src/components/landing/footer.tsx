@@ -9,21 +9,22 @@ export function LandingFooter() {
             Laniakea
           </p>
           <p className="mt-2 max-w-sm text-sm text-subtle">
-            Immense heaven. A two-sided floor for investment research.
+            Immense heaven. A research floor for writers who post and
+            investors who read.
           </p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
-          <a href="#thesis" className="inline-flex min-h-11 items-center hover:text-fg">
-            Thesis
+          <a href="#problem" className="inline-flex min-h-11 items-center hover:text-fg">
+            Use case
+          </a>
+          <a href="#seats" className="inline-flex min-h-11 items-center hover:text-fg">
+            Seats
           </a>
           <a href="#floor" className="inline-flex min-h-11 items-center hover:text-fg">
             Floor
           </a>
-          <a href="#arena" className="inline-flex min-h-11 items-center hover:text-fg">
-            Arena
-          </a>
-          <a href="#chain" className="inline-flex min-h-11 items-center hover:text-fg">
-            Chain
+          <a href="#access" className="inline-flex min-h-11 items-center hover:text-fg">
+            Access
           </a>
           <Link href="/login" className="inline-flex min-h-11 items-center hover:text-fg">
             Request access

@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     template: "%s · Laniakea Network",
   },
   description:
-    "A two-sided floor for investment research. Analysts who should run a book, investors who should stop gambling.",
+    "A scarce-speech floor for investment research. Creators publish and judge. Individual investors read the tape and unlock higher rooms.",
 };
 
 export const viewport: Viewport = {

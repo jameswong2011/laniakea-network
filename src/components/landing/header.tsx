@@ -42,10 +42,16 @@ export function LandingHeader({
 
       <nav className="hidden items-center gap-7 text-sm text-muted md:flex">
         <a
-          href="#thesis"
+          href="#problem"
           className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
         >
-          Thesis
+          Use case
+        </a>
+        <a
+          href="#seats"
+          className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
+        >
+          Seats
         </a>
         <a
           href="#floor"
@@ -54,30 +60,24 @@ export function LandingHeader({
           Floor
         </a>
         <a
-          href="#arena"
+          href="#access"
           className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
         >
-          Arena
-        </a>
-        <a
-          href="#chain"
-          className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
-        >
-          Chain
+          Access
         </a>
       </nav>
 
       {isSignedIn ? (
         <Link
           href="/feed"
-          className="tap-scale inline-flex h-11 items-center rounded-xs bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-fg"
+          className="tap-scale inline-flex h-11 cursor-pointer items-center rounded-xs bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-fg"
         >
           Enter the floor
         </Link>
       ) : (
         <Link
           href="/login"
-          className="tap-scale inline-flex h-11 items-center rounded-xs bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-fg"
+          className="tap-scale inline-flex h-11 cursor-pointer items-center rounded-xs bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-fg"
         >
           Request access
         </Link>

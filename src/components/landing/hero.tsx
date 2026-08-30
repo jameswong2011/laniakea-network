@@ -24,33 +24,32 @@ export function Hero() {
           Hawaiian · “immense heaven” · {LANIAKEA_PRONUNCIATION}
         </p>
         <h1 className="max-w-4xl font-display text-3xl leading-display text-fg md:text-5xl">
-          The longest horizon we can name.{" "}
-          <em className="italic">A floor for the people who still do the work.</em>
+          Two seats. One research floor.{" "}
+          <em className="italic">Write, or read.</em>
         </h1>
         <p className="mt-6 max-w-2xl text-base text-muted md:text-lg">
-          Investment management hides talent behind gatekeepers and funnels
-          capital into asset gatherers. Laniakea is a two-sided research
-          network: analysts who should run a book, and investors who should
-          stop gambling — meeting on a public tape where conviction has a cost.
+          Laniakea is a scarce-speech floor for investment research. Creators
+          stake Health Points to publish and to judge. Individual investors
+          follow desks and unlock higher rooms — without having to originate.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <Link
             href="/login"
-            className="tap-scale inline-flex h-12 items-center gap-2 rounded-sm bg-accent px-6 text-sm font-medium text-accent-fg hover:bg-fg"
+            className="tap-scale inline-flex h-12 cursor-pointer items-center gap-2 rounded-sm bg-accent px-6 text-sm font-medium text-accent-fg hover:bg-fg"
           >
             Request access
             <ArrowRight className="size-4" />
           </Link>
           <a
-            href="#thesis"
-            className="tap-scale inline-flex h-12 items-center gap-2 rounded-sm px-6 text-sm font-medium text-fg shadow-border hover:shadow-border-hover"
+            href="#seats"
+            className="tap-scale inline-flex h-12 cursor-pointer items-center gap-2 rounded-sm px-6 text-sm font-medium text-fg shadow-border hover:shadow-border-hover"
           >
-            Read the thesis
+            See both seats
             <ArrowDown className="size-4" />
           </a>
         </div>
         <p className="mt-10 font-mono text-xs tracking-kicker text-subtle uppercase">
-          Home of the Milky Way · ~100,000 galaxies · one terminus
+          Creators post and engage · Investors mainly read
         </p>
       </div>
     </section>

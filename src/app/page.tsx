@@ -4,19 +4,24 @@ import { LandingFooter } from "@/components/landing/footer";
 import { LandingHeader } from "@/components/landing/header";
 import { Hero } from "@/components/landing/hero";
 import { HuntAscent } from "@/components/landing/hunt-ascent";
-import { Close, Rulebook } from "@/components/landing/mechanisms";
+import { Close } from "@/components/landing/mechanisms";
 import { Mission } from "@/components/landing/mission";
-import { Referral } from "@/components/landing/referral";
+import { Seats } from "@/components/landing/seats";
 import { getAuthContext } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
-  title: "Open skies for investment research",
+  title: "Two seats. One research floor.",
   description:
-    "Laniakea connects analysts who should run a book with investors who should stop gambling — a two-sided research floor where conviction has a cost.",
+    "Laniakea is a scarce-speech floor for investment research. Creators stake Health Points to publish and judge. Individual investors read the tape and unlock higher rooms.",
 };
 
 export default async function LandingPage() {
-  const { userId } = await getAuthContext();
+  const hasSupabase =
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const { userId } = hasSupabase
+    ? await getAuthContext()
+    : { userId: null };
 
   return (
     <div className="landing min-h-dvh overflow-x-clip bg-bg text-fg">
@@ -24,10 +29,9 @@ export default async function LandingPage() {
       <main>
         <Hero />
         <Mission />
+        <Seats />
         <Floor />
         <HuntAscent />
-        <Rulebook />
-        <Referral />
         <Close />
       </main>
       <LandingFooter />
