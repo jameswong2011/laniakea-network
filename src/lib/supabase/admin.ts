@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { fetchRetryingFutureJwt } from "@/lib/supabase/retry-fetch";
 
 export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,6 +14,9 @@ export function createServiceClient() {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+    },
+    global: {
+      fetch: fetchRetryingFutureJwt,
     },
   });
 }

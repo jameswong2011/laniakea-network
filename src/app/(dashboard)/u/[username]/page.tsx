@@ -2,18 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { PageFrame, PageHeading, Panel, PanelHeader } from "@/components/layout/PageFrame";
+import { PageFrame, Panel, PanelHeader } from "@/components/layout/PageFrame";
 import { DeskAvatar } from "@/components/laniakea/DeskAvatar";
 import { FollowAuthorButton } from "@/components/laniakea/FollowAuthorButton";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { requireUser } from "@/lib/auth/session";
-import { researchCommentPath, researchPostPath } from "@/lib/research/feed";
+import { researchCommentPath, researchExcerpt, researchPostPath } from "@/lib/research/feed";
 import {
   countAuthorFollowers,
   isAuthorFollowed,
 } from "@/lib/research/forum";
-import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
 
 export async function generateMetadata({
   params,
@@ -96,51 +95,54 @@ export default async function PublicProfilePage({
     countAuthorFollowers(supabase, profile.id),
   ]);
 
+  const noteCount = posts?.length ?? 0;
+  const commentCount = comments?.length ?? 0;
+
   return (
     <PageFrame>
-      <div className="flex items-end gap-4">
-        <DeskAvatar
-          url={profile.avatar_url}
-          name={profile.display_name}
-          size="lg"
-        />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <DeskAvatar url={profile.avatar_url} name={profile.display_name} size="lg" />
         <div className="min-w-0 flex-1">
-          <PageHeading
-            kicker="Desk"
-            title={profile.display_name}
-            description={`@${profile.username} · joined ${format(new Date(profile.created_at), "d MMM yyyy")}`}
-            meta={
-              <div className="flex items-center gap-3">
-                <TierBadge tier={profile.tier} size="md" />
-                {profile.id !== userId ? (
-                  <FollowAuthorButton
-                    authorId={profile.id}
-                    following={following}
-                    followerCount={followerCount}
-                  />
-                ) : (
-                  <span className="text-[13px] text-muted-foreground">
-                    {followerCount} {followerCount === 1 ? "follower" : "followers"}
-                  </span>
-                )}
-              </div>
-            }
-          />
+          <p className="text-[12px] text-muted-foreground">Desk</p>
+          <h1 className="mt-1 font-heading text-[28px] leading-tight text-foreground">
+            {profile.display_name}
+          </h1>
+          <p className="mt-1 text-[15px] text-muted-foreground">
+            @{profile.username} · joined {format(new Date(profile.created_at), "d MMM yyyy")}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <TierBadge tier={profile.tier} size="md" />
+            <span className="text-[13px] text-muted-foreground">
+              {followerCount} {followerCount === 1 ? "follower" : "followers"}
+            </span>
+            <span className="text-[13px] text-muted-foreground">
+              {noteCount} {noteCount === 1 ? "note" : "notes"}
+            </span>
+            <span className="text-[13px] text-muted-foreground">
+              {commentCount} {commentCount === 1 ? "comment" : "comments"}
+            </span>
+          </div>
+          {profile.id !== userId ? (
+            <div className="mt-4">
+              <FollowAuthorButton
+                authorId={profile.id}
+                following={following}
+                followerCount={followerCount}
+                showCount={false}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
       {profile.bio ? (
-        <p className="max-w-2xl text-[16px] leading-relaxed text-foreground">
-          {profile.bio}
-        </p>
+        <p className="max-w-2xl text-[16px] leading-relaxed text-foreground">{profile.bio}</p>
       ) : null}
 
       <Panel>
-        <PanelHeader label="Posts" meta={posts?.length ?? 0} />
-        {(posts ?? []).length === 0 ? (
-          <p className="px-4 py-5 text-[14px] text-muted-foreground">
-            No published notes yet.
-          </p>
+        <PanelHeader label="Notes" meta={noteCount} />
+        {noteCount === 0 ? (
+          <p className="px-4 py-5 text-[14px] text-muted-foreground">No published notes yet.</p>
         ) : (
           <div className="divide-y divide-border">
             {(posts ?? []).map((post) => (
@@ -156,6 +158,11 @@ export default async function PublicProfilePage({
                     {post.title}
                   </Link>
                 </h2>
+                {post.body ? (
+                  <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-muted-foreground">
+                    {researchExcerpt(post.body, 180)}
+                  </p>
+                ) : null}
               </article>
             ))}
           </div>
@@ -163,24 +170,22 @@ export default async function PublicProfilePage({
       </Panel>
 
       <Panel>
-        <PanelHeader label="Recent comments" meta={comments?.length ?? 0} />
-        {(comments ?? []).length === 0 ? (
-          <p className="px-4 py-5 text-[14px] text-muted-foreground">
-            No comments yet.
-          </p>
+        <PanelHeader label="Comments" meta={commentCount} />
+        {commentCount === 0 ? (
+          <p className="px-4 py-5 text-[14px] text-muted-foreground">No comments yet.</p>
         ) : (
           <div className="divide-y divide-border">
             {(comments ?? []).map((comment) => (
               <article key={comment.id} className="px-4 py-4">
-                <p className="mb-2 text-[12px] text-muted-foreground">
-                  <Link
-                    href={researchCommentPath(comment.post_id, comment.id)}
-                    className="hover:text-foreground"
-                  >
-                    On a note · {format(new Date(comment.created_at), "d MMM yyyy")}
-                  </Link>
+                <Link
+                  href={researchCommentPath(comment.post_id, comment.id)}
+                  className="text-[12px] text-muted-foreground hover:text-foreground"
+                >
+                  On a note · {format(new Date(comment.created_at), "d MMM yyyy")}
+                </Link>
+                <p className="mt-1 line-clamp-3 text-[15px] leading-relaxed text-foreground">
+                  {researchExcerpt(comment.body, 220)}
                 </p>
-                <MarkdownBody source={comment.body} />
               </article>
             ))}
           </div>

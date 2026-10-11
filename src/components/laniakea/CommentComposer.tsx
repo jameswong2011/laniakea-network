@@ -7,6 +7,7 @@ import {
 } from "@/app/(dashboard)/feed/[postId]/actions";
 import { saveDraft } from "@/app/(dashboard)/forum/actions";
 import { ImageAttachButton } from "@/components/laniakea/ImageAttachButton";
+import { StakeSlider } from "@/components/laniakea/StakeSlider";
 import {
   DEFAULT_COMMENT_STAKE_HP,
   MAX_STAKE_HP,
@@ -33,11 +34,15 @@ export function CommentComposer({
   const [body, setBody] = useState(draft?.body ?? "");
   const [draftNote, setDraftNote] = useState<string | null>(null);
   const saving = useRef(false);
-  const defaultStake =
-    draft?.stake_hp ??
-    (availableHp >= DEFAULT_COMMENT_STAKE_HP
-      ? DEFAULT_COMMENT_STAKE_HP
-      : Math.max(availableHp, 1));
+  const stakeMax = Math.min(MAX_STAKE_HP, Math.max(availableHp, 1));
+  const [stakeHp, setStakeHp] = useState(() => {
+    const opening =
+      draft?.stake_hp ??
+      (availableHp >= DEFAULT_COMMENT_STAKE_HP
+        ? DEFAULT_COMMENT_STAKE_HP
+        : Math.max(availableHp, 1));
+    return Math.min(Math.min(MAX_STAKE_HP, Math.max(availableHp, 1)), Math.max(1, opening));
+  });
 
   async function persistDraft() {
     if (!canStake || saving.current || !body.trim()) {
@@ -49,6 +54,7 @@ export function CommentComposer({
     form.set("kind", "comment");
     form.set("postId", postId);
     form.set("body", body);
+    form.set("stakeHp", String(stakeHp));
     const result = await saveDraft({}, form);
     setDraftNote(result.error ?? (result.id ? "Draft saved." : null));
     saving.current = false;
@@ -61,7 +67,7 @@ export function CommentComposer({
 
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body]);
+  }, [body, stakeHp]);
 
   return (
     <form
@@ -89,31 +95,22 @@ export function CommentComposer({
           className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-[15px] leading-relaxed text-foreground outline-none focus-visible:border-ring disabled:opacity-50"
         />
       </label>
+      <StakeSlider
+        value={stakeHp}
+        max={stakeMax}
+        disabled={!canStake || pending || availableHp < 1}
+        onChange={setStakeHp}
+      />
       <div className="flex flex-wrap items-center gap-3">
         <ImageAttachButton
           disabled={!canStake || pending}
           onInsert={(markdown) => setBody((current) => `${current}${markdown}`)}
         />
-        <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
-          Stake
-          <input
-            name="stakeHp"
-            type="number"
-            min={1}
-            max={Math.min(MAX_STAKE_HP, Math.max(availableHp, 1))}
-            step={1}
-            required
-            defaultValue={defaultStake}
-            disabled={!canStake || pending}
-            className="h-8 w-20 rounded-md border border-border bg-background px-2 text-[13px] disabled:opacity-50"
-          />
-          HP
-        </label>
         <button
           type="button"
           onClick={() => void persistDraft()}
           disabled={!canStake || !body.trim()}
-          className="text-[13px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+          className="inline-flex h-8 items-center rounded-md border border-border bg-secondary px-3 text-[13px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
         >
           Save draft
         </button>

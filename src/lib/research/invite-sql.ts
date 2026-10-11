@@ -730,7 +730,7 @@ begin
   v_receipt := public.spend_with_referral_internal(
     v_user,
     'buy_invite',
-    100,
+    10,
     null,
     'invite_code',
     null,
@@ -1093,7 +1093,7 @@ begin
   v_receipt := public.spend_with_referral_internal(
     v_user,
     'buy_invite',
-    100,
+    10,
     null,
     'invite_code',
     null,

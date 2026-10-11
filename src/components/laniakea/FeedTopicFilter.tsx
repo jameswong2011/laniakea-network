@@ -31,10 +31,10 @@ export function FeedTopicFilter({
           })}
           active={allSelected}
           onSelect={onSelect}
-          className={`inline-flex h-7 shrink-0 items-center px-2 text-[12px] underline-offset-4 ${
+          className={`inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 text-[12px] ${
             allSelected
-              ? "text-foreground underline"
-              : "text-muted-foreground hover:text-foreground"
+              ? "border-foreground/20 bg-muted text-foreground"
+              : "border-border text-muted-foreground hover:bg-muted/70 hover:text-foreground"
           }`}
         >
           All sectors
@@ -47,10 +47,10 @@ export function FeedTopicFilter({
               href={feedTopicHref(selected, topic, selectedTiers, selectedStatuses)}
               active={on}
               onSelect={onSelect}
-              className={`inline-flex h-7 shrink-0 items-center px-2 text-[12px] underline-offset-4 ${
+              className={`inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 text-[12px] ${
                 on
-                  ? "text-foreground underline"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "border-foreground/20 bg-muted text-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted/70 hover:text-foreground"
               }`}
             >
               {topic}

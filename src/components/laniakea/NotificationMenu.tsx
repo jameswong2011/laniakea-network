@@ -40,7 +40,7 @@ export function NotificationMenu({
               <form action={markNotificationsRead}>
                 <button
                   type="submit"
-                  className="text-[12px] text-muted-foreground hover:text-foreground"
+                  className="inline-flex h-7 items-center rounded-md border border-border bg-secondary px-2 text-[12px] font-medium text-foreground hover:bg-muted"
                 >
                   Mark read
                 </button>

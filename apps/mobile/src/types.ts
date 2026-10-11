@@ -1,0 +1,26 @@
+export type GuestStackParamList = {
+  Overview: undefined;
+  Login: undefined;
+  Signup: undefined;
+};
+
+export type TabParamList = {
+  Feed: undefined;
+  Search: undefined;
+  Write: undefined;
+  Ranking: undefined;
+  You: undefined;
+};
+
+export type AppStackParamList = {
+  Main: undefined;
+  Overview: undefined;
+  Compose: { draftId?: string } | undefined;
+  Thread: { postId: string };
+  Desk: { username: string };
+  Inbox: undefined;
+  Drafts: undefined;
+  Saved: undefined;
+  Wallet: undefined;
+  Account: undefined;
+};

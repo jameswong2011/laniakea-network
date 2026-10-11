@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { fetchRetryingFutureJwt } from "@/lib/supabase/retry-fetch";
 import {
   DEMO_POSTS,
   DEMO_USERS,
@@ -58,6 +59,9 @@ function createAuthClient() {
         persistSession: false,
         autoRefreshToken: false,
         detectSessionInUrl: false,
+      },
+      global: {
+        fetch: fetchRetryingFutureJwt,
       },
     }
   );

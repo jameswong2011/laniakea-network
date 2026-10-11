@@ -478,6 +478,4 @@ export async function loadDraftById(
   return error || !data ? null : (data as ContentDraft);
 }
 
-export function searchPattern(query: string) {
-  return `%${query.trim().replace(/[%_]/g, "").slice(0, 80)}%`;
-}
+export { searchPattern } from "@/lib/research/search";

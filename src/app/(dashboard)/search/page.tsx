@@ -10,12 +10,15 @@ import {
 import { SearchBox } from "@/components/laniakea/SearchBox";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { requireUser } from "@/lib/auth/session";
+import { researchCommentPath, researchPostPath } from "@/lib/research/feed";
+import { profilePath } from "@/lib/research/forum";
 import {
-  researchCommentPath,
-  researchExcerpt,
-  researchPostPath,
-} from "@/lib/research/feed";
-import { profilePath, searchPattern } from "@/lib/research/forum";
+  orderSearchPosts,
+  searchExcerpt,
+  searchPattern,
+  searchTerms,
+  textHasTerms,
+} from "@/lib/research/search";
 
 export const metadata: Metadata = {
   title: "Search",
@@ -30,38 +33,45 @@ export default async function SearchPage({
 }: PageProps<"/search">) {
   const query = firstParam((await searchParams).q).trim();
   const { supabase } = await requireUser();
-  const pattern = query.length >= 2 ? searchPattern(query) : "";
+  const terms = query.length >= 2 ? searchTerms(query) : [];
 
-  const [titleHits, bodyHits, comments, nameHits, userHits] = pattern
+  function matching<Q extends { ilike: (column: string, pattern: string) => Q }>(
+    request: Q,
+    column: string
+  ) {
+    return terms.reduce((current, term) => current.ilike(column, searchPattern(term)), request);
+  }
+
+  const [titleHits, bodyHits, comments, nameHits, userHits] = terms.length
     ? await Promise.all([
-        supabase
-          .from("research_posts")
-          .select("id, title, body, sub_topic, created_at")
-          .ilike("title", pattern)
+        matching(
+          supabase.from("research_posts").select("id, title, body, sub_topic, created_at"),
+          "title"
+        )
           .order("created_at", { ascending: false })
           .limit(20),
-        supabase
-          .from("research_posts")
-          .select("id, title, body, sub_topic, created_at")
-          .ilike("body", pattern)
+        matching(
+          supabase.from("research_posts").select("id, title, body, sub_topic, created_at"),
+          "body"
+        )
           .order("created_at", { ascending: false })
           .limit(20),
-        supabase
-          .from("research_comments")
-          .select("id, post_id, body, created_at")
-          .ilike("body", pattern)
+        matching(
+          supabase.from("research_comments").select("id, post_id, body, created_at"),
+          "body"
+        )
           .order("created_at", { ascending: false })
           .limit(12),
-        supabase
-          .from("profiles")
-          .select("id, username, display_name, tier, bio")
-          .ilike("display_name", pattern)
+        matching(
+          supabase.from("profiles").select("id, username, display_name, tier, bio"),
+          "display_name"
+        )
           .neq("username", "laniakea_treasury")
           .limit(12),
-        supabase
-          .from("profiles")
-          .select("id, username, display_name, tier, bio")
-          .ilike("username", pattern)
+        matching(
+          supabase.from("profiles").select("id, username, display_name, tier, bio"),
+          "username"
+        )
           .neq("username", "laniakea_treasury")
           .limit(12),
       ])
@@ -73,33 +83,51 @@ export default async function SearchPage({
         { data: [], error: null },
       ];
 
-  const posts = {
-    data: [
+  const ordered = orderSearchPosts(
+    [
       ...new Map(
         [...(titleHits.data ?? []), ...(bodyHits.data ?? [])].map((row) => [
           row.id,
-          row,
+          {
+            id: row.id,
+            title: row.title,
+            body: row.body,
+            subTopic: row.sub_topic,
+            createdAt: row.created_at,
+          },
         ])
       ).values(),
     ],
-  };
-  const desks = {
-    data: [
-      ...new Map(
-        [...(nameHits.data ?? []), ...(userHits.data ?? [])].map((row) => [
-          row.id,
-          row,
-        ])
-      ).values(),
-    ],
-  };
+    query
+  );
+  const commentRows = [...(comments.data ?? [])]
+    .filter((row) => textHasTerms(row.body, query))
+    .sort((a, b) => {
+      const phrase = query.toLowerCase();
+      const aPhrase = a.body.toLowerCase().includes(phrase) ? 0 : 1;
+      const bPhrase = b.body.toLowerCase().includes(phrase) ? 0 : 1;
+      if (aPhrase !== bPhrase) {
+        return aPhrase - bPhrase;
+      }
+      return a.created_at < b.created_at ? 1 : -1;
+    });
+  const commentPostIds = [...new Set(commentRows.map((row) => row.post_id))];
+  const commentPosts = commentPostIds.length
+    ? await supabase.from("research_posts").select("id, title").in("id", commentPostIds)
+    : { data: [] };
+  const commentTitles = new Map((commentPosts.data ?? []).map((row) => [row.id, row.title]));
+  const desks = [
+    ...new Map(
+      [...(nameHits.data ?? []), ...(userHits.data ?? [])].map((row) => [row.id, row])
+    ).values(),
+  ];
 
   return (
     <PageFrame>
       <PageHeading
         kicker="Find"
         title="Search"
-        description="Notes, comments, and desks."
+        description="Titles first, then matches inside the note, then comments."
       />
       <SearchBox defaultValue={query} />
       {query.length > 0 && query.length < 2 ? (
@@ -109,92 +137,107 @@ export default async function SearchPage({
       ) : null}
       {query.length >= 2 ? (
         <>
-          <Panel>
-            <PanelHeader label="Notes" meta={posts.data?.length ?? 0} />
-            {(posts.data ?? []).length === 0 ? (
-              <p className="px-4 py-5 text-[14px] text-muted-foreground">
-                No notes matched.
-              </p>
-            ) : (
+          {ordered.titleHits.length === 0 &&
+          ordered.bodyHits.length === 0 &&
+          commentRows.length === 0 &&
+          desks.length === 0 ? (
+            <p className="text-[14px] text-muted-foreground">Nothing matched.</p>
+          ) : null}
+          {ordered.titleHits.length > 0 ? (
+            <Panel>
+              <PanelHeader label="Titles" meta={ordered.titleHits.length} />
               <div className="divide-y divide-border">
-                {(posts.data ?? []).map((post) => (
+                {ordered.titleHits.map((post) => (
                   <article key={post.id} className="px-4 py-4">
                     <div className="mb-1 flex items-center gap-2">
-                      <SubTopicBadge topic={post.sub_topic} />
+                      <SubTopicBadge topic={post.subTopic} />
                       <span className="text-[12px] text-muted-foreground">
-                        {format(new Date(post.created_at), "d MMM yyyy")}
+                        {format(new Date(post.createdAt), "d MMM yyyy")}
                       </span>
                     </div>
                     <h2 className="font-heading text-[20px]">
-                      <Link
-                        href={researchPostPath(post.id)}
-                        className="hover:underline"
-                      >
+                      <Link href={researchPostPath(post.id)} className="hover:underline">
                         {post.title}
                       </Link>
                     </h2>
-                    <p className="mt-1 text-[14px] text-muted-foreground">
-                      {researchExcerpt(post.body, 180)}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </Panel>
-          <Panel>
-            <PanelHeader label="Comments" meta={comments.data?.length ?? 0} />
-            {(comments.data ?? []).length === 0 ? (
-              <p className="px-4 py-5 text-[14px] text-muted-foreground">
-                No comments matched.
-              </p>
-            ) : (
-              <div className="divide-y divide-border">
-                {(comments.data ?? []).map((comment) => (
-                  <article key={comment.id} className="px-4 py-4">
-                    <Link
-                      href={researchCommentPath(comment.post_id, comment.id)}
-                      className="text-[13px] text-muted-foreground hover:text-foreground"
-                    >
-                      Open comment ·{" "}
-                      {format(new Date(comment.created_at), "d MMM yyyy")}
-                    </Link>
-                    <p className="mt-1 text-[14px] text-foreground">
-                      {researchExcerpt(comment.body, 200)}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </Panel>
-          <Panel>
-            <PanelHeader label="Desks" meta={desks.data?.length ?? 0} />
-            {(desks.data ?? []).length === 0 ? (
-              <p className="px-4 py-5 text-[14px] text-muted-foreground">
-                No desks matched.
-              </p>
-            ) : (
-              <div className="divide-y divide-border">
-                {(desks.data ?? []).map((desk) => (
-                  <article key={desk.id} className="px-4 py-4">
-                    <Link
-                      href={profilePath(desk.username)}
-                      className="font-medium hover:underline"
-                    >
-                      {desk.display_name}{" "}
-                      <span className="font-normal text-muted-foreground">
-                        @{desk.username}
-                      </span>
-                    </Link>
-                    {desk.bio ? (
+                    {post.body ? (
                       <p className="mt-1 text-[14px] text-muted-foreground">
-                        {desk.bio}
+                        {searchExcerpt(post.body, query, 180, false)}
                       </p>
                     ) : null}
                   </article>
                 ))}
               </div>
-            )}
-          </Panel>
+            </Panel>
+          ) : null}
+          {ordered.bodyHits.length > 0 ? (
+            <Panel>
+              <PanelHeader label="In the note" meta={ordered.bodyHits.length} />
+              <div className="divide-y divide-border">
+                {ordered.bodyHits.map((post) => (
+                  <article key={post.id} className="px-4 py-4">
+                    <div className="mb-1 flex items-center gap-2">
+                      <SubTopicBadge topic={post.subTopic} />
+                      <span className="text-[12px] text-muted-foreground">
+                        {format(new Date(post.createdAt), "d MMM yyyy")}
+                      </span>
+                    </div>
+                    <h2 className="font-heading text-[20px]">
+                      <Link href={researchPostPath(post.id)} className="hover:underline">
+                        {post.title}
+                      </Link>
+                    </h2>
+                    <p className="mt-1 text-[14px] text-muted-foreground">
+                      {searchExcerpt(post.body, query, 220)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
+          {commentRows.length > 0 ? (
+            <Panel>
+              <PanelHeader label="Comments" meta={commentRows.length} />
+              <div className="divide-y divide-border">
+                {commentRows.map((comment) => (
+                  <article key={comment.id} className="px-4 py-4">
+                    <h2 className="font-heading text-[18px]">
+                      <Link
+                        href={researchCommentPath(comment.post_id, comment.id)}
+                        className="hover:underline"
+                      >
+                        {commentTitles.get(comment.post_id) ?? "Note"}
+                      </Link>
+                    </h2>
+                    <p className="mt-1 text-[12px] text-muted-foreground">
+                      Comment · {format(new Date(comment.created_at), "d MMM yyyy")}
+                    </p>
+                    <p className="mt-1 text-[14px] text-foreground">
+                      {searchExcerpt(comment.body, query, 200)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
+          {desks.length > 0 ? (
+            <Panel>
+              <PanelHeader label="Desks" meta={desks.length} />
+              <div className="divide-y divide-border">
+                {desks.map((desk) => (
+                  <article key={desk.id} className="px-4 py-4">
+                    <Link href={profilePath(desk.username)} className="font-medium hover:underline">
+                      {desk.display_name}{" "}
+                      <span className="font-normal text-muted-foreground">@{desk.username}</span>
+                    </Link>
+                    {desk.bio ? (
+                      <p className="mt-1 text-[14px] text-muted-foreground">{desk.bio}</p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
         </>
       ) : null}
     </PageFrame>

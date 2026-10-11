@@ -8,6 +8,7 @@ import {
 } from "@/app/(dashboard)/feed/actions";
 import { saveDraft } from "@/app/(dashboard)/forum/actions";
 import { ImageAttachButton } from "@/components/laniakea/ImageAttachButton";
+import { StakeSlider } from "@/components/laniakea/StakeSlider";
 import { SubTopicSelect } from "@/components/laniakea/SubTopicSelect";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { DEFAULT_STAKE_HP, MAX_STAKE_HP } from "@/lib/research/economy";
@@ -99,7 +100,7 @@ export function NewResearchForm({
         </div>
         <Link
           href="/drafts"
-          className="text-[13px] text-muted-foreground hover:text-foreground"
+          className="inline-flex h-8 items-center rounded-md border border-border bg-secondary px-3 text-[13px] font-medium text-foreground hover:bg-muted"
         >
           All drafts
         </Link>
@@ -150,55 +151,24 @@ export function NewResearchForm({
           disabled={pending}
           onInsert={(markdown) => setBody((current) => `${current}${markdown}`)}
         />
-        <div
-          className={
-            showUnlockRate
-              ? "grid gap-2.5 md:grid-cols-[12rem_minmax(0,1fr)]"
-              : undefined
-          }
-        >
-          <label className="flex max-w-[12rem] flex-col gap-1">
-            <span className="text-[13px] text-muted-foreground">
-              HP to stake (max {MAX_STAKE_HP})
-            </span>
-            <input
-              name="stakeHp"
-              type="number"
-              min={1}
-              max={Math.min(MAX_STAKE_HP, Math.max(availableHp, 1))}
-              step={1}
-              required
-              value={stakeHp}
-              onChange={(event) => setStakeHp(Number(event.target.value))}
-              className={`${fieldClassName} font-data`}
-            />
-          </label>
+        <StakeSlider
+          value={stakeHp}
+          max={Math.min(MAX_STAKE_HP, Math.max(availableHp, 1))}
+          disabled={pending || availableHp < 1}
+          onChange={setStakeHp}
+        />
+        <div>
           {showUnlockRate ? (
-            <label className="flex flex-col gap-1">
-              <span className="text-[13px] text-muted-foreground">
-                Unlock rate
-              </span>
-              <select
-                name="unlockRateMultiple"
-                value={unlockMultiple}
-                onChange={(event) => {
-                  setUnlockMultiple(Number(event.target.value));
-                }}
-                className={`${fieldClassName} font-data`}
-              >
-                {Array.from(
-                  {
-                    length:
-                      UNLOCK_RATE_MULTIPLE_MAX - UNLOCK_RATE_MULTIPLE_MIN + 1,
-                  },
-                  (_, index) => UNLOCK_RATE_MULTIPLE_MIN + index
-                ).map((multiple) => (
-                  <option key={multiple} value={multiple}>
-                    {multiple}× default
-                  </option>
-                ))}
-              </select>
-            </label>
+            <StakeSlider
+              label="Unlock rate"
+              name="unlockRateMultiple"
+              suffix="×"
+              min={UNLOCK_RATE_MULTIPLE_MIN}
+              max={UNLOCK_RATE_MULTIPLE_MAX}
+              value={unlockMultiple}
+              disabled={pending}
+              onChange={setUnlockMultiple}
+            />
           ) : (
             <input
               type="hidden"
@@ -224,7 +194,7 @@ export function NewResearchForm({
           <button
             type="button"
             onClick={() => void persistDraft()}
-            className="h-9 rounded-md px-3 text-[13px] text-muted-foreground hover:text-foreground"
+            className="inline-flex h-9 items-center rounded-md border border-border bg-secondary px-3 text-[13px] font-medium text-foreground hover:bg-muted"
           >
             Save draft
           </button>

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { fetchRetryingFutureJwt } from "@/lib/supabase/retry-fetch";
 
 export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,6 +15,9 @@ export async function updateSession(request: NextRequest) {
     url,
     anonKey,
     {
+      global: {
+        fetch: fetchRetryingFutureJwt,
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll();

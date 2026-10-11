@@ -100,7 +100,7 @@ export default async function DraftsPage() {
                   <input type="hidden" name="draftId" value={draft.id} />
                   <button
                     type="submit"
-                    className="text-[13px] text-muted-foreground hover:text-loss"
+                    className="inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px] font-medium text-loss hover:bg-muted"
                   >
                     Delete
                   </button>
@@ -143,7 +143,7 @@ export default async function DraftsPage() {
                   <input type="hidden" name="draftId" value={draft.id} />
                   <button
                     type="submit"
-                    className="text-[13px] text-muted-foreground hover:text-loss"
+                    className="inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px] font-medium text-loss hover:bg-muted"
                   >
                     Delete
                   </button>

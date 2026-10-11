@@ -28,7 +28,7 @@ export function CopyPermalinkButton({
     <button
       type="button"
       onClick={copy}
-      className="text-[12px] text-muted-foreground hover:text-foreground"
+      className="inline-flex h-7 items-center rounded-md border border-border bg-secondary px-2 text-[12px] font-medium text-foreground hover:bg-muted"
     >
       {copied ? "Copied" : label}
     </button>

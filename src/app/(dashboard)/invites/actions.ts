@@ -6,6 +6,7 @@ import {
   isMissingInviteSchema,
   missingInviteSchemaMessage,
 } from "@/lib/research/invite";
+import { INVITE_PURCHASE_UTL } from "@/lib/research/referral";
 
 export type InviteActionState = {
   error?: string;
@@ -47,8 +48,8 @@ export async function buyInviteCode(
 
   return {
     message: code
-      ? `Bought one invite for 100 UTL. Code ${code}.`
-      : "Bought one invite for 100 UTL.",
+      ? `Bought one invite for ${INVITE_PURCHASE_UTL} UTL. Code ${code}.`
+      : `Bought one invite for ${INVITE_PURCHASE_UTL} UTL.`,
     stamp: Date.now(),
   };
 }

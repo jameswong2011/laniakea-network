@@ -79,11 +79,15 @@ export function PostToolbar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={() => void toggleSave()}
-        className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+        className={`inline-flex h-8 items-center rounded-md border px-3 text-[13px] font-medium ${
+          isSaved
+            ? "border-foreground bg-foreground text-background"
+            : "border-border bg-secondary text-foreground hover:bg-muted"
+        }`}
       >
         {isSaved ? "Saved" : "Save"}
       </button>
@@ -91,7 +95,11 @@ export function PostToolbar({
         <button
           type="button"
           onClick={() => void toggleFollow()}
-          className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+          className={`inline-flex h-8 items-center rounded-md border px-3 text-[13px] font-medium ${
+            isSubscribed
+              ? "border-foreground bg-foreground text-background"
+              : "border-border bg-secondary text-foreground hover:bg-muted"
+          }`}
         >
           {isSubscribed ? "Following" : "Follow thread"}
         </button>
@@ -99,7 +107,7 @@ export function PostToolbar({
       <button
         type="button"
         onClick={copyLink}
-        className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+        className="inline-flex h-8 items-center rounded-md border border-border bg-secondary px-3 text-[13px] font-medium text-foreground hover:bg-muted"
       >
         {copied ? "Copied" : "Share"}
       </button>

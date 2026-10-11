@@ -8,10 +8,12 @@ export function FollowAuthorButton({
   authorId,
   following,
   followerCount,
+  showCount = true,
 }: {
   authorId: string;
   following: boolean;
   followerCount: number;
+  showCount?: boolean;
 }) {
   const refresh = useSilentRefresh();
   const lock = useRef(false);
@@ -48,9 +50,11 @@ export function FollowAuthorButton({
       >
         {isFollowing ? "Following" : "Follow"}
       </button>
-      <span className="text-[12px] text-muted-foreground">
-        {count} {count === 1 ? "follower" : "followers"}
-      </span>
+      {showCount ? (
+        <span className="text-[12px] text-muted-foreground">
+          {count} {count === 1 ? "follower" : "followers"}
+        </span>
+      ) : null}
     </div>
   );
 }

@@ -17,7 +17,7 @@ import {
 } from "@/types";
 
 const buttonClassName =
-  "h-6 border px-2 font-data text-[10px] tracking-[0.12em] uppercase disabled:opacity-40";
+  "inline-flex h-8 flex-1 items-center justify-center rounded-md border px-3 text-[12px] font-medium disabled:opacity-40";
 
 export function VoteControls({
   postId,
@@ -89,7 +89,7 @@ export function VoteControls({
   }
 
   return (
-    <div className="flex w-[8.75rem] shrink-0 flex-col items-end gap-1 sm:w-[9.5rem]">
+    <div className="flex w-[11rem] shrink-0 flex-col items-stretch gap-1">
       <div className="flex w-full items-center gap-1.5">
         <input
           type="range"
@@ -109,15 +109,15 @@ export function VoteControls({
         <span>{VOTE_STRENGTH_MIN}</span>
         <span>{VOTE_STRENGTH_MAX}</span>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
           disabled={locked}
           onClick={() => void cast("up")}
           className={`${buttonClassName} ${
-            recordedVote !== null && recordedVote > 0
-              ? "border-gain text-gain"
-              : "border-border text-muted-foreground hover:text-foreground"
+            recordedVote !== null && recordedVote < 0
+              ? "border-border bg-secondary text-muted-foreground"
+              : "border-gain bg-gain text-background hover:opacity-90"
           }`}
         >
           Up
@@ -127,9 +127,9 @@ export function VoteControls({
           disabled={locked}
           onClick={() => void cast("down")}
           className={`${buttonClassName} ${
-            recordedVote !== null && recordedVote < 0
-              ? "border-loss text-loss"
-              : "border-border text-muted-foreground hover:text-foreground"
+            recordedVote !== null && recordedVote > 0
+              ? "border-border bg-secondary text-muted-foreground"
+              : "border-loss bg-loss text-background hover:opacity-90"
           }`}
         >
           Down

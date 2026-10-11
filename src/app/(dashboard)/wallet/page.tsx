@@ -68,25 +68,33 @@ export default async function WalletPage() {
         </Panel>
       )}
 
-      <Panel>
-        <PanelHeader
-          label={showCashout ? "Cash out HP" : "Buy HP"}
-          meta={showCashout ? "Masters desk" : `Bronze · restore to ${BUY_HP_CAP}`}
-        />
-        {showBuy || showCashout ? (
+      {showBuy ? (
+        <Panel>
+          <PanelHeader label="Buy HP" meta={`Bronze · restore to ${BUY_HP_CAP}`} />
           <TokenDesk
-            mode={showCashout ? "cashout" : "buy"}
+            mode="buy"
             availableHp={profile?.current_hp ?? 0}
             availableTokens={tokenSchema.ready ? (profile?.utility_tokens ?? 0) : 0}
             schemaReady={tokenSchema.ready}
           />
-        ) : (
-          <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
-            Buy HP is Bronze only, and only restores overall HP up to {BUY_HP_CAP}.
-            Masters can cash out.
-          </p>
-        )}
-      </Panel>
+        </Panel>
+      ) : null}
+      {showCashout ? (
+        <Panel>
+          <PanelHeader label="Cash out HP" meta="Masters desk" />
+          <TokenDesk
+            mode="cashout"
+            availableHp={profile?.current_hp ?? 0}
+            availableTokens={tokenSchema.ready ? (profile?.utility_tokens ?? 0) : 0}
+            schemaReady={tokenSchema.ready}
+          />
+        </Panel>
+      ) : null}
+      {showBuy || showCashout ? null : (
+        <p className="font-data text-[13px] text-muted-foreground">
+          Buy HP is Bronze only, and only restores overall HP up to {BUY_HP_CAP}. Cash out is Masters only.
+        </p>
+      )}
 
       <Panel>
         <PanelHeader label="HP transactions" meta={entries.length} />

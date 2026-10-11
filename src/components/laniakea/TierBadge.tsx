@@ -1,3 +1,4 @@
+import { TierIcon } from "@/components/laniakea/TierIcon";
 import { TIER_LABELS, resolveTier, type Tier } from "@/types";
 
 const TIER_TONE: Record<Tier, string> = {
@@ -39,6 +40,7 @@ export function TierBadge({
       }
     >
       {lockMark ? <span aria-hidden="true">{lockMark}</span> : null}
+      {resolved ? <TierIcon tier={resolved} size={compact ? 11 : 13} /> : null}
       {label}
     </span>
   );

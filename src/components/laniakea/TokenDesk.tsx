@@ -115,7 +115,7 @@ export function TokenDesk({
       <button
         type="submit"
         disabled={pending || Boolean(blockedReason)}
-        className="h-8 w-fit border border-border bg-secondary px-3 text-[12px] font-medium tracking-wide text-foreground hover:bg-muted disabled:opacity-50"
+        className="inline-flex h-11 w-full items-center justify-center bg-foreground px-4 text-[14px] font-medium text-background disabled:opacity-40 sm:w-fit"
       >
         {pending
           ? mode === "buy"
@@ -123,7 +123,7 @@ export function TokenDesk({
             : "Cashing out…"
           : mode === "buy"
             ? "Buy HP"
-            : "Cash out"}
+            : "Cash out HP"}
       </button>
     </form>
   );

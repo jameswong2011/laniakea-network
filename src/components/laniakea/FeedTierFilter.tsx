@@ -1,4 +1,5 @@
 import { FeedFilterChip, FeedFilterGroup } from "@/components/laniakea/FeedFilterChip";
+import { TierIcon } from "@/components/laniakea/TierIcon";
 import { feedHref, feedTierHref, type FeedStatus } from "@/lib/research/feed";
 import { TIER_LABELS, TIERS, type SubTopic, type Tier } from "@/types";
 
@@ -75,10 +76,11 @@ export function FeedTierFilter({
               )}
               active={on}
               onSelect={onSelect}
-              className={`inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 font-data text-[11px] tracking-[0.08em] ${
+              className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-2.5 font-data text-[11px] tracking-[0.08em] ${
                 on ? TIER_TONE[tier].on : TIER_TONE[tier].off
               }`}
             >
+              <TierIcon tier={tier} size={11} />
               {TIER_LABELS[tier]}
             </FeedFilterChip>
           );

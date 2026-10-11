@@ -11,6 +11,7 @@ import {
   huntMultiplier,
 } from "@/lib/research/settlement";
 import {
+  INVITE_PURCHASE_UTL,
   SIGNUP_INVITE_GRANT,
   UNLOCK_CREATOR_SHARE_PCT,
 } from "@/lib/research/referral";
@@ -92,7 +93,7 @@ export const FLOOR_RULES = [
   },
   {
     title: "The floor is invite-only",
-    body: `Every desk gets ${SIGNUP_INVITE_GRANT} codes. Extra codes cost UTL. Elite desks mint without a cap. Residual on UTL spends walks the invite line. HP spends do not.`,
+    body: `Every desk gets ${SIGNUP_INVITE_GRANT} codes. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Elite desks mint without a cap. Residual on UTL spends walks the invite line. HP spends do not.`,
   },
 ] as const;
 

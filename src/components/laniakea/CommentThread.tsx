@@ -10,7 +10,6 @@ import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
 import { ReactionBar } from "@/components/laniakea/ReactionBar";
 import { ReplyComposer } from "@/components/laniakea/ReplyComposer";
-import { ReplyLikeButton } from "@/components/laniakea/ReplyLikeButton";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { VoteControls } from "@/components/laniakea/VoteControls";
 import {
@@ -125,19 +124,22 @@ export function CommentThread({
         <h2 className="text-[16px] font-medium text-foreground">
           {comments.length} {comments.length === 1 ? "comment" : "comments"}
         </h2>
-        <div className="flex items-center gap-2 text-[13px]">
+        <div className="flex overflow-hidden rounded-md border border-border">
           <button
             type="button"
             onClick={() => setSort("top")}
-            className={sort === "top" ? "text-foreground" : "text-muted-foreground"}
+            className={`h-8 px-3 text-[13px] font-medium ${
+              sort === "top" ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
+            }`}
           >
             Top
           </button>
-          <span className="text-border">·</span>
           <button
             type="button"
             onClick={() => setSort("new")}
-            className={sort === "new" ? "text-foreground" : "text-muted-foreground"}
+            className={`h-8 border-l border-border px-3 text-[13px] font-medium ${
+              sort === "new" ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
+            }`}
           >
             New
           </button>
@@ -229,7 +231,7 @@ export function CommentThread({
                       [comment.id]: !hidden,
                     }))
                   }
-                  className="text-muted-foreground hover:text-foreground"
+                  className="inline-flex h-7 items-center rounded-md border border-border bg-secondary px-2 text-[12px] font-medium text-foreground hover:bg-muted"
                 >
                   {hidden ? "Expand" : "Collapse"}
                 </button>
@@ -329,21 +331,13 @@ export function CommentThread({
                           maxLength={REPLY_BODY_MAX}
                         />
                       ) : null}
-                      <div className="flex flex-wrap items-center gap-3">
-                        <ReactionBar
-                          targetType="reply"
-                          targetId={reply.id}
-                          postId={postId}
-                          counts={replyReactions[reply.id] ?? []}
-                          canReact={access === "full"}
-                        />
-                        <ReplyLikeButton
-                          postId={postId}
-                          replyId={reply.id}
-                          likeCount={reply.likeCount}
-                          likedByViewer={reply.likedByViewer}
-                        />
-                      </div>
+                      <ReactionBar
+                        targetType="reply"
+                        targetId={reply.id}
+                        postId={postId}
+                        counts={replyReactions[reply.id] ?? []}
+                        canReact={access === "full"}
+                      />
                     </div>
                   ))}
                   {access === "full" ? (

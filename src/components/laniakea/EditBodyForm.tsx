@@ -39,7 +39,7 @@ export function EditBodyForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[12px] text-muted-foreground hover:text-foreground"
+        className="inline-flex h-8 items-center rounded-md border border-border bg-secondary px-3 text-[13px] font-medium text-foreground hover:bg-muted"
       >
         Edit
       </button>
@@ -82,7 +82,7 @@ export function EditBodyForm({
             setBody(initialBody);
             setOpen(false);
           }}
-          className="text-[13px] text-muted-foreground hover:text-foreground"
+          className="inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           Cancel
         </button>

@@ -1,4 +1,4 @@
-export const INVITE_PURCHASE_UTL = 100;
+export const INVITE_PURCHASE_UTL = 10;
 export const SIGNUP_INVITE_GRANT = 5;
 export const UNLOCK_CREATOR_SHARE_PCT = 75;
 export const REFERRAL_POOL_NUMERATOR = 1;
