@@ -34,6 +34,8 @@ export type AppStackParamList = {
         conviction?: string | null;
         claims?: string[];
         risks?: string[];
+        agreement?: string | null;
+        objection?: string | null;
         commentCount?: number;
         meaning?: { id: string; title: string; summary: string }[] | null;
       }

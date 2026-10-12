@@ -296,42 +296,84 @@ export async function notifyReplyToComment(
   await subscribeToPost(supabase, input.actorId, input.postId);
 }
 
+const NOTIFICATION_COLUMNS = "id, kind, post_id, comment_id, read_at, created_at, actor_id";
+
+type NotificationRecord = {
+  id: string;
+  kind: NotificationRow["kind"];
+  post_id: string | null;
+  comment_id: string | null;
+  read_at: string | null;
+  created_at: string;
+  actor_id: string | null;
+  actor?: { display_name: string; username: string } | null;
+  post?: { title: string } | null;
+};
+
 export async function loadNotifications(
   supabase: SupabaseClient,
   userId: string
 ): Promise<{ items: NotificationRow[]; unread: number }> {
-  const [{ data, error }, unreadTotal] = await Promise.all([
+  const recent = (columns: string) =>
     supabase
       .from("notifications")
-      .select("id, kind, post_id, comment_id, read_at, created_at, actor_id")
+      .select(columns)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(20);
+  const [joined, unreadTotal] = await Promise.all([
+    recent(
+      `${NOTIFICATION_COLUMNS}, actor:profiles!actor_id(display_name, username), post:research_posts(title)`
+    ),
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .is("read_at", null),
   ]);
+  let rows = (joined.data ?? []) as unknown as NotificationRecord[];
 
-  if (error) {
-    return { items: [], unread: 0 };
+  if (joined.error) {
+    const plain = await recent(NOTIFICATION_COLUMNS);
+
+    if (plain.error) {
+      return { items: [], unread: 0 };
+    }
+
+    rows = await withNotificationNames(
+      supabase,
+      (plain.data ?? []) as unknown as NotificationRecord[]
+    );
   }
 
-  const rows = data ?? [];
+  return {
+    unread: unreadTotal.error
+      ? rows.filter((row) => !row.read_at).length
+      : (unreadTotal.count ?? 0),
+    items: rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      post_id: row.post_id ?? null,
+      comment_id: row.comment_id ?? null,
+      read_at: row.read_at ?? null,
+      created_at: row.created_at,
+      actor_name: row.actor?.display_name ?? null,
+      actor_username: row.actor?.username ?? null,
+      post_title: row.post?.title ?? null,
+    })),
+  };
+}
+
+/** Runs only when the embedded profile and note are unavailable to the notifications read. */
+async function withNotificationNames(
+  supabase: SupabaseClient,
+  rows: NotificationRecord[]
+): Promise<NotificationRecord[]> {
   const actorIds = [
-    ...new Set(
-      rows
-        .map((row) => row.actor_id as string | null)
-        .filter((id): id is string => Boolean(id))
-    ),
+    ...new Set(rows.map((row) => row.actor_id).filter((id): id is string => Boolean(id))),
   ];
   const postIds = [
-    ...new Set(
-      rows
-        .map((row) => row.post_id as string | null)
-        .filter((id): id is string => Boolean(id))
-    ),
+    ...new Set(rows.map((row) => row.post_id).filter((id): id is string => Boolean(id))),
   ];
 
   const actors = new Map<string, { display_name: string; username: string }>();
@@ -364,26 +406,15 @@ export async function loadNotifications(
     titles.set(post.id, post.title);
   }
 
-  return {
-    unread: unreadTotal.error
-      ? rows.filter((row) => !row.read_at).length
-      : (unreadTotal.count ?? 0),
-    items: rows.map((row) => {
-      const actor = row.actor_id ? actors.get(row.actor_id as string) : null;
+  return rows.map((row) => {
+    const title = row.post_id ? titles.get(row.post_id) : undefined;
 
-      return {
-        id: row.id as string,
-        kind: row.kind as NotificationRow["kind"],
-        post_id: (row.post_id as string | null) ?? null,
-        comment_id: (row.comment_id as string | null) ?? null,
-        read_at: (row.read_at as string | null) ?? null,
-        created_at: row.created_at as string,
-        actor_name: actor?.display_name ?? null,
-        actor_username: actor?.username ?? null,
-        post_title: row.post_id ? titles.get(row.post_id as string) ?? null : null,
-      };
-    }),
-  };
+    return {
+      ...row,
+      actor: row.actor_id ? (actors.get(row.actor_id) ?? null) : null,
+      post: title == null ? null : { title },
+    };
+  });
 }
 
 export function notificationHref(item: NotificationRow) {

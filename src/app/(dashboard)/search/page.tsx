@@ -13,6 +13,7 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { requireUser } from "@/lib/auth/session";
 import { researchCommentPath, researchPostPath } from "@/lib/research/feed";
 import { profilePath } from "@/lib/research/forum";
+import { isMissingFunction, readOpenNotes } from "@/lib/research/open-notes";
 import { wantsMeaningSearch } from "@/lib/ai/meaning-query";
 import {
   orderSearchPosts,
@@ -44,26 +45,52 @@ export default async function SearchPage({
     return terms.reduce((current, term) => current.ilike(column, searchPattern(term)), request);
   }
 
+  const patterns = terms.map(searchPattern);
+
+  async function bodyMatches() {
+    const viaFunction = await supabase
+      .rpc("search_note_bodies", { p_patterns: patterns, p_limit: 20 })
+      .select("id, title, body, sub_topic, created_at");
+    const result = isMissingFunction(viaFunction.error)
+      ? await readOpenNotes((relation) =>
+          matching(supabase.from(relation).select("id, title, body, sub_topic, created_at"), "body")
+            .order("created_at", { ascending: false })
+            .limit(20)
+        )
+      : viaFunction;
+
+    return {
+      data: result.data as unknown as
+        | { id: string; title: string; body: string; sub_topic: string; created_at: string }[]
+        | null,
+      error: result.error,
+    };
+  }
+
+  async function commentMatches() {
+    const viaFunction = await supabase.rpc("search_comments", { p_patterns: patterns, p_limit: 12 });
+
+    if (!isMissingFunction(viaFunction.error)) {
+      return viaFunction;
+    }
+
+    return matching(supabase.from("research_comments").select("id, post_id, body, created_at"), "body")
+      .order("created_at", { ascending: false })
+      .limit(12);
+  }
+
   const [titleHits, bodyHits, comments, nameHits, userHits] = terms.length
     ? await Promise.all([
-        matching(
-          supabase.from("research_posts").select("id, title, body, sub_topic, created_at"),
-          "title"
-        )
-          .order("created_at", { ascending: false })
-          .limit(20),
-        matching(
-          supabase.from("research_posts").select("id, title, body, sub_topic, created_at"),
-          "body"
-        )
-          .order("created_at", { ascending: false })
-          .limit(20),
-        matching(
-          supabase.from("research_comments").select("id, post_id, body, created_at"),
-          "body"
-        )
-          .order("created_at", { ascending: false })
-          .limit(12),
+        readOpenNotes((relation) =>
+          matching(
+            supabase.from(relation).select("id, title, body, sub_topic, created_at"),
+            "title"
+          )
+            .order("created_at", { ascending: false })
+            .limit(20)
+        ),
+        bodyMatches(),
+        commentMatches(),
         matching(
           supabase.from("profiles").select("id, username, display_name, tier, bio"),
           "display_name"

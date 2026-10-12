@@ -1262,6 +1262,8 @@ export function ThreadScreen({
           conviction: note.conviction,
           claims: note.claims,
           risks: note.risks,
+          agreement: note.agreement,
+          objection: note.objection,
           commentCount: comments.length,
         })
       }

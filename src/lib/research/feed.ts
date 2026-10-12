@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { researchExcerpt as excerptNote, postedInWindow, postedSince, resolveFeedPosted, FEED_POSTED_LABELS, type FeedPosted } from "@laniakea/domain";
 import { getDeskAccess } from "@/lib/research/access";
+import { isMissingOpenNotes, OPEN_NOTES, type NoteRelation } from "@/lib/research/open-notes";
 import {
   loadViewerUnlockIds,
   quoteDeskUnlock,
@@ -471,12 +472,15 @@ export const FEED_PAGE_SIZE = 40;
 const CARD_COLUMNS =
   "id, author_id, title, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
 
-const FEED_COLUMN_SETS = [
-  `${CARD_COLUMNS}, body_preview, ai_summary`,
-  `${CARD_COLUMNS}, body, ai_summary`,
-  `${CARD_COLUMNS}, body`,
-  POST_COLUMNS_WITHOUT_UNLOCK,
-  "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at",
+const FEED_SOURCES: { relation: NoteRelation; columns: string }[] = [
+  { relation: OPEN_NOTES, columns: `${CARD_COLUMNS}, body_preview, ai_summary` },
+  ...[
+    `${CARD_COLUMNS}, body_preview, ai_summary`,
+    `${CARD_COLUMNS}, body, ai_summary`,
+    `${CARD_COLUMNS}, body`,
+    POST_COLUMNS_WITHOUT_UNLOCK,
+    "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at",
+  ].map((columns) => ({ relation: "research_posts" as const, columns })),
 ];
 
 const FEED_DB_STATUS: Record<FeedStatus, string> = {
@@ -535,14 +539,14 @@ function isSchemaError(error: { code?: string; message: string }) {
 
 function feedRequest(
   supabase: SupabaseClient,
-  columns: string,
+  { relation, columns }: (typeof FEED_SOURCES)[number],
   options: FeedPageOptions,
   statuses: string[],
   tierJoin: boolean
 ) {
   const { query } = options;
   let request = supabase
-    .from("research_posts")
+    .from(relation)
     .select(tierJoin ? `${columns}, profiles!inner(tier)` : columns)
     .in("status", statuses)
     .order("created_at", { ascending: false })
@@ -587,19 +591,21 @@ export async function getLiveResearchFeed(
 
   const limit = options.limit ?? FEED_PAGE_SIZE;
   let tierJoin = query.tiers != null;
-  let columnSet = 0;
-  let result = await feedRequest(supabase, FEED_COLUMN_SETS[columnSet], options, statuses, tierJoin);
+  let source = 0;
+  let result = await feedRequest(supabase, FEED_SOURCES[source], options, statuses, tierJoin);
 
-  while (result.error && isSchemaError(result.error)) {
-    if (tierJoin && /profiles|relationship/i.test(result.error.message)) {
+  while (result.error && (isMissingOpenNotes(result.error) || isSchemaError(result.error))) {
+    if (isMissingOpenNotes(result.error)) {
+      source += 1;
+    } else if (tierJoin && /profiles|relationship/i.test(result.error.message)) {
       tierJoin = false;
-    } else if (columnSet < FEED_COLUMN_SETS.length - 1) {
-      columnSet += 1;
+    } else if (source < FEED_SOURCES.length - 1) {
+      source += 1;
     } else {
       break;
     }
 
-    result = await feedRequest(supabase, FEED_COLUMN_SETS[columnSet], options, statuses, tierJoin);
+    result = await feedRequest(supabase, FEED_SOURCES[source], options, statuses, tierJoin);
   }
 
   if (result.error) {
@@ -648,11 +654,19 @@ export async function getResearchPostById(
   postId: string,
   viewer?: FeedViewer
 ): Promise<{ item: ResearchFeedItem | null; error: string | null }> {
-  const withAi = await supabase
-    .from("research_posts")
+  const viaView = await supabase
+    .from(OPEN_NOTES)
     .select(POST_COLUMNS_AI)
     .eq("id", postId)
     .maybeSingle();
+
+  const withAi = isMissingOpenNotes(viaView.error)
+    ? await supabase
+        .from("research_posts")
+        .select(POST_COLUMNS_AI)
+        .eq("id", postId)
+        .maybeSingle()
+    : viaView;
 
   const withUnlock =
     withAi.error && withAi.error.message.includes("ai_summary")

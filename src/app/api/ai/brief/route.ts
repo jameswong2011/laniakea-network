@@ -1,6 +1,7 @@
 import { AI_LIMIT_MESSAGE, overAiLimit } from "@/lib/ai/limits";
 import { ensureNoteBrief, lockedBrief, storedNoteBrief } from "@/lib/ai/note-brief";
 import { readerAccess, viewerFromRequest } from "@/lib/ai/viewer";
+import { readOpenNotes } from "@/lib/research/open-notes";
 
 const STORED_COLUMNS =
   "author_id, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_comment_agreement, ai_comment_objection";
@@ -23,11 +24,9 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing note." }, { status: 400 });
   }
 
-  const withComments = await viewer.supabase
-    .from("research_posts")
-    .select(STORED_COLUMNS)
-    .eq("id", postId)
-    .maybeSingle();
+  const withComments = await readOpenNotes((relation) =>
+    viewer.supabase.from(relation).select(STORED_COLUMNS).eq("id", postId).maybeSingle()
+  );
   const read =
     withComments.error?.message.includes("ai_comment")
       ? await viewer.supabase

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { completeJson, textField } from "@/lib/ai/openrouter";
+import { readOpenNotes, type NoteRelation } from "@/lib/research/open-notes";
 
 export type CommentBrief = {
   agreement: string;
@@ -22,12 +23,14 @@ export async function ensureCommentBrief(
     return null;
   }
 
-  const [post, comments] = await Promise.all([
+  const readStored = (relation: NoteRelation) =>
     db
-      .from("research_posts")
+      .from(relation)
       .select("ai_comment_agreement, ai_comment_objection, ai_comment_ids")
       .eq("id", postId)
-      .maybeSingle(),
+      .maybeSingle();
+  const [post, comments] = await Promise.all([
+    admin ? readStored("research_posts") : readOpenNotes(readStored),
     db
       .from("research_comments")
       .select("id, body, updated_at")

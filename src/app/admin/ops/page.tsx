@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   PageFrame,
   PageHeading,
@@ -37,6 +38,7 @@ import { getLatestWeeklyRun } from "@/lib/research/weekly";
 import { loadRevenueTotals } from "@/lib/research/invite";
 import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
 import { requireAdmin } from "@/lib/auth/session";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { SUB_TOPICS, resolveTier, type Profile } from "@/types";
 import { format, subDays } from "date-fns";
 
@@ -44,33 +46,87 @@ export const metadata: Metadata = {
   title: "Admin",
 };
 
-export default async function AdminPage() {
-  const { supabase } = await requireAdmin();
-  const now = new Date();
-  const [
-    { data, error },
-    weekly,
-    revenue7d,
-    revenue30d,
-    stakeProbe,
-    applyProbe,
-    commentsProbe,
-    { data: livePosts },
-  ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, username, display_name, role, tier, current_hp")
-      .order("username", { ascending: true }),
-    getLatestWeeklyRun(supabase),
-    loadRevenueTotals(supabase, subDays(now, 7).toISOString()),
-    loadRevenueTotals(supabase, subDays(now, 30).toISOString()),
+type SchemaStatus = {
+  originalStake: boolean;
+  settleApply: boolean;
+  comments: boolean;
+  moneyClosed: boolean;
+  balanceFunctions: boolean;
+  writesLocked: boolean;
+  openNotes: boolean;
+  textClosed: boolean;
+};
+
+const ROLLOUT: { key: keyof SchemaStatus; label: string; file: string }[] = [
+  {
+    key: "moneyClosed",
+    label: "Money helpers closed to the apps",
+    file: "20261012220000_close_money_functions.sql",
+  },
+  {
+    key: "balanceFunctions",
+    label: "Votes, stakes and cash-out run in SQL",
+    file: "20261012221000_balance_functions.sql",
+  },
+  {
+    key: "writesLocked",
+    label: "Direct balance writes closed",
+    file: "20261012223000_lock_direct_writes.sql",
+  },
+  {
+    key: "openNotes",
+    label: "Note reads go through the access view",
+    file: "20261012224000_locked_note_reads.sql",
+  },
+  {
+    key: "textClosed",
+    label: "Locked-note text closed to direct reads",
+    file: "20261012225000_close_locked_text.sql",
+  },
+];
+
+async function loadSchemaStatus(supabase: SupabaseClient) {
+  const { data, error } = await supabase.rpc("laniakea_schema_status");
+  return error || !data ? null : (data as SchemaStatus);
+}
+
+/** Used only while laniakea_schema_status is absent from the database. */
+async function probeSchema(supabase: SupabaseClient) {
+  const [stakeProbe, applyProbe, commentsProbe] = await Promise.all([
     supabase.from("research_posts").select("original_stake").limit(1),
     supabase.rpc("settle_hunted_post", {
       p_post_id: "00000000-0000-4000-8000-000000000000",
     }),
     supabase.from("research_comments").select("id").limit(1),
-    supabase.from("research_posts").select("id, title, author_id"),
   ]);
+
+  return {
+    originalStake: !stakeProbe.error,
+    settleApply:
+      !applyProbe.error ||
+      !(
+        applyProbe.error.message.includes("42883") ||
+        applyProbe.error.message.includes("does not exist") ||
+        applyProbe.error.message.includes("schema cache")
+      ),
+    comments: !commentsProbe.error,
+  };
+}
+
+export default async function AdminPage() {
+  const { supabase } = await requireAdmin();
+  const now = new Date();
+  const serverKeySet = createServiceClient() != null;
+  const [{ data, error }, weekly, [revenue7d, revenue30d], status] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, username, display_name, role, tier, current_hp")
+      .order("username", { ascending: true }),
+    getLatestWeeklyRun(supabase),
+    loadRevenueTotals(supabase, [subDays(now, 7), subDays(now, 30)]),
+    loadSchemaStatus(supabase),
+  ]);
+  const schema = status ?? (await probeSchema(supabase));
 
   const profiles = (
     (data ?? []) as Pick<
@@ -98,19 +154,22 @@ export default async function AdminPage() {
       catalogNameByUsername.get(profile.username) !== profile.display_name
   );
 
-  const settlementReady = !stakeProbe.error;
-  const applyReady =
-    !applyProbe.error ||
-    !(
-      applyProbe.error.message.includes("42883") ||
-      applyProbe.error.message.includes("does not exist") ||
-      applyProbe.error.message.includes("schema cache")
-    );
-  const commentsReady = !commentsProbe.error;
+  const settlementReady = schema.originalStake;
+  const applyReady = schema.settleApply;
+  const commentsReady = schema.comments;
 
+  const { data: demoPosts } = demoProfiles.length
+    ? await supabase
+        .from("research_posts")
+        .select("id, title, author_id")
+        .in(
+          "author_id",
+          demoProfiles.map((profile) => profile.id)
+        )
+    : { data: [] };
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const catalogByTitle = new Map(DEMO_POSTS.map((post) => [post.title, post]));
-  const catalogPosts = (livePosts ?? []).filter((post) =>
+  const catalogPosts = (demoPosts ?? []).filter((post) =>
     catalogByTitle.has(post.title)
   );
   const matchedPosts = catalogPosts.filter((post) => {
@@ -127,6 +186,48 @@ export default async function AdminPage() {
         description="Seed, wipe, schema, and weekly jobs. Metrics and content live on the other admin tabs."
       />
       <AdminNav current="/admin/ops" />
+
+      <Panel>
+        <PanelHeader label="Database" meta={status ? "live check" : "status SQL pending"} />
+        {status ? (
+          <div className="flex flex-col">
+            {ROLLOUT.map((step) => (
+              <div
+                key={step.key}
+                className="flex items-baseline justify-between gap-4 border-b border-border px-2.5 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-[13px] text-foreground">{step.label}</p>
+                  <p className="font-data text-[10px] text-muted-foreground">{step.file}</p>
+                </div>
+                <p
+                  className={`shrink-0 font-data text-[11px] ${status[step.key] ? "text-gain" : "text-warning"}`}
+                >
+                  {status[step.key] ? "Live" : "Pending"}
+                </p>
+              </div>
+            ))}
+            <div className="flex items-baseline justify-between gap-4 px-2.5 py-2">
+              <div className="min-w-0">
+                <p className="text-[13px] text-foreground">Server key on this deployment</p>
+                <p className="font-data text-[10px] text-muted-foreground">
+                  SUPABASE_SERVICE_ROLE_KEY
+                </p>
+              </div>
+              <p
+                className={`shrink-0 font-data text-[11px] ${serverKeySet ? "text-gain" : "text-warning"}`}
+              >
+                {serverKeySet ? "Set" : "Missing"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="px-2.5 py-2 text-[12px] text-muted-foreground">
+            Paste 20261012215000_ops_schema_status.sql once in the Supabase SQL editor to see
+            which database changes are live.
+          </p>
+        )}
+      </Panel>
 
       <Panel>
         <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">

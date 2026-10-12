@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AI_LIMIT_MESSAGE, overAiLimit } from "@/lib/ai/limits";
 import { completeJson, textField } from "@/lib/ai/openrouter";
 import { readerAccess } from "@/lib/ai/viewer";
+import { readOpenNotes } from "@/lib/research/open-notes";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export type AskResult = {
@@ -77,11 +78,13 @@ export async function askNote(
     return { error: "Ask a question about this note." };
   }
 
-  const withBrief = await supabase
-    .from("research_posts")
-    .select("id, author_id, title, body, ai_summary")
-    .eq("id", postId)
-    .maybeSingle();
+  const withBrief = await readOpenNotes((relation) =>
+    supabase
+      .from(relation)
+      .select("id, author_id, title, body, ai_summary")
+      .eq("id", postId)
+      .maybeSingle()
+  );
   const post =
     withBrief.error?.message.includes("ai_summary")
       ? await supabase

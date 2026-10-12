@@ -1,6 +1,7 @@
 -- Balances, roles, tiers, note and comment health, votes, the HP ledger, sector ranks and unlocks
 -- now change only inside the database functions. Signed-in users keep editing their own profile
--- text and the bodies of their own notes, comments and replies. Reads stay as they were.
+-- text and the bodies of their own notes, comments and replies. Votes and the HP ledger read as
+-- each member's own rows, plus the public calibration moves; admins read everything.
 -- Run after 20261012221000_balance_functions.sql, once the apps that call those functions are live.
 -- Safe to re-run.
 
@@ -46,13 +47,21 @@ create policy comment_replies_edit_own on public.comment_replies
   using (author_id = (select auth.uid()))
   with check (author_id = (select auth.uid()));
 
+-- Each member reads their own votes and HP ledger. Calibration moves stay public for the ranking page.
 drop policy if exists votes_read on public.votes;
 create policy votes_read on public.votes
-  for select to authenticated using (true);
+  for select to authenticated
+  using (user_id = (select auth.uid()) or (select public.is_admin()));
+
+drop policy if exists comment_votes_read on public.comment_votes;
+create policy comment_votes_read on public.comment_votes
+  for select to authenticated
+  using (user_id = (select auth.uid()) or (select public.is_admin()));
 
 drop policy if exists hp_transactions_read on public.hp_transactions;
 create policy hp_transactions_read on public.hp_transactions
-  for select to authenticated using (true);
+  for select to authenticated
+  using (user_id = (select auth.uid()) or type = 'calibration' or (select public.is_admin()));
 
 drop policy if exists subtopic_ranks_read on public.subtopic_ranks;
 create policy subtopic_ranks_read on public.subtopic_ranks

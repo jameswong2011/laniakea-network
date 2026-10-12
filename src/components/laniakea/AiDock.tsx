@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { AskNote } from "@/components/laniakea/AskNote";
 import { NoteBriefCard } from "@/components/laniakea/NoteBriefCard";
@@ -207,7 +208,7 @@ export function AiDock({
         onClick={() => setOpen((current) => !current)}
         className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-black shadow-[0_0_16px_5px_rgba(168,168,176,0.45)]"
       >
-        <img src="/bot-stars.jpg" alt="" className="h-full w-full object-cover" />
+        <Image src="/bot-stars.jpg" alt="" width={56} height={56} className="h-full w-full object-cover" />
       </button>
     </div>
   );

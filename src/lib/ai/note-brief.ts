@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { completeJson, textField, textList } from "@/lib/ai/openrouter";
+import { isMissingOpenNotes, OPEN_NOTES, type NoteRelation } from "@/lib/research/open-notes";
 
 export type NoteBrief = {
   summary: string;
@@ -32,15 +33,23 @@ const BRIEF_COLUMNS_BASE =
   "id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks";
 const REFRESH_GAP_MS = 60_000;
 
-async function readBriefRow(client: SupabaseClient, postId: string) {
-  const full = await client.from("research_posts").select(BRIEF_COLUMNS).eq("id", postId).maybeSingle();
+async function readBriefRow(
+  client: SupabaseClient,
+  postId: string,
+  relation: NoteRelation = "research_posts"
+): Promise<BriefRow | null> {
+  const full = await client.from(relation).select(BRIEF_COLUMNS).eq("id", postId).maybeSingle();
 
   if (!full.error) {
     return full.data as BriefRow | null;
   }
 
+  if (relation === OPEN_NOTES && isMissingOpenNotes(full.error)) {
+    return readBriefRow(client, postId);
+  }
+
   const base = await client
-    .from("research_posts")
+    .from(relation)
     .select(BRIEF_COLUMNS_BASE)
     .eq("id", postId)
     .maybeSingle();
@@ -184,7 +193,8 @@ export async function ensureNoteBrief(
   const admin = createServiceClient();
 
   if (!admin) {
-    const note = source ?? (options.reader ? await readBriefRow(options.reader, postId) : null);
+    const note =
+      source ?? (options.reader ? await readBriefRow(options.reader, postId, OPEN_NOTES) : null);
 
     if (!note?.body) {
       return null;

@@ -147,36 +147,43 @@ export async function loadInviteDesk(
   };
 }
 
+/** One read covers every window; each window is totalled from the rows since its own start. */
 export async function loadRevenueTotals(
   supabase: SupabaseClient,
-  since: string
+  windows: Date[]
 ) {
+  const oldest = new Date(Math.min(...windows.map((since) => since.getTime())));
   const { data, error } = await supabase
     .from("revenue_events")
-    .select("creator_share, platform_burn, dust, referral_pool")
-    .gte("created_at", since);
+    .select("creator_share, platform_burn, dust, referral_pool, created_at")
+    .gte("created_at", oldest.toISOString());
 
   if (error) {
-    return {
+    const message = isMissingInviteSchema(error.message)
+      ? missingInviteSchemaMessage()
+      : error.message;
+    return windows.map(() => ({
       creatorShare: 0,
       platformBurn: 0,
       dust: 0,
       referralPool: 0,
       events: 0,
-      error: isMissingInviteSchema(error.message)
-        ? missingInviteSchemaMessage()
-        : error.message,
-    };
+      error: message,
+    }));
   }
 
-  const rows = data ?? [];
+  return windows.map((since) => {
+    const rows = (data ?? []).filter(
+      (row) => Date.parse(row.created_at as string) >= since.getTime()
+    );
 
-  return {
-    creatorShare: rows.reduce((sum, row) => sum + Number(row.creator_share), 0),
-    platformBurn: rows.reduce((sum, row) => sum + Number(row.platform_burn), 0),
-    dust: rows.reduce((sum, row) => sum + Number(row.dust ?? 0), 0),
-    referralPool: rows.reduce((sum, row) => sum + Number(row.referral_pool), 0),
-    events: rows.length,
-    error: null,
-  };
+    return {
+      creatorShare: rows.reduce((sum, row) => sum + Number(row.creator_share), 0),
+      platformBurn: rows.reduce((sum, row) => sum + Number(row.platform_burn), 0),
+      dust: rows.reduce((sum, row) => sum + Number(row.dust ?? 0), 0),
+      referralPool: rows.reduce((sum, row) => sum + Number(row.referral_pool), 0),
+      events: rows.length,
+      error: null,
+    };
+  });
 }

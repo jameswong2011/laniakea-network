@@ -184,7 +184,9 @@ export function CommentThread({
 
       {comments.length === 0 && !missingTable && !error ? (
         <p className="px-4 py-6 text-[14px] text-muted-foreground">
-          No comments yet. Stake HP to open a position on this note.
+          {access === "hidden"
+            ? "Unlock this note with UTL to read its comments."
+            : "No comments yet. Stake HP to open a position on this note."}
         </p>
       ) : null}
 

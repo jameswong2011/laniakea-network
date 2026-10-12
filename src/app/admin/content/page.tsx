@@ -5,6 +5,7 @@ import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
 import { PageFrame, PageHeading, Panel, PanelHeader } from "@/components/layout/PageFrame";
 import { requireAdmin } from "@/lib/auth/session";
 import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Admin content" };
 
@@ -16,18 +17,19 @@ export default async function AdminContentPage({
   const { q } = await searchParams;
   const query = (q ?? "").trim().toLowerCase();
   const { supabase } = await requireAdmin();
+  const reader = createServiceClient() ?? supabase;
   const [profiles, posts, comments] = await Promise.all([
-    supabase
+    reader
       .from("profiles")
       .select("id, username, display_name")
       .neq("id", TREASURY_PROFILE_ID)
       .order("username"),
-    supabase
+    reader
       .from("research_posts")
       .select("id, title, body, status, author_id, created_at")
       .order("created_at", { ascending: false })
       .limit(80),
-    supabase
+    reader
       .from("research_comments")
       .select("id, body, author_id, post_id, created_at")
       .order("created_at", { ascending: false })

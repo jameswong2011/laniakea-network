@@ -47,6 +47,16 @@ export async function getCommentCounts(
   }
 
   const counts: Record<string, number> = {};
+  const totals = await supabase.rpc("note_comment_counts", { p_post_ids: postIds });
+
+  if (!totals.error) {
+    for (const row of (totals.data ?? []) as { post_id: string; total: number | string }[]) {
+      counts[row.post_id] = Number(row.total);
+    }
+
+    return counts;
+  }
+
   const embedded = await Promise.all(
     batches(postIds).map((ids) =>
       supabase.from("research_posts").select("id, research_comments(count)").in("id", ids)

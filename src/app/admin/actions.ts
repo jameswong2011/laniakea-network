@@ -280,8 +280,8 @@ export async function runWeeklyMaintenanceNow(
   _prevState: AdminActionState,
   _formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase } = await requireAdmin();
-  const result = await invokeWeeklyMaintenance(supabase, "manual");
+  const { writer } = await requireAdminWriter();
+  const result = await invokeWeeklyMaintenance(writer, "manual");
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
@@ -399,7 +399,7 @@ export async function updateResearchPost(
   _prevState: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase, writer } = await requireAdminWriter();
+  const { writer } = await requireAdminWriter();
   const parsed = postEditSchema.safeParse({
     id: formData.get("id"),
     title: formData.get("title"),
@@ -411,7 +411,7 @@ export async function updateResearchPost(
     return { error: firstIssue(parsed.error), stamp: Date.now() };
   }
 
-  const { data: before } = await supabase
+  const { data: before } = await writer
     .from("research_posts")
     .select("title, body")
     .eq("id", parsed.data.id)

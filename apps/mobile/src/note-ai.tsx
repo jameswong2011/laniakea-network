@@ -56,11 +56,21 @@ export function AssistantScreen({
   const conviction = params?.conviction ?? null;
   const claims = params?.claims;
   const risks = params?.risks;
+  const agreement = params?.agreement;
+  const objection = params?.objection;
   const meaning = params?.meaning ?? null;
   const scrollRef = useRef<ScrollView>(null);
   const [brief, setBrief] = useState<NoteBrief | null>(
     summary
-      ? { summary, ticker, conviction, claims: claims ?? [], risks: risks ?? [], agreement: null, objection: null }
+      ? {
+          summary,
+          ticker,
+          conviction,
+          claims: claims ?? [],
+          risks: risks ?? [],
+          agreement: agreement ?? null,
+          objection: objection ?? null,
+        }
       : null
   );
   const [question, setQuestion] = useState("");
@@ -81,9 +91,13 @@ export function AssistantScreen({
         conviction,
         claims: claims ?? [],
         risks: risks ?? [],
-        agreement: null,
-        objection: null,
+        agreement: agreement ?? null,
+        objection: objection ?? null,
       });
+
+      if (agreement !== undefined && objection !== undefined) {
+        return;
+      }
     }
 
     void requestNoteBrief(postId).then((result) => {
@@ -91,7 +105,7 @@ export function AssistantScreen({
         setBrief(result.brief);
       }
     });
-  }, [claims, conviction, postId, risks, summary, ticker]);
+  }, [agreement, claims, conviction, objection, postId, risks, summary, ticker]);
 
   useEffect(() => {
     if (!answer) {

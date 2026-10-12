@@ -3,6 +3,7 @@ import { researchExcerpt } from "@laniakea/domain";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { wantsMeaningSearch } from "@/lib/ai/meaning-query";
 import { completeJson, textList } from "@/lib/ai/openrouter";
+import { readOpenNotes, type NoteRelation } from "@/lib/research/open-notes";
 
 export { wantsMeaningSearch };
 
@@ -28,11 +29,13 @@ export async function rankNotesByMeaning(
     return [];
   }
 
-  const withSummary = await db
-    .from("research_posts")
-    .select("id, title, body, ai_summary")
-    .order("created_at", { ascending: false })
-    .limit(40);
+  const listNotes = (relation: NoteRelation) =>
+    db
+      .from(relation)
+      .select("id, title, body, ai_summary")
+      .order("created_at", { ascending: false })
+      .limit(40);
+  const withSummary = admin ? await listNotes("research_posts") : await readOpenNotes(listNotes);
   const listed =
     withSummary.error?.message.includes("ai_summary")
       ? await db

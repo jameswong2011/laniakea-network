@@ -13,6 +13,7 @@ import {
   countAuthorFollowers,
   isAuthorFollowed,
 } from "@/lib/research/forum";
+import { readOpenNotes } from "@/lib/research/open-notes";
 
 export async function generateMetadata({
   params,
@@ -77,12 +78,14 @@ export default async function PublicProfilePage({
 
   const [{ data: posts }, { data: comments }, following, followerCount, noteTotal, commentTotal] =
     await Promise.all([
-    supabase
-      .from("research_posts")
-      .select("id, title, body, ai_summary, sub_topic, created_at, status")
-      .eq("author_id", profile.id)
-      .order("created_at", { ascending: false })
-      .limit(20),
+    readOpenNotes((relation) =>
+      supabase
+        .from(relation)
+        .select("id, title, body, ai_summary, sub_topic, created_at, status")
+        .eq("author_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ),
     supabase
       .from("research_comments")
       .select("id, post_id, body, created_at")

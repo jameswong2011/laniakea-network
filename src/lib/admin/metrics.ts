@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 const DAY = 24 * 60 * 60 * 1000;
 const WEEK = 7 * DAY;
@@ -172,7 +173,8 @@ async function readNewest<T>(
   return { data: rows, error: null, capped: true };
 }
 
-export async function loadAdminMetrics(supabase: SupabaseClient): Promise<AdminMetrics> {
+export async function loadAdminMetrics(session: SupabaseClient): Promise<AdminMetrics> {
+  const supabase = createServiceClient() ?? session;
   const now = Date.now();
   const dayFloor = since(DAY, now);
   const weekFloor = since(WEEK, now);

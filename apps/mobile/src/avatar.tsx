@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { colors } from "./theme";
 
 export function DeskAvatar({
@@ -23,6 +24,8 @@ export function DeskAvatar({
       <Image
         source={{ uri: url }}
         accessibilityIgnoresInvertColors
+        cachePolicy="disk"
+        recyclingKey={url}
         onError={() => setFailed(true)}
         style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surface }}
       />

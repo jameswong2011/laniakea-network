@@ -24,6 +24,7 @@ import {
   type DeskAccess,
 } from "./domain";
 import { requestCommentBrief, requestNoteBrief } from "./ai";
+import { isMissingFunction, readOpenNotes, type NoteRelation } from "./open-notes";
 import { supabase } from "./supabase";
 import {
   COMMENT_BODY_MAX,
@@ -1575,7 +1576,7 @@ export async function searchFloor(query: string) {
   }
 
   function matchColumn(
-    table: "research_posts" | "research_comments" | "profiles",
+    table: NoteRelation | "research_comments" | "profiles",
     column: string,
     select: string
   ) {
@@ -1586,16 +1587,44 @@ export async function searchFloor(query: string) {
     return request;
   }
 
+  const patterns = terms.map(searchPattern);
+
+  async function bodyMatches() {
+    const viaFunction = await supabase
+      .rpc("search_note_bodies", { p_patterns: patterns, p_limit: 20 })
+      .select("id, title, body, sub_topic, created_at");
+
+    if (!isMissingFunction(viaFunction.error)) {
+      return viaFunction;
+    }
+
+    return readOpenNotes((relation) =>
+      matchColumn(relation, "body", "id, title, body, sub_topic, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20)
+    );
+  }
+
+  async function commentMatches() {
+    const viaFunction = await supabase.rpc("search_comments", { p_patterns: patterns, p_limit: 12 });
+
+    if (!isMissingFunction(viaFunction.error)) {
+      return viaFunction;
+    }
+
+    return matchColumn("research_comments", "body", "id, post_id, body, created_at")
+      .order("created_at", { ascending: false })
+      .limit(12);
+  }
+
   const [titles, bodies, comments, names, users] = (await Promise.all([
-    matchColumn("research_posts", "title", "id, title, body, sub_topic, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20),
-    matchColumn("research_posts", "body", "id, title, body, sub_topic, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20),
-    matchColumn("research_comments", "body", "id, post_id, body, created_at")
-      .order("created_at", { ascending: false })
-      .limit(12),
+    readOpenNotes((relation) =>
+      matchColumn(relation, "title", "id, title, body, sub_topic, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ),
+    bodyMatches(),
+    commentMatches(),
     matchColumn("profiles", "display_name", "id, username, display_name, tier, avatar_url")
       .neq("username", "laniakea_treasury")
       .limit(12),
@@ -1955,12 +1984,14 @@ export async function loadDesk(username: string, viewerId: string): Promise<Desk
 
   const row = profile.data;
   const [posts, comments, followers, followed] = await Promise.all([
-    supabase
-      .from("research_posts")
-      .select("id, title, body, ai_summary, sub_topic, created_at")
-      .eq("author_id", row.id)
-      .order("created_at", { ascending: false })
-      .limit(20),
+    readOpenNotes((relation) =>
+      supabase
+        .from(relation)
+        .select("id, title, body, ai_summary, sub_topic, created_at")
+        .eq("author_id", row.id)
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ),
     supabase
       .from("research_comments")
       .select("id, post_id, body, created_at")

@@ -19,12 +19,15 @@ import {
   type UnlockQuote,
 } from "./domain";
 import { DEFAULT_FEED_STATUSES, type FeedQuery } from "./feed-query";
+import { isMissingOpenNotes, OPEN_NOTES, readOpenNotes, type NoteRelation } from "./open-notes";
 import { supabase } from "./supabase";
 
 const POST_COLUMNS =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
 
 const POST_COLUMNS_AI = `${POST_COLUMNS}, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks`;
+
+const THREAD_COLUMNS = `${POST_COLUMNS_AI}, ai_comment_agreement, ai_comment_objection`;
 
 const CARD_COLUMNS =
   "id, author_id, title, body_preview, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at, ai_summary, ai_ticker, ai_conviction";
@@ -65,6 +68,8 @@ export type FloorNote = {
   conviction: string | null;
   claims: string[];
   risks: string[];
+  agreement: string | null;
+  objection: string | null;
 };
 
 export type FloorReply = {
@@ -105,6 +110,8 @@ type PostRow = {
   ai_conviction?: string | null;
   ai_claims?: unknown;
   ai_risks?: unknown;
+  ai_comment_agreement?: string | null;
+  ai_comment_objection?: string | null;
 };
 
 type AuthorRow = {
@@ -208,6 +215,8 @@ function toNote(
     conviction: post.ai_conviction?.trim() || null,
     claims: access === "hidden" ? [] : textLines(post.ai_claims),
     risks: access === "hidden" ? [] : textLines(post.ai_risks),
+    agreement: access === "hidden" ? null : post.ai_comment_agreement?.trim() || null,
+    objection: access === "hidden" ? null : post.ai_comment_objection?.trim() || null,
   };
 }
 
@@ -262,15 +271,23 @@ function isSchemaError(error: { code?: string; message: string }) {
   );
 }
 
+const FEED_SOURCES: { relation: NoteRelation; columns: string }[] = [
+  { relation: OPEN_NOTES, columns: CARD_COLUMNS },
+  ...[CARD_COLUMNS, POST_COLUMNS_AI, POST_COLUMNS].map((columns) => ({
+    relation: "research_posts" as const,
+    columns,
+  })),
+];
+
 function feedRequest(
-  columns: string,
+  { relation, columns }: (typeof FEED_SOURCES)[number],
   query: FeedQuery,
   statuses: string[],
   tierJoin: boolean,
   before: string | null
 ) {
   let request = supabase
-    .from("research_posts")
+    .from(relation)
     .select(tierJoin ? `${columns}, profiles!inner(tier)` : columns)
     .in("status", statuses)
     .order("created_at", { ascending: false })
@@ -318,21 +335,22 @@ export async function loadFeed(
     return { notes: [], nextCursor: null };
   }
 
-  const columnSets = [CARD_COLUMNS, POST_COLUMNS_AI, POST_COLUMNS];
-  let columnSet = 0;
+  let source = 0;
   let tierJoin = query.tiers != null;
-  let result = await feedRequest(columnSets[columnSet], query, statuses, tierJoin, before);
+  let result = await feedRequest(FEED_SOURCES[source], query, statuses, tierJoin, before);
 
-  while (result.error && isSchemaError(result.error)) {
-    if (tierJoin && /profiles|relationship/i.test(result.error.message)) {
+  while (result.error && (isMissingOpenNotes(result.error) || isSchemaError(result.error))) {
+    if (isMissingOpenNotes(result.error)) {
+      source += 1;
+    } else if (tierJoin && /profiles|relationship/i.test(result.error.message)) {
       tierJoin = false;
-    } else if (columnSet < columnSets.length - 1) {
-      columnSet += 1;
+    } else if (source < FEED_SOURCES.length - 1) {
+      source += 1;
     } else {
       break;
     }
 
-    result = await feedRequest(columnSets[columnSet], query, statuses, tierJoin, before);
+    result = await feedRequest(FEED_SOURCES[source], query, statuses, tierJoin, before);
   }
 
   const { data, error } = result;
@@ -373,11 +391,9 @@ export async function loadFeed(
 }
 
 export async function loadThread(viewer: FloorViewer, postId: string) {
-  const withAi = await supabase
-    .from("research_posts")
-    .select(POST_COLUMNS_AI)
-    .eq("id", postId)
-    .maybeSingle();
+  const withAi = await readOpenNotes((relation) =>
+    supabase.from(relation).select(THREAD_COLUMNS).eq("id", postId).maybeSingle()
+  );
   const loaded =
     withAi.error?.message.includes("ai_summary")
       ? await supabase.from("research_posts").select(POST_COLUMNS).eq("id", postId).maybeSingle()

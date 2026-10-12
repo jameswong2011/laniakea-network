@@ -8,6 +8,9 @@ alter table public.hp_transactions add column if not exists comment_id uuid;
 alter table public.research_posts add column if not exists original_stake integer;
 alter table public.research_posts add column if not exists unlock_rate_multiple integer;
 
+create index if not exists hp_transactions_user_post_type_comment_idx
+  on public.hp_transactions (user_id, post_id, type, comment_id);
+
 create or replace function public.laniakea_note_access(p_viewer uuid, p_post uuid)
 returns text
 language plpgsql
