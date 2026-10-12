@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { researchExcerpt } from "@laniakea/domain";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { wantsMeaningSearch } from "@/lib/ai/meaning-query";
 import { completeJson, textList } from "@/lib/ai/openrouter";
@@ -53,7 +52,7 @@ export async function rankNotesByMeaning(
     .map((note) => ({
       id: note.id,
       title: note.title,
-      summary: note.ai_summary?.trim() || researchExcerpt(note.body ?? "", 280),
+      summary: note.ai_summary?.trim() || "",
     }))
     .filter((note) => note.summary);
   const json = await completeJson(

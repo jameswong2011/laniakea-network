@@ -11,6 +11,7 @@ import type { NoteBrief } from "@/lib/ai/note-brief";
 import { researchPostPath } from "@/lib/research/feed";
 
 type MeaningResult = { hits: MeaningHit[]; error: string | null };
+type BriefResult = { brief: NoteBrief | null; error: string | null };
 
 const MEANING_TTL_MS = 10 * 60 * 1000;
 const meaningCache = new Map<string, { at: number; hits: MeaningHit[] }>();
@@ -44,6 +45,30 @@ async function loadMeaning(query: string): Promise<MeaningResult> {
   }
 }
 
+async function loadBrief(postId: string): Promise<BriefResult> {
+  try {
+    const response = await fetch("/api/ai/brief", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postId }),
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { brief?: NoteBrief | null; error?: string }
+      | null;
+
+    if (!response.ok) {
+      return {
+        brief: null,
+        error: payload?.error ?? "The AI summary is unavailable right now.",
+      };
+    }
+
+    return { brief: payload?.brief ?? null, error: payload?.error ?? null };
+  } catch {
+    return { brief: null, error: "The AI summary is unavailable right now." };
+  }
+}
+
 export function AiDock({
   postId,
   locked = false,
@@ -57,14 +82,23 @@ export function AiDock({
 }) {
   const [open, setOpen] = useState(false);
   const [lift, setLift] = useState(0);
+  const [loadedBrief, setLoadedBrief] = useState<{ postId: string; brief: NoteBrief } | null>(null);
+  const [briefLoadingFor, setBriefLoadingFor] = useState<string | null>(null);
+  const [briefFailure, setBriefFailure] = useState<{ postId: string; error: string } | null>(null);
   const [reply, setReply] = useState<{ text: string; section: string | null } | null>(null);
   const [found, setFound] = useState<(MeaningResult & { query: string }) | null>(null);
   const askFocused = useRef(false);
+  const requestedBriefFor = useRef<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const replyRef = useRef<HTMLDivElement>(null);
   const query = meaningQuery?.trim() ?? "";
   const wantsMeaning = wantsMeaningSearch(query);
   const meaning = found && found.query === query ? found : null;
+  const shownBrief =
+    loadedBrief && loadedBrief.postId === postId ? loadedBrief.brief : brief;
+  const briefLoading = briefLoadingFor === postId;
+  const briefError =
+    briefFailure && briefFailure.postId === postId ? briefFailure.error : null;
 
   useEffect(() => {
     if (!open || !wantsMeaning) {
@@ -129,15 +163,17 @@ export function AiDock({
           style={{ height: `min(88dvh, calc(100dvh - ${lift + 96}px))` }}
         >
           <div ref={scrollerRef} className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
-          {postId && !brief ? (
+          {postId && !shownBrief ? (
             <section className="rounded-xl border border-gain/40 bg-gain-muted px-4 py-3">
               <p className="font-data text-[10px] tracking-[0.14em] text-gain uppercase">Summary</p>
               <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
-                The note and its comments are summarized here. Agreement and objection appear after three comments.
+                {briefLoading
+                  ? "Writing and saving the AI summary…"
+                  : briefError ?? "The AI summary is still being written."}
               </p>
             </section>
           ) : null}
-          {brief ? <NoteBriefCard brief={brief} locked={locked} /> : null}
+          {shownBrief ? <NoteBriefCard brief={shownBrief} locked={locked} /> : null}
           {meaningQuery != null ? (
             <div className="flex flex-col gap-3">
               <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
@@ -205,11 +241,52 @@ export function AiDock({
         type="button"
         aria-expanded={open}
         aria-label={open ? "Close assistant" : "Open assistant"}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          if (next && postId) {
+            void refreshBrief(postId);
+          }
+        }}
         className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-black shadow-[0_0_16px_5px_rgba(168,168,176,0.45)]"
       >
         <Image src="/bot-stars.jpg" alt="" width={56} height={56} className="h-full w-full object-cover" />
       </button>
     </div>
   );
+
+  async function refreshBrief(id: string) {
+    if (requestedBriefFor.current === id) {
+      return;
+    }
+
+    requestedBriefFor.current = id;
+    setBriefLoadingFor(id);
+    setBriefFailure(null);
+    let result = await loadBrief(id);
+
+    for (
+      let attempt = 0;
+      !result.brief &&
+      result.error?.includes("still being written") &&
+      attempt < 5;
+      attempt += 1
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      result = await loadBrief(id);
+    }
+
+    setBriefLoadingFor(null);
+
+    if (result.brief) {
+      setLoadedBrief({ postId: id, brief: result.brief });
+      return;
+    }
+
+    requestedBriefFor.current = null;
+    setBriefFailure({
+      postId: id,
+      error: result.error ?? "The AI summary is still being written.",
+    });
+  }
 }

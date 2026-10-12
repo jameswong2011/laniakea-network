@@ -16,7 +16,6 @@ import {
   canWriteDesk,
   maxBuyHpTokens,
   resolveTier,
-  researchExcerpt,
   resolveUnlockRateMultiple,
   voteCostHp,
   voteHealthDelta,
@@ -380,7 +379,7 @@ async function afterPublish(userId: string, postId: string, draftId?: string) {
     );
   }
 
-  void requestNoteBrief(postId, true);
+  await requestNoteBrief(postId, true, true);
 }
 
 export async function publishNote(input: {
@@ -1744,7 +1743,7 @@ export async function editPostBody(userId: string, postId: string, body: string)
     return { error: write.error.message };
   }
 
-  void requestNoteBrief(postId, true);
+  await requestNoteBrief(postId, true, true);
   return { message: "Post updated." };
 }
 
@@ -2027,7 +2026,7 @@ export async function loadDesk(username: string, viewerId: string): Promise<Desk
       createdAt: post.created_at as string,
       excerpt:
         (post.ai_summary as string | null)?.trim() ||
-        researchExcerpt((post.body as string | null) ?? "", 180),
+        "AI summary is being written…",
     })),
     comments: (comments.data ?? []).map((comment) => ({
       id: comment.id as string,

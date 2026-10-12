@@ -25,13 +25,16 @@ type BriefRow = {
   ai_risks: unknown;
   edited_at?: string | null;
   ai_generated_at?: string | null;
+  ai_brief_attempted_at?: string | null;
 };
 
 const BRIEF_COLUMNS =
+  "id, title, body, edited_at, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_generated_at, ai_brief_attempted_at";
+const BRIEF_COLUMNS_WITHOUT_ATTEMPT =
   "id, title, body, edited_at, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_generated_at";
 const BRIEF_COLUMNS_BASE =
   "id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks";
-const REFRESH_GAP_MS = 60_000;
+const ATTEMPT_GAP_MS = 2 * 60_000;
 
 async function readBriefRow(
   client: SupabaseClient,
@@ -48,6 +51,16 @@ async function readBriefRow(
     return readBriefRow(client, postId);
   }
 
+  const withoutAttempt = await client
+    .from(relation)
+    .select(BRIEF_COLUMNS_WITHOUT_ATTEMPT)
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (!withoutAttempt.error) {
+    return withoutAttempt.data as BriefRow | null;
+  }
+
   const base = await client
     .from(relation)
     .select(BRIEF_COLUMNS_BASE)
@@ -56,41 +69,71 @@ async function readBriefRow(
   return base.error ? null : (base.data as BriefRow | null);
 }
 
-function generatedRecently(row: BriefRow) {
-  const at = row.ai_generated_at ? Date.parse(row.ai_generated_at) : NaN;
-
-  if (!Number.isFinite(at) || Date.now() - at >= REFRESH_GAP_MS) {
-    return false;
-  }
-
-  const edited = row.edited_at ? Date.parse(row.edited_at) : NaN;
-  return !(Number.isFinite(edited) && edited > at);
+function timestamp(value: string | null | undefined) {
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** One summary job per note: the claim only lands while the stamp still holds the value this job read. */
-async function claimGeneration(admin: SupabaseClient, row: BriefRow) {
-  if (!("ai_generated_at" in row)) {
+export function noteBriefNeedsGeneration(row: {
+  ai_summary?: string | null;
+  edited_at?: string | null;
+  ai_generated_at?: string | null;
+}) {
+  if (!row.ai_summary?.trim()) {
     return true;
   }
 
-  if (generatedRecently(row)) {
+  const edited = timestamp(row.edited_at);
+  const generated = timestamp(row.ai_generated_at);
+  return edited != null && (generated == null || edited > generated);
+}
+
+function attemptedRecently(row: BriefRow) {
+  const value =
+    "ai_brief_attempted_at" in row ? row.ai_brief_attempted_at : row.ai_generated_at;
+  const at = timestamp(value);
+
+  if (at == null || Date.now() - at >= ATTEMPT_GAP_MS) {
     return false;
   }
 
-  const stamp = admin
-    .from("research_posts")
-    .update({ ai_generated_at: new Date().toISOString() })
-    .eq("id", row.id);
-  const claimed = await (row.ai_generated_at
-    ? stamp.eq("ai_generated_at", row.ai_generated_at)
-    : stamp.is("ai_generated_at", null)
-  ).select("id");
-
-  return Boolean(claimed.error) || (claimed.data?.length ?? 0) > 0;
+  const edited = timestamp(row.edited_at);
+  return edited == null || edited <= at;
 }
 
-async function releaseGeneration(admin: SupabaseClient, row: BriefRow) {
-  if ("ai_generated_at" in row) {
+/** One summary job per note revision: the claim lands only while the previous attempt stamp still matches. */
+async function claimGeneration(admin: SupabaseClient, row: BriefRow) {
+  const claimColumn =
+    "ai_brief_attempted_at" in row
+      ? ("ai_brief_attempted_at" as const)
+      : "ai_generated_at" in row
+        ? ("ai_generated_at" as const)
+        : null;
+
+  if (!claimColumn) {
+    return new Date().toISOString();
+  }
+
+  if (attemptedRecently(row)) {
+    return null;
+  }
+
+  const previous = row[claimColumn];
+  const claimedAt = new Date().toISOString();
+  const stamp = admin
+    .from("research_posts")
+    .update({ [claimColumn]: claimedAt })
+    .eq("id", row.id);
+  const claimed = await (previous
+    ? stamp.eq(claimColumn, previous)
+    : stamp.is(claimColumn, null)
+  ).select("id");
+
+  return !claimed.error && (claimed.data?.length ?? 0) > 0 ? claimedAt : null;
+}
+
+async function releaseLegacyClaim(admin: SupabaseClient, row: BriefRow) {
+  if (!("ai_brief_attempted_at" in row) && "ai_generated_at" in row) {
     await admin
       .from("research_posts")
       .update({ ai_generated_at: row.ai_generated_at ?? null })
@@ -133,7 +176,6 @@ function asBrief(row: BriefRow): NoteBrief | null {
 
 export type BriefOptions = {
   refresh?: boolean;
-  source?: { title: string; body: string };
   comments?: boolean;
   reader?: SupabaseClient;
   userId?: string | null;
@@ -189,19 +231,14 @@ export async function ensureNoteBrief(
   postId: string,
   options: BriefOptions = {}
 ): Promise<NoteBrief | null> {
-  const { refresh = false, source, userId } = options;
+  const { refresh = false, userId } = options;
   const admin = createServiceClient();
 
   if (!admin) {
-    const note =
-      source ?? (options.reader ? await readBriefRow(options.reader, postId, OPEN_NOTES) : null);
-
-    if (!note?.body) {
-      return null;
-    }
-
-    const generated = await generateNoteBrief(note.title, note.body, userId);
-    return generated ? withComments(postId, generated, options) : null;
+    const note = options.reader
+      ? await readBriefRow(options.reader, postId, OPEN_NOTES)
+      : null;
+    return note ? asBrief(note) : null;
   }
 
   const row = await readBriefRow(admin, postId);
@@ -212,31 +249,52 @@ export async function ensureNoteBrief(
 
   const existing = asBrief(row);
 
-  if (existing && !refresh) {
+  if (existing && !refresh && !noteBriefNeedsGeneration(row)) {
     return withComments(postId, existing, options);
   }
 
-  if (!(await claimGeneration(admin, row))) {
+  const claimedAt = await claimGeneration(admin, row);
+
+  if (!claimedAt) {
     return existing ? withComments(postId, existing, options) : null;
   }
 
   const brief = await generateNoteBrief(row.title, row.body, userId);
 
   if (!brief) {
-    await releaseGeneration(admin, row);
+    await releaseLegacyClaim(admin, row);
     return existing ? withComments(postId, existing, options) : null;
   }
 
-  await admin
+  const values: Record<string, unknown> = {
+    ai_summary: brief.summary,
+    ai_ticker: brief.ticker,
+    ai_conviction: brief.conviction,
+    ai_claims: brief.claims,
+    ai_risks: brief.risks,
+  };
+
+  if ("ai_generated_at" in row) {
+    values.ai_generated_at = claimedAt;
+  }
+
+  let store = admin
     .from("research_posts")
-    .update({
-      ai_summary: brief.summary,
-      ai_ticker: brief.ticker,
-      ai_conviction: brief.conviction,
-      ai_claims: brief.claims,
-      ai_risks: brief.risks,
-    })
+    .update(values)
     .eq("id", postId);
+
+  if ("edited_at" in row) {
+    store = row.edited_at
+      ? store.eq("edited_at", row.edited_at)
+      : store.is("edited_at", null);
+  }
+
+  const saved = await store.select("id");
+
+  if (saved.error || (saved.data?.length ?? 0) === 0) {
+    await releaseLegacyClaim(admin, row);
+    return existing ? withComments(postId, existing, options) : null;
+  }
 
   return withComments(postId, brief, options);
 }

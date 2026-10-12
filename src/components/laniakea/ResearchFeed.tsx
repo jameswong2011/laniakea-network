@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import Link from "next/link";
+import { AiSummaryPreview } from "@/components/laniakea/AiSummaryPreview";
 import { AuthorLink } from "@/components/laniakea/AuthorLink";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { PostToolbar } from "@/components/laniakea/PostToolbar";
@@ -12,7 +13,7 @@ import {
   canWriteDesk,
   deskAccessRailClass,
 } from "@/lib/research/access";
-import { researchExcerpt, researchPostPath } from "@/lib/research/feed";
+import { researchPostPath } from "@/lib/research/feed";
 import { isAscendedStatus, isHuntedStatus } from "@/lib/research/health";
 import {
   RESEARCH_POST_STATUS_LIVE,
@@ -43,6 +44,13 @@ export function ResearchFeed({
       </div>
     );
   }
+
+  const summaryBackfillIds = new Set(
+    items
+      .filter((item) => !item.ai_summary?.trim())
+      .slice(0, 3)
+      .map((item) => item.id)
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -118,17 +126,14 @@ export function ResearchFeed({
                     <span>{item.title}</span>
                   )}
                 </h2>
-                {item.ai_summary || item.body ? (
-                  <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
-                    {open ? (
-                      <Link href={href} className="hover:text-foreground">
-                        {item.ai_summary || researchExcerpt(item.body, 280)}
-                      </Link>
-                    ) : (
-                      item.ai_summary || researchExcerpt(item.body, 280)
-                    )}
-                  </p>
-                ) : null}
+                <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+                  <AiSummaryPreview
+                    postId={item.id}
+                    summary={item.ai_summary}
+                    href={open ? href : undefined}
+                    generate={summaryBackfillIds.has(item.id)}
+                  />
+                </p>
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
                   <AuthorLink
                     username={item.author?.username}

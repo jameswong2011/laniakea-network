@@ -20,7 +20,26 @@ import {
 import { colors, radius } from "./theme";
 import type { AppStackParamList } from "./types";
 
+// Metro resolves bundled React Native image assets through require().
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const BOT = require("../assets/bot-stars.jpg");
+
+async function loadSavedBrief(postId: string) {
+  let result = await requestNoteBrief(postId);
+
+  for (
+    let attempt = 0;
+    !result?.brief &&
+    result?.error?.includes("still being written") &&
+    attempt < 5;
+    attempt += 1
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    result = await requestNoteBrief(postId);
+  }
+
+  return result;
+}
 
 export function AiButton({
   aboveTabs = false,
@@ -36,6 +55,8 @@ export function AiButton({
     <View pointerEvents="box-none" style={[styles.dock, { bottom, right: 16 }]}>
       <View style={styles.glow}>
         <Pressable accessibilityLabel="Open assistant" onPress={onPress} style={styles.button}>
+          {/* React Native supplies accessibility text on the pressable rather than an HTML alt prop. */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image source={BOT} accessibilityIgnoresInvertColors style={styles.bot} />
         </Pressable>
       </View>
@@ -60,19 +81,22 @@ export function AssistantScreen({
   const objection = params?.objection;
   const meaning = params?.meaning ?? null;
   const scrollRef = useRef<ScrollView>(null);
-  const [brief, setBrief] = useState<NoteBrief | null>(
-    summary
-      ? {
-          summary,
-          ticker,
-          conviction,
-          claims: claims ?? [],
-          risks: risks ?? [],
-          agreement: agreement ?? null,
-          objection: objection ?? null,
-        }
-      : null
-  );
+  const passedBrief: NoteBrief | null = summary
+    ? {
+        summary,
+        ticker,
+        conviction,
+        claims: claims ?? [],
+        risks: risks ?? [],
+        agreement: agreement ?? null,
+        objection: objection ?? null,
+      }
+    : null;
+  const [briefResponse, setBriefResponse] = useState<{
+    postId: string;
+    brief: NoteBrief | null;
+    error: string | null;
+  } | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [section, setSection] = useState<string | null>(null);
@@ -84,28 +108,23 @@ export function AssistantScreen({
       return;
     }
 
-    if (summary) {
-      setBrief({
-        summary,
-        ticker,
-        conviction,
-        claims: claims ?? [],
-        risks: risks ?? [],
-        agreement: agreement ?? null,
-        objection: objection ?? null,
-      });
-
-      if (agreement !== undefined && objection !== undefined) {
+    let active = true;
+    void loadSavedBrief(postId).then((result) => {
+      if (!active) {
         return;
       }
-    }
 
-    void requestNoteBrief(postId).then((result) => {
-      if (result?.brief) {
-        setBrief(result.brief);
-      }
+      setBriefResponse({
+        postId,
+        brief: result?.brief ?? null,
+        error: result?.error ?? (result?.brief ? null : "The AI summary is still being written."),
+      });
     });
-  }, [agreement, claims, conviction, objection, postId, risks, summary, ticker]);
+
+    return () => {
+      active = false;
+    };
+  }, [postId]);
 
   useEffect(() => {
     if (!answer) {
@@ -117,7 +136,10 @@ export function AssistantScreen({
     return () => clearTimeout(timer);
   }, [answer]);
 
-  const shown = brief;
+  const response = briefResponse?.postId === postId ? briefResponse : null;
+  const shown = response?.brief ?? passedBrief;
+  const briefLoading = Boolean(postId && !response);
+  const briefError = response?.error ?? null;
 
   return (
     <KeyboardAvoidingView
@@ -133,7 +155,11 @@ export function AssistantScreen({
         {postId && !shown ? (
           <View style={styles.summaryCard}>
             <Text style={styles.summaryKicker}>Summary</Text>
-            <Text style={styles.item}>The note and its comments are summarized here. Agreement and objection appear after three comments.</Text>
+            <Text style={styles.item}>
+              {briefLoading
+                ? "Writing and saving the AI summary…"
+                : briefError ?? "The AI summary is still being written."}
+            </Text>
           </View>
         ) : null}
         {shown ? (

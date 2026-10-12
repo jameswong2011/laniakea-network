@@ -169,11 +169,9 @@ export default async function PublicProfilePage({
                     {post.title}
                   </Link>
                 </h2>
-                {post.ai_summary || post.body ? (
-                  <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
-                    {post.ai_summary?.trim() || researchExcerpt(post.body, 180)}
-                  </p>
-                ) : null}
+                <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
+                  {post.ai_summary?.trim() || "AI summary is being written…"}
+                </p>
               </article>
             ))}
           </div>

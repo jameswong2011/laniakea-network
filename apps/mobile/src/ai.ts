@@ -26,26 +26,28 @@ async function postAi<T>(path: string, body: unknown): Promise<T | null> {
     return null;
   }
 
-  const response = await fetch(`${SITE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  try {
+    const response = await fetch(`${SITE}${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
 
-  const payload = (await response.json().catch(() => null)) as T | null;
-
-  if (!response.ok) {
-    return payload;
+    return (await response.json().catch(() => null)) as T | null;
+  } catch {
+    return null;
   }
-
-  return payload;
 }
 
-export function requestNoteBrief(postId: string, refresh = false) {
-  return postAi<{ brief?: NoteBrief; error?: string }>(`/api/ai/brief`, { postId, refresh });
+export function requestNoteBrief(postId: string, refresh = false, background = false) {
+  return postAi<{ brief?: NoteBrief; queued?: boolean; error?: string }>(`/api/ai/brief`, {
+    postId,
+    refresh,
+    background,
+  });
 }
 
 export function requestCommentBrief(postId: string) {

@@ -15,7 +15,8 @@ import type { CompositeScreenProps } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { researchExcerpt, TIERS, type Tier } from "../domain";
+import { requestNoteBrief, type NoteBrief } from "../ai";
+import { TIERS, type Tier } from "../domain";
 import { useDesk } from "../desk";
 import {
   DEFAULT_FEED_STATUSES,
@@ -90,6 +91,35 @@ function tapeLabel(query: FeedQuery) {
 }
 
 const NO_REACTIONS: ReactionCount[] = [];
+const summaryRequests = new Map<string, Promise<NoteBrief | null>>();
+
+function loadSavedSummary(postId: string) {
+  const active = summaryRequests.get(postId);
+
+  if (active) {
+    return active;
+  }
+
+  const request = requestNoteBrief(postId)
+    .then((result) => result?.brief ?? null)
+    .catch(() => null)
+    .then((brief) => {
+      if (!brief) {
+        summaryRequests.delete(postId);
+      }
+      return brief;
+    });
+  summaryRequests.set(postId, request);
+  return request;
+}
+
+async function fillMissingSummaries(notes: FloorNote[]) {
+  const missing = notes.filter((note) => !note.summary).slice(0, 3);
+  const results = await Promise.all(
+    missing.map(async (note) => [note.id, await loadSavedSummary(note.id)] as const)
+  );
+  return new Map(results.filter((entry): entry is readonly [string, NoteBrief] => entry[1] != null));
+}
 
 function noteKey(note: FloorNote) {
   return note.id;
@@ -132,7 +162,7 @@ const FeedCard = memo(function FeedCard({
       </Pressable>
       <Text style={styles.cardTitle}>{note.title}</Text>
       <Text style={styles.cardBody}>
-        {note.summary || researchExcerpt(note.body, 360)}
+        {note.summary || "AI summary is being written…"}
       </Text>
       <ReactionTally counts={reactions} />
     </Pressable>
@@ -173,6 +203,27 @@ export function FeedScreen({ navigation }: Props) {
       setNotes(page.notes);
       setCursor(page.nextCursor);
       setReactions(counts);
+      void fillMissingSummaries(page.notes).then((summaries) => {
+        if (run === generation.current && summaries.size > 0) {
+          setNotes((current) =>
+            current.map((note) => {
+              const brief = summaries.get(note.id);
+              return brief
+                ? {
+                    ...note,
+                    summary: brief.summary,
+                    ticker: brief.ticker,
+                    conviction: brief.conviction,
+                    claims: brief.claims,
+                    risks: brief.risks,
+                    agreement: brief.agreement ?? null,
+                    objection: brief.objection ?? null,
+                  }
+                : note;
+            })
+          );
+        }
+      });
     } catch (cause) {
       if (run === generation.current) {
         setError(cause instanceof Error ? cause.message : "Could not load the tape.");
@@ -209,6 +260,27 @@ export function FeedScreen({ navigation }: Props) {
       });
       setReactions((current) => ({ ...current, ...counts }));
       setCursor(page.nextCursor);
+      void fillMissingSummaries(page.notes).then((summaries) => {
+        if (run === generation.current && summaries.size > 0) {
+          setNotes((current) =>
+            current.map((note) => {
+              const brief = summaries.get(note.id);
+              return brief
+                ? {
+                    ...note,
+                    summary: brief.summary,
+                    ticker: brief.ticker,
+                    conviction: brief.conviction,
+                    claims: brief.claims,
+                    risks: brief.risks,
+                    agreement: brief.agreement ?? null,
+                    objection: brief.objection ?? null,
+                  }
+                : note;
+            })
+          );
+        }
+      });
     } catch (cause) {
       if (run === generation.current) {
         setError(cause instanceof Error ? cause.message : "Could not load more of the tape.");

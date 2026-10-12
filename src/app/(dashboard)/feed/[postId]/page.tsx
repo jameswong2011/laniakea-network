@@ -123,11 +123,9 @@ export default async function ResearchPostPage({
               <TierBadge tier={item.deskTier} locked />
             ) : null}
           </div>
-          {item.body ? (
-            <p className="mb-4 text-[15px] leading-relaxed text-muted-foreground">
-              {brief?.summary ?? item.body}
-            </p>
-          ) : null}
+          <p className="mb-4 text-[15px] leading-relaxed text-muted-foreground">
+            {brief?.summary ?? "AI summary is being written…"}
+          </p>
           {item.unlockQuote ? (
             <UnlockPostButton
               postId={item.id}

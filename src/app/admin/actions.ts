@@ -416,12 +416,17 @@ export async function updateResearchPost(
     .select("title, body")
     .eq("id", parsed.data.id)
     .maybeSingle();
+  const contentChanged =
+    before != null &&
+    (before.title !== parsed.data.title || before.body !== parsed.data.body);
+  const now = new Date().toISOString();
   const { error } = await writer
     .from("research_posts")
     .update({
       title: parsed.data.title,
       body: parsed.data.body,
       status: parsed.data.status,
+      ...(contentChanged ? { edited_at: now, updated_at: now } : {}),
     })
     .eq("id", parsed.data.id);
 
@@ -433,7 +438,7 @@ export async function updateResearchPost(
     return { error: error.message, stamp: Date.now() };
   }
 
-  if (before && (before.title !== parsed.data.title || before.body !== parsed.data.body)) {
+  if (contentChanged) {
     after(() =>
       Promise.all([
         ensureNoteBrief(parsed.data.id, { refresh: true }),
