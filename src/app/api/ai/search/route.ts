@@ -1,10 +1,10 @@
 import { rankNotesByMeaning, wantsMeaningSearch } from "@/lib/ai/meaning-search";
-import { viewerIdFromRequest } from "@/lib/ai/viewer";
+import { viewerFromRequest } from "@/lib/ai/viewer";
 
 export async function POST(request: Request) {
-  const userId = await viewerIdFromRequest(request);
+  const viewer = await viewerFromRequest(request);
 
-  if (!userId) {
+  if (!viewer) {
     return Response.json({ error: "Sign in to search." }, { status: 401 });
   }
 
@@ -15,6 +15,6 @@ export async function POST(request: Request) {
     return Response.json({ hits: [] });
   }
 
-  const hits = await rankNotesByMeaning(query);
+  const hits = await rankNotesByMeaning(query, viewer.supabase);
   return Response.json({ hits });
 }

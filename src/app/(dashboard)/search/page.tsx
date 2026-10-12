@@ -7,6 +7,7 @@ import {
   Panel,
   PanelHeader,
 } from "@/components/layout/PageFrame";
+import { AiDock } from "@/components/laniakea/AiDock";
 import { SearchBox } from "@/components/laniakea/SearchBox";
 import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { requireUser } from "@/lib/auth/session";
@@ -122,7 +123,7 @@ export default async function SearchPage({
       [...(nameHits.data ?? []), ...(userHits.data ?? [])].map((row) => [row.id, row])
     ).values(),
   ];
-  const meaning = wantsMeaningSearch(query) ? await rankNotesByMeaning(query) : [];
+  const meaning = wantsMeaningSearch(query) ? await rankNotesByMeaning(query, supabase) : [];
 
   return (
     <PageFrame>
@@ -132,6 +133,7 @@ export default async function SearchPage({
         description="Titles first, then matches inside the note, then a reading of the summaries."
       />
       <SearchBox defaultValue={query} />
+      <AiDock meaning={query.length >= 2 ? meaning : null} />
       {query.length > 0 && query.length < 2 ? (
         <p className="text-[14px] text-muted-foreground">
           Type at least two characters.
@@ -139,23 +141,6 @@ export default async function SearchPage({
       ) : null}
       {query.length >= 2 ? (
         <>
-          {meaning.length > 0 ? (
-            <Panel>
-              <PanelHeader label="By meaning" meta={meaning.length} />
-              <div className="divide-y divide-border">
-                {meaning.map((post) => (
-                  <article key={post.id} className="px-4 py-4">
-                    <h2 className="font-heading text-[20px]">
-                      <Link href={researchPostPath(post.id)} className="hover:underline">
-                        {post.title}
-                      </Link>
-                    </h2>
-                    <p className="mt-1 text-[14px] text-muted-foreground">{post.summary}</p>
-                  </article>
-                ))}
-              </div>
-            </Panel>
-          ) : null}
           {ordered.titleHits.length === 0 &&
           ordered.bodyHits.length === 0 &&
           commentRows.length === 0 &&

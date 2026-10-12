@@ -25,7 +25,7 @@ import {
   type FloorNote,
 } from "../floor";
 import { isPostSaved, toggleSaved } from "../library";
-import { NoteAssist, CommentRead } from "../note-ai";
+import { AiButton } from "../note-ai";
 import { NoteBody } from "../note-body";
 import { DeskAvatar } from "../avatar";
 import { ReactionMark, ReactionTally } from "../reaction-tally";
@@ -585,15 +585,6 @@ export function ThreadScreen({
       <View style={styles.meter}>
         <View style={[styles.meterFill, { width: `${note.healthPercent}%` }]} />
       </View>
-      <NoteAssist
-        postId={postId}
-        locked={note.access === "hidden"}
-        summary={note.summary}
-        ticker={note.ticker}
-        conviction={note.conviction}
-        claims={note.claims}
-        risks={note.risks}
-      />
       {editingPost ? (
         <View>
           <TextInput value={draftBody} onChangeText={setDraftBody} multiline style={styles.area} />
@@ -651,7 +642,6 @@ export function ThreadScreen({
       {dock == null && error ? <Text style={styles.error}>{error}</Text> : null}
       {dock == null && notice ? <Text style={styles.notice}>{notice}</Text> : null}
       {comments.length > 0 ? <Text style={styles.section}>Comments</Text> : null}
-      {note.access !== "hidden" ? <CommentRead postId={postId} count={comments.length} /> : null}
       {comments.map((comment) => (
         <View key={comment.id} style={styles.comment}>
           <View style={styles.byline}>
@@ -911,6 +901,16 @@ export function ThreadScreen({
         </Pressable>
       </View>
     ) : null}
+    <AiButton
+      postId={postId}
+      locked={note.access === "hidden"}
+      summary={note.summary}
+      ticker={note.ticker}
+      conviction={note.conviction}
+      claims={note.claims}
+      risks={note.risks}
+      commentCount={comments.length}
+    />
     </KeyboardAvoidingView>
   );
 }

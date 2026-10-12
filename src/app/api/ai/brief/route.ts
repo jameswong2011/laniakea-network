@@ -1,10 +1,10 @@
 import { ensureNoteBrief } from "@/lib/ai/note-brief";
-import { viewerIdFromRequest } from "@/lib/ai/viewer";
+import { viewerFromRequest } from "@/lib/ai/viewer";
 
 export async function POST(request: Request) {
-  const userId = await viewerIdFromRequest(request);
+  const viewer = await viewerFromRequest(request);
 
-  if (!userId) {
+  if (!viewer) {
     return Response.json({ error: "Sign in to brief this note." }, { status: 401 });
   }
 
@@ -15,7 +15,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing note." }, { status: 400 });
   }
 
-  const brief = await ensureNoteBrief(postId, Boolean(body?.refresh));
+  const read = await viewer.supabase
+    .from("research_posts")
+    .select("title, body")
+    .eq("id", postId)
+    .maybeSingle();
+  const brief = await ensureNoteBrief(
+    postId,
+    Boolean(body?.refresh),
+    read.data ? { title: read.data.title as string, body: read.data.body as string } : undefined
+  );
 
   if (!brief) {
     return Response.json({ error: "No brief yet. Add OPENROUTER_API_KEY and run the note AI SQL." }, { status: 503 });

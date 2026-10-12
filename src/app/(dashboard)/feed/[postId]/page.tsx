@@ -8,9 +8,7 @@ import { FollowAuthorButton } from "@/components/laniakea/FollowAuthorButton";
 import { CommentThread } from "@/components/laniakea/CommentThread";
 import { EditBodyForm } from "@/components/laniakea/EditBodyForm";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
-import { AskNote } from "@/components/laniakea/AskNote";
-import { CommentBriefCard } from "@/components/laniakea/CommentBriefCard";
-import { NoteBriefCard } from "@/components/laniakea/NoteBriefCard";
+import { AiDock } from "@/components/laniakea/AiDock";
 import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
 import { PostToolbar } from "@/components/laniakea/PostToolbar";
 import { ReactionBar } from "@/components/laniakea/ReactionBar";
@@ -98,7 +96,11 @@ export default async function ResearchPostPage({
     notFound();
   }
 
-  const brief = await ensureNoteBrief(item.id);
+  const brief = await ensureNoteBrief(
+    item.id,
+    false,
+    item.access === "hidden" ? undefined : { title: item.title, body: item.body }
+  );
   const locked = !canOpenDesk(item.access);
 
   if (locked) {
@@ -126,13 +128,11 @@ export default async function ResearchPostPage({
               <TierBadge tier={item.deskTier} locked />
             ) : null}
           </div>
-          {brief ? <NoteBriefCard brief={brief} locked /> : null}
-          {!brief && item.body ? (
+          {item.body ? (
             <p className="mb-4 text-[15px] leading-relaxed text-muted-foreground">
-              {item.body}
+              {brief?.summary ?? item.body}
             </p>
           ) : null}
-          <AskNote postId={item.id} locked />
           {item.unlockQuote ? (
             <UnlockPostButton
               postId={item.id}
@@ -148,6 +148,7 @@ export default async function ResearchPostPage({
             </p>
           )}
         </article>
+        <AiDock postId={item.id} locked brief={brief} />
       </PageFrame>
     );
   }
@@ -155,7 +156,7 @@ export default async function ResearchPostPage({
   const viewerVotes = await getViewerVotes(supabase, userId, [item.id]);
   const thread = await getCommentThread(supabase, item.id, userId);
   const commentBrief =
-    thread.comments.length >= 3 ? await ensureCommentBrief(item.id) : null;
+    thread.comments.length >= 3 ? await ensureCommentBrief(item.id, supabase) : null;
   const commentVotes = await getViewerCommentVotes(
     supabase,
     userId,
@@ -259,8 +260,6 @@ export default async function ResearchPostPage({
                 </span>
               ) : null}
             </div>
-            {brief ? <NoteBriefCard brief={brief} /> : null}
-            <AskNote postId={item.id} />
             <MarkdownBody source={item.body} />
             {item.author_id === userId ? (
               <EditBodyForm
@@ -328,7 +327,7 @@ export default async function ResearchPostPage({
         </div>
       </article>
 
-      {commentBrief ? <CommentBriefCard brief={commentBrief} /> : null}
+      <AiDock postId={item.id} brief={brief} commentBrief={commentBrief} />
 
       <CommentThread
         postId={item.id}

@@ -8,7 +8,8 @@ import { DeskAvatar } from "../avatar";
 import { colors, radius } from "../theme";
 import { TierName } from "../tier-mark";
 import type { AppStackParamList, TabParamList } from "../types";
-import { searchByMeaning } from "../ai";
+import { AiButton } from "../note-ai";
+import { searchByMeaning, type MeaningHit } from "../ai";
 import { searchFloor } from "../writes";
 
 type Hit =
@@ -26,6 +27,7 @@ export function SearchScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
+  const [meaning, setMeaning] = useState<MeaningHit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function run() {
@@ -39,20 +41,10 @@ export function SearchScreen({ navigation }: Props) {
     const next: Hit[] = [];
     const words = query.trim().split(/\s+/).filter(Boolean);
     if (words.length >= 3 || query.includes("?")) {
-      const meaning = await searchByMeaning(query);
-      if (meaning?.hits?.length) {
-        next.push({ kind: "label", id: "meaning", title: "By meaning" });
-        for (const hit of meaning.hits) {
-          next.push({
-            kind: "post",
-            id: `meaning-${hit.id}`,
-            postId: hit.id,
-            title: hit.title,
-            meta: "Summary",
-            excerpt: hit.summary,
-          });
-        }
-      }
+      const found = await searchByMeaning(query);
+      setMeaning(found?.hits ?? []);
+    } else {
+      setMeaning(null);
     }
     if (result.titles.length > 0) {
       next.push({ kind: "label", id: "titles", title: "Titles" });
@@ -162,6 +154,11 @@ export function SearchScreen({ navigation }: Props) {
             </Pressable>
           );
         }}
+      />
+      <AiButton
+        aboveTabs
+        meaning={meaning}
+        onOpenNote={(id) => navigation.navigate("Thread", { postId: id })}
       />
     </View>
   );

@@ -90,11 +90,19 @@ export async function generateNoteBrief(title: string, body: string): Promise<No
   };
 }
 
-export async function ensureNoteBrief(postId: string, refresh = false): Promise<NoteBrief | null> {
+export async function ensureNoteBrief(
+  postId: string,
+  refresh = false,
+  source?: { title: string; body: string }
+): Promise<NoteBrief | null> {
   const admin = createServiceClient();
 
   if (!admin) {
-    return null;
+    if (!source?.body) {
+      return null;
+    }
+
+    return generateNoteBrief(source.title, source.body);
   }
 
   const { data, error } = await admin

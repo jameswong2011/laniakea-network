@@ -1,10 +1,10 @@
 import { ensureCommentBrief } from "@/lib/ai/comment-brief";
-import { viewerIdFromRequest } from "@/lib/ai/viewer";
+import { viewerFromRequest } from "@/lib/ai/viewer";
 
 export async function POST(request: Request) {
-  const userId = await viewerIdFromRequest(request);
+  const viewer = await viewerFromRequest(request);
 
-  if (!userId) {
+  if (!viewer) {
     return Response.json({ error: "Sign in to read the thread." }, { status: 401 });
   }
 
@@ -15,6 +15,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing note." }, { status: 400 });
   }
 
-  const brief = await ensureCommentBrief(postId);
+  const brief = await ensureCommentBrief(postId, viewer.supabase);
   return Response.json({ brief });
 }
