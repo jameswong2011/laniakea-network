@@ -5,6 +5,7 @@ import {
   FEED_STATUS_LABELS,
   feedHref,
   feedStatusHref,
+  type FeedPosted,
   type FeedStatus,
 } from "@/lib/research/feed";
 import type { SubTopic, Tier } from "@/types";
@@ -41,11 +42,13 @@ export function FeedStatusFilter({
   selectedStatuses,
   selectedTopics = null,
   selectedTiers = null,
+  selectedPosted = null,
   onSelect,
 }: {
   selectedStatuses: FeedStatus[] | null;
   selectedTopics?: SubTopic[] | null;
   selectedTiers?: Tier[] | null;
+  selectedPosted?: FeedPosted | null;
   onSelect?: (href: string) => void;
 }) {
   const active = selectedStatuses ?? DEFAULT_FEED_STATUSES;
@@ -62,6 +65,7 @@ export function FeedStatusFilter({
             topics: selectedTopics,
             tiers: selectedTiers,
             statuses: null,
+            posted: selectedPosted,
           })}
           active={selectedStatuses == null}
           onSelect={onSelect}
@@ -76,7 +80,8 @@ export function FeedStatusFilter({
               selectedStatuses,
               status,
               selectedTopics,
-              selectedTiers
+              selectedTiers,
+              selectedPosted
             )}
             active={active.includes(status)}
             onSelect={onSelect}

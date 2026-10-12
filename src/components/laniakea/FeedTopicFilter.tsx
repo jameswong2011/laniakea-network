@@ -1,16 +1,18 @@
 import { FeedFilterChip, FeedFilterGroup } from "@/components/laniakea/FeedFilterChip";
-import { feedHref, feedTopicHref, type FeedStatus } from "@/lib/research/feed";
+import { feedHref, feedTopicHref, type FeedPosted, type FeedStatus } from "@/lib/research/feed";
 import { SUB_TOPICS, type SubTopic, type Tier } from "@/types";
 
 export function FeedTopicFilter({
   selected,
   selectedTiers = null,
   selectedStatuses = null,
+  selectedPosted = null,
   onSelect,
 }: {
   selected: SubTopic[] | null;
   selectedTiers?: Tier[] | null;
   selectedStatuses?: FeedStatus[] | null;
+  selectedPosted?: FeedPosted | null;
   onSelect?: (href: string) => void;
 }) {
   const allSelected = selected == null;
@@ -28,6 +30,7 @@ export function FeedTopicFilter({
             topics: null,
             tiers: selectedTiers,
             statuses: selectedStatuses,
+            posted: selectedPosted,
           })}
           active={allSelected}
           onSelect={onSelect}
@@ -44,7 +47,7 @@ export function FeedTopicFilter({
           return (
             <FeedFilterChip
               key={topic}
-              href={feedTopicHref(selected, topic, selectedTiers, selectedStatuses)}
+              href={feedTopicHref(selected, topic, selectedTiers, selectedStatuses, selectedPosted)}
               active={on}
               onSelect={onSelect}
               className={`inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 text-[12px] ${

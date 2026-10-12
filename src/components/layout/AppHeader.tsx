@@ -14,6 +14,7 @@ import { FeedStatusFilter } from "@/components/laniakea/FeedStatusFilter";
 import { FeedTierFilter } from "@/components/laniakea/FeedTierFilter";
 import {
   feedSingleTopicHref,
+  parseFeedPosted,
   parseFeedStatuses,
   parseFeedTiers,
   parseFeedTopics,
@@ -49,6 +50,7 @@ function AuthenticatedLeftNav({
   const topicParam = searchParams.getAll("topic");
   const tierParam = searchParams.getAll("tier");
   const statusParam = searchParams.getAll("status");
+  const selectedPosted = parseFeedPosted(searchParams.get("posted") ?? undefined);
   const selectedTopics = parseFeedTopics(
     topicParam.length > 0 ? topicParam : undefined
   );
@@ -63,7 +65,8 @@ function AuthenticatedLeftNav({
     onFeed &&
     selectedTopics == null &&
     selectedTiers == null &&
-    selectedStatuses == null;
+    selectedStatuses == null &&
+    selectedPosted == null;
 
   return (
     <nav className="hidden min-w-0 flex-1 items-stretch overflow-x-auto md:flex">
@@ -99,6 +102,7 @@ function MobilePrimaryNav() {
   const topicParam = searchParams.getAll("topic");
   const tierParam = searchParams.getAll("tier");
   const statusParam = searchParams.getAll("status");
+  const selectedPosted = parseFeedPosted(searchParams.get("posted") ?? undefined);
   const selectedTopics = parseFeedTopics(
     topicParam.length > 0 ? topicParam : undefined
   );
@@ -113,7 +117,8 @@ function MobilePrimaryNav() {
     onFeed &&
     selectedTopics == null &&
     selectedTiers == null &&
-    selectedStatuses == null;
+    selectedStatuses == null &&
+    selectedPosted == null;
 
   return (
     <nav className="flex h-10 items-stretch overflow-x-auto border-t border-border md:hidden">
@@ -146,6 +151,9 @@ function HeaderMenuFilters() {
   const selectedStatuses = onFeed
     ? parseFeedStatuses(statusParam.length > 0 ? statusParam : undefined)
     : null;
+  const selectedPosted = onFeed
+    ? parseFeedPosted(searchParams.get("posted") ?? undefined)
+    : null;
 
   return (
     <div className="flex flex-col gap-2 border-b border-border px-3 py-2.5">
@@ -153,11 +161,13 @@ function HeaderMenuFilters() {
         selectedStatuses={selectedStatuses}
         selectedTopics={selectedTopics}
         selectedTiers={selectedTiers}
+        selectedPosted={selectedPosted}
       />
       <FeedTierFilter
         selectedTiers={selectedTiers}
         selectedTopics={selectedTopics}
         selectedStatuses={selectedStatuses}
+        selectedPosted={selectedPosted}
       />
     </div>
   );

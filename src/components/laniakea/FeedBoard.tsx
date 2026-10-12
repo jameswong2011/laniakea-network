@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeading } from "@/components/layout/PageFrame";
+import { FeedPostedFilter } from "@/components/laniakea/FeedPostedFilter";
 import { FeedStatusFilter } from "@/components/laniakea/FeedStatusFilter";
 import { FeedTierFilter } from "@/components/laniakea/FeedTierFilter";
 import { FeedTopicFilter } from "@/components/laniakea/FeedTopicFilter";
@@ -10,6 +11,7 @@ import { ResearchFeed } from "@/components/laniakea/ResearchFeed";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import {
   feedHeadingTitle,
+  itemMatchesFeedPosted,
   itemMatchesFeedStatuses,
   itemMatchesFeedTiers,
   itemMatchesFeedTopics,
@@ -61,7 +63,8 @@ export function FeedBoard({
     (item) =>
       itemMatchesFeedTopics(item, query.topics) &&
       itemMatchesFeedTiers(item, query.tiers) &&
-      itemMatchesFeedStatuses(item, query.statuses)
+      itemMatchesFeedStatuses(item, query.statuses) &&
+      itemMatchesFeedPosted(item, query.posted)
   );
 
   return (
@@ -91,18 +94,28 @@ export function FeedBoard({
           selectedStatuses={query.statuses}
           selectedTopics={query.topics}
           selectedTiers={query.tiers}
+          selectedPosted={query.posted}
+          onSelect={apply}
+        />
+        <FeedPostedFilter
+          selectedPosted={query.posted}
+          selectedTopics={query.topics}
+          selectedTiers={query.tiers}
+          selectedStatuses={query.statuses}
           onSelect={apply}
         />
         <FeedTierFilter
           selectedTiers={query.tiers}
           selectedTopics={query.topics}
           selectedStatuses={query.statuses}
+          selectedPosted={query.posted}
           onSelect={apply}
         />
         <FeedTopicFilter
           selected={query.topics}
           selectedTiers={query.tiers}
           selectedStatuses={query.statuses}
+          selectedPosted={query.posted}
           onSelect={apply}
         />
       </div>

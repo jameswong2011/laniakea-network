@@ -1,4 +1,4 @@
-import { TIERS, type Tier } from "./domain";
+import { FEED_POSTED, FEED_POSTED_LABELS, type FeedPosted, TIERS, type Tier } from "./domain";
 import { SUB_TOPICS, type SubTopic } from "../../../src/types";
 
 export const FEED_STATUSES = ["battleground", "ascended", "hunted"] as const;
@@ -16,12 +16,14 @@ export type FeedQuery = {
   topics: SubTopic[] | null;
   tiers: Tier[] | null;
   statuses: FeedStatus[] | null;
+  posted: FeedPosted | null;
 };
 
 export const EMPTY_FEED_QUERY: FeedQuery = {
   topics: null,
   tiers: null,
   statuses: null,
+  posted: null,
 };
 
 function normalize<T extends string>(next: T[], all: readonly T[], fallback: T[] | null) {
@@ -71,5 +73,5 @@ export function toggleTopic(selected: SubTopic[] | null, topic: SubTopic) {
   return normalize(next, SUB_TOPICS, null);
 }
 
-export { SUB_TOPICS };
-export type { SubTopic };
+export { SUB_TOPICS, FEED_POSTED, FEED_POSTED_LABELS };
+export type { SubTopic, FeedPosted };

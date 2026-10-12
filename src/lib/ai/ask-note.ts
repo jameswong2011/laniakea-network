@@ -1,7 +1,7 @@
 import { prepareNoteMarkdown } from "@laniakea/domain";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDeskAccess } from "@/lib/research/access";
 import { withPaidUnlock } from "@/lib/research/unlock";
-import { createServiceClient } from "@/lib/supabase/admin";
 import { completeJson, textField, textList } from "@/lib/ai/openrouter";
 
 export type AskResult = {
@@ -9,40 +9,57 @@ export type AskResult = {
   section: string;
 };
 
-export async function askNote(userId: string, postId: string, question: string): Promise<AskResult | { error: string }> {
+export async function askNote(
+  supabase: SupabaseClient,
+  userId: string,
+  postId: string,
+  question: string
+): Promise<AskResult | { error: string }> {
   const trimmed = question.trim().slice(0, 500);
 
   if (trimmed.length < 2) {
     return { error: "Ask a question about this note." };
   }
 
-  const admin = createServiceClient();
-
-  if (!admin) {
-    return { error: "The server cannot read this note yet." };
-  }
-
-  const post = await admin
+  const withBrief = await supabase
     .from("research_posts")
     .select("id, author_id, title, body, ai_summary, ai_claims, ai_risks")
     .eq("id", postId)
     .maybeSingle();
+  const post =
+    withBrief.error?.message.includes("ai_summary")
+      ? await supabase
+          .from("research_posts")
+          .select("id, author_id, title, body")
+          .eq("id", postId)
+          .maybeSingle()
+      : withBrief;
 
   if (post.error || !post.data) {
-    return { error: "This note is not on the tape." };
+    return { error: post.error?.message ?? "This note is not on the tape." };
   }
 
+  const note = post.data as {
+    id: string;
+    author_id: string;
+    title: string;
+    body: string;
+    ai_summary?: string | null;
+    ai_claims?: unknown;
+    ai_risks?: unknown;
+  };
+
   const [viewer, author, unlock] = await Promise.all([
-    admin.from("profiles").select("tier, role").eq("id", userId).maybeSingle(),
-    admin.from("profiles").select("tier").eq("id", post.data.author_id).maybeSingle(),
-    admin
+    supabase.from("profiles").select("tier, role").eq("id", userId).maybeSingle(),
+    supabase.from("profiles").select("tier").eq("id", note.author_id).maybeSingle(),
+    supabase
       .from("post_unlocks")
       .select("post_id")
       .eq("user_id", userId)
       .eq("post_id", postId)
       .maybeSingle(),
   ]);
-  const ownsNote = userId === post.data.author_id;
+  const ownsNote = userId === note.author_id;
   const access = ownsNote
     ? "full"
     : withPaidUnlock(
@@ -52,16 +69,20 @@ export async function askNote(userId: string, postId: string, question: string):
   const locked = access === "hidden";
   const source = locked
     ? [
-        post.data.ai_summary ?? "",
-        ...textList(post.data.ai_claims, 3).map((claim) => `Claim: ${claim}`),
-        ...textList(post.data.ai_risks, 3).map((risk) => `Risk: ${risk}`),
+        note.ai_summary ?? "",
+        ...textList(note.ai_claims, 3).map((claim) => `Claim: ${claim}`),
+        ...textList(note.ai_risks, 3).map((risk) => `Risk: ${risk}`),
       ]
         .filter(Boolean)
         .join("\n")
-    : prepareNoteMarkdown(post.data.body as string).slice(0, 16000);
+    : prepareNoteMarkdown(note.body).slice(0, 16000);
 
   if (!source) {
     return { error: locked ? "This desk is locked. Open it to ask about the full note." : "This note has no text yet." };
+  }
+
+  if (!process.env.OPENROUTER_API_KEY) {
+    return { error: "OpenRouter is not set on the server." };
   }
 
   const json = await completeJson(
@@ -72,7 +93,7 @@ export async function askNote(userId: string, postId: string, question: string):
       "Return JSON with keys answer and section.",
       "answer is two to four sentences.",
       "section is the heading, or Summary when the note is only a card.",
-      `Title: ${post.data.title}`,
+      `Title: ${note.title}`,
       `Question: ${trimmed}`,
       source,
     ].join("\n\n"),
@@ -82,7 +103,7 @@ export async function askNote(userId: string, postId: string, question: string):
   const answer = textField(json?.answer, 800);
 
   if (!answer) {
-    return { error: "No answer came back." };
+    return { error: "The model did not return an answer." };
   }
 
   return {

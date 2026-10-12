@@ -7,6 +7,7 @@ import { VOTE_COST_HP } from "@/lib/research/economy";
 import {
   getLiveResearchFeed,
   getViewerVotes,
+  parseFeedPosted,
   parseFeedStatuses,
   parseFeedTiers,
   parseFeedTopics,
@@ -21,11 +22,12 @@ export const metadata: Metadata = {
 export default async function FeedPage({
   searchParams,
 }: PageProps<"/feed">) {
-  const { topic, tier, status } = await searchParams;
+  const { topic, tier, status, posted } = await searchParams;
   const initialQuery = {
     topics: parseFeedTopics(topic),
     tiers: parseFeedTiers(tier),
     statuses: parseFeedStatuses(status),
+    posted: parseFeedPosted(posted),
   };
   const { supabase, userId, profile } = await requireUser();
   const deskTier = resolveTier(profile?.tier) ?? "Bronze";

@@ -1,6 +1,6 @@
 import { FeedFilterChip, FeedFilterGroup } from "@/components/laniakea/FeedFilterChip";
 import { TierIcon } from "@/components/laniakea/TierIcon";
-import { feedHref, feedTierHref, type FeedStatus } from "@/lib/research/feed";
+import { feedHref, feedTierHref, type FeedPosted, type FeedStatus } from "@/lib/research/feed";
 import { TIER_LABELS, TIERS, type SubTopic, type Tier } from "@/types";
 
 const TIER_TONE: Record<Tier, { on: string; off: string }> = {
@@ -30,11 +30,13 @@ export function FeedTierFilter({
   selectedTiers,
   selectedTopics = null,
   selectedStatuses = null,
+  selectedPosted = null,
   onSelect,
 }: {
   selectedTiers: Tier[] | null;
   selectedTopics?: SubTopic[] | null;
   selectedStatuses?: FeedStatus[] | null;
+  selectedPosted?: FeedPosted | null;
   onSelect?: (href: string) => void;
 }) {
   const allSelected = selectedTiers == null;
@@ -52,6 +54,7 @@ export function FeedTierFilter({
             topics: selectedTopics,
             tiers: null,
             statuses: selectedStatuses,
+            posted: selectedPosted,
           })}
           active={allSelected}
           onSelect={onSelect}
@@ -72,7 +75,8 @@ export function FeedTierFilter({
                 selectedTiers,
                 tier,
                 selectedTopics,
-                selectedStatuses
+                selectedStatuses,
+                selectedPosted
               )}
               active={on}
               onSelect={onSelect}

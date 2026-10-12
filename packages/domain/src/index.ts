@@ -376,3 +376,51 @@ export function feedStatusOf(status: string | null | undefined) {
 
   return null;
 }
+
+export const FEED_POSTED = ["today", "week", "month"] as const;
+export type FeedPosted = (typeof FEED_POSTED)[number];
+
+export const FEED_POSTED_LABELS: Record<FeedPosted, string> = {
+  today: "Today",
+  week: "This week",
+  month: "This month",
+};
+
+export function resolveFeedPosted(value: string | null | undefined): FeedPosted | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return FEED_POSTED.find((posted) => posted === normalized) ?? null;
+}
+
+/** Local midnight, Monday, or the first of the month. */
+export function postedSince(posted: FeedPosted, now = new Date()) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+
+  if (posted === "week") {
+    const mondayOffset = start.getDay() === 0 ? 6 : start.getDay() - 1;
+    start.setDate(start.getDate() - mondayOffset);
+  }
+
+  if (posted === "month") {
+    start.setDate(1);
+  }
+
+  return start;
+}
+
+export function postedInWindow(
+  createdAt: string,
+  posted: FeedPosted | null,
+  now = new Date()
+) {
+  if (posted == null) {
+    return true;
+  }
+
+  const time = new Date(createdAt).getTime();
+  return Number.isFinite(time) && time >= postedSince(posted, now).getTime();
+}

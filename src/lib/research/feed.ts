@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { researchExcerpt as excerptNote } from "@laniakea/domain";
+import { researchExcerpt as excerptNote, postedInWindow, resolveFeedPosted, FEED_POSTED_LABELS, type FeedPosted } from "@laniakea/domain";
 import { getDeskAccess } from "@/lib/research/access";
 import {
   loadViewerUnlockIds,
@@ -43,8 +43,18 @@ export function researchComposePath() {
   return "/feed/new";
 }
 
+export type { FeedPosted };
+export { FEED_POSTED_LABELS, postedInWindow, resolveFeedPosted };
+
 export function researchExcerpt(body: string, max = 220) {
   return excerptNote(body, max);
+}
+
+export function parseFeedPosted(
+  postedParam: string | string[] | undefined
+): FeedPosted | null {
+  const value = Array.isArray(postedParam) ? postedParam[0] : postedParam;
+  return resolveFeedPosted(value);
 }
 
 /** null = every sub-topic (the default). */
@@ -175,6 +185,7 @@ export type FeedQuery = {
   topics: SubTopic[] | null;
   tiers: Tier[] | null;
   statuses: FeedStatus[] | null;
+  posted: FeedPosted | null;
 };
 
 export function parseFeedQueryFromSearch(search: string | URLSearchParams): FeedQuery {
@@ -191,6 +202,7 @@ export function parseFeedQueryFromSearch(search: string | URLSearchParams): Feed
     statuses: params.has("status")
       ? parseFeedStatuses(params.getAll("status"))
       : null,
+    posted: params.has("posted") ? parseFeedPosted(params.get("posted") ?? undefined) : null,
   };
 }
 
@@ -216,6 +228,10 @@ export function feedHeadingTitle(query: FeedQuery) {
     return FEED_STATUS_LABELS[query.statuses[0]];
   }
 
+  if (query.posted) {
+    return FEED_POSTED_LABELS[query.posted];
+  }
+
   return "Main Feed";
 }
 
@@ -223,10 +239,12 @@ export function feedHref({
   topics = null,
   tiers = null,
   statuses = null,
+  posted = null,
 }: {
   topics?: SubTopic[] | null;
   tiers?: Tier[] | null;
   statuses?: FeedStatus[] | null;
+  posted?: FeedPosted | null;
 } = {}) {
   const params = new URLSearchParams();
   const topicFilter =
@@ -273,6 +291,10 @@ export function feedHref({
     }
   }
 
+  if (posted) {
+    params.set("posted", posted);
+  }
+
   const query = params.toString();
   return query ? `/feed?${query}` : "/feed";
 }
@@ -281,42 +303,45 @@ export function feedTopicHref(
   selected: SubTopic[] | null,
   toggle: SubTopic,
   tiers: Tier[] | null = null,
-  statuses: FeedStatus[] | null = null
+  statuses: FeedStatus[] | null = null,
+  posted: FeedPosted | null = null
 ) {
   const current = selected ?? [...SUB_TOPICS];
   const next = current.includes(toggle)
     ? current.filter((topic) => topic !== toggle)
     : [...current, toggle];
 
-  return feedHref({ topics: next, tiers, statuses });
+  return feedHref({ topics: next, tiers, statuses, posted });
 }
 
 export function feedTierHref(
   selected: Tier[] | null,
   toggle: Tier,
   topics: SubTopic[] | null = null,
-  statuses: FeedStatus[] | null = null
+  statuses: FeedStatus[] | null = null,
+  posted: FeedPosted | null = null
 ) {
   const current = selected ?? [...TIERS];
   const next = current.includes(toggle)
     ? current.filter((tier) => tier !== toggle)
     : [...current, toggle];
 
-  return feedHref({ topics, tiers: next, statuses });
+  return feedHref({ topics, tiers: next, statuses, posted });
 }
 
 export function feedStatusHref(
   selected: FeedStatus[] | null,
   toggle: FeedStatus,
   topics: SubTopic[] | null = null,
-  tiers: Tier[] | null = null
+  tiers: Tier[] | null = null,
+  posted: FeedPosted | null = null
 ) {
   const current = activeFeedStatuses(selected);
   const next = current.includes(toggle)
     ? current.filter((status) => status !== toggle)
     : [...current, toggle];
 
-  return feedHref({ topics, tiers, statuses: next });
+  return feedHref({ topics, tiers, statuses: next, posted });
 }
 
 export function feedSingleTopicHref(topic: SubTopic) {
@@ -330,9 +355,17 @@ export function feedSingleTierHref(tier: Tier) {
 export function feedTopicsHref(
   selected: SubTopic[],
   tiers: Tier[] | null = null,
-  statuses: FeedStatus[] | null = null
+  statuses: FeedStatus[] | null = null,
+  posted: FeedPosted | null = null
 ) {
-  return feedHref({ topics: selected, tiers, statuses });
+  return feedHref({ topics: selected, tiers, statuses, posted });
+}
+
+export function itemMatchesFeedPosted(
+  item: Pick<ResearchPost, "created_at">,
+  posted: FeedPosted | null
+) {
+  return postedInWindow(item.created_at, posted);
 }
 
 export function itemMatchesFeedTopics(

@@ -1,15 +1,20 @@
 import { askNote } from "@/lib/ai/ask-note";
-import { viewerIdFromRequest } from "@/lib/ai/viewer";
+import { viewerFromRequest } from "@/lib/ai/viewer";
 
 export async function POST(request: Request) {
-  const userId = await viewerIdFromRequest(request);
+  const viewer = await viewerFromRequest(request);
 
-  if (!userId) {
+  if (!viewer) {
     return Response.json({ error: "Sign in to ask this note." }, { status: 401 });
   }
 
   const body = (await request.json().catch(() => null)) as { postId?: string; question?: string } | null;
-  const result = await askNote(userId, body?.postId?.trim() ?? "", body?.question ?? "");
+  const result = await askNote(
+    viewer.supabase,
+    viewer.userId,
+    body?.postId?.trim() ?? "",
+    body?.question ?? ""
+  );
 
   if ("error" in result) {
     return Response.json(result, { status: 400 });

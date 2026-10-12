@@ -1,8 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { fetchRetryingFutureJwt } from "@/lib/supabase/retry-fetch";
 
-export async function viewerIdFromRequest(request: Request) {
+export async function viewerFromRequest(request: Request): Promise<{
+  userId: string;
+  supabase: SupabaseClient;
+} | null> {
   const header = request.headers.get("authorization");
 
   if (header?.startsWith("Bearer ")) {
@@ -14,18 +17,33 @@ export async function viewerIdFromRequest(request: Request) {
       return null;
     }
 
-    const client = createClient(url, anon, {
+    const supabase = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: {
         fetch: fetchRetryingFutureJwt,
         headers: { Authorization: `Bearer ${token}` },
       },
     });
-    const { data } = await client.auth.getUser(token);
-    return data.user?.id ?? null;
+    const { data } = await supabase.auth.getUser(token);
+
+    if (!data.user) {
+      return null;
+    }
+
+    return { userId: data.user.id, supabase };
   }
 
   const supabase = await createServerClient();
   const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
+
+  if (!data.user) {
+    return null;
+  }
+
+  return { userId: data.user.id, supabase };
+}
+
+export async function viewerIdFromRequest(request: Request) {
+  const viewer = await viewerFromRequest(request);
+  return viewer?.userId ?? null;
 }

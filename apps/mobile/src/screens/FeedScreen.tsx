@@ -20,12 +20,15 @@ import { useDesk } from "../desk";
 import {
   DEFAULT_FEED_STATUSES,
   EMPTY_FEED_QUERY,
+  FEED_POSTED,
+  FEED_POSTED_LABELS,
   FEED_STATUS_LABELS,
   FEED_STATUSES,
   SUB_TOPICS,
   toggleStatus,
   toggleTier,
   toggleTopic,
+  type FeedPosted,
   type FeedQuery,
   type FeedStatus,
 } from "../feed-query";
@@ -80,7 +83,9 @@ function tapeLabel(query: FeedQuery) {
         ? query.topics[0]
         : `${query.topics.length} sectors`;
 
-  return `${outcome} · ${desk} · ${sectors}`;
+  const posted = query.posted == null ? "Any time" : FEED_POSTED_LABELS[query.posted];
+
+  return `${outcome} · ${desk} · ${sectors} · ${posted}`;
 }
 
 export function FeedScreen({ navigation }: Props) {
@@ -206,6 +211,22 @@ export function FeedScreen({ navigation }: Props) {
                         statuses: toggleStatus(current.statuses, status),
                       }))
                     }
+                  />
+                ))}
+              </View>
+              <SectionLabel label="Posted" hint="Today starts at midnight. This week starts Monday." />
+              <View style={styles.wrap}>
+                <Chip
+                  label="Any time"
+                  active={query.posted == null}
+                  onPress={() => setQuery((current) => ({ ...current, posted: null }))}
+                />
+                {FEED_POSTED.map((posted) => (
+                  <Chip
+                    key={posted}
+                    label={FEED_POSTED_LABELS[posted]}
+                    active={query.posted === posted}
+                    onPress={() => setQuery((current) => ({ ...current, posted: posted as FeedPosted }))}
                   />
                 ))}
               </View>

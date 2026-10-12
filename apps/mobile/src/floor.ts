@@ -7,6 +7,8 @@ import {
   getPostHealthLabel,
   getPostHealthPercent,
   getPostHealthState,
+  postedInWindow,
+  postedSince,
   quoteDeskUnlock,
   researchExcerpt,
   resolveTier,
@@ -268,6 +270,10 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
     request = request.in("sub_topic", query.topics);
   }
 
+  if (query.posted) {
+    request = request.gte("created_at", postedSince(query.posted).toISOString());
+  }
+
   let result = await request;
 
   if (result.error?.message.includes("ai_summary")) {
@@ -280,6 +286,10 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
 
     if (query.topics != null) {
       fallback = fallback.in("sub_topic", query.topics);
+    }
+
+    if (query.posted) {
+      fallback = fallback.gte("created_at", postedSince(query.posted).toISOString());
     }
 
     result = await fallback;
@@ -300,12 +310,9 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
 
   return posts
     .filter((post) => {
-      if (query.tiers == null) {
-        return true;
-      }
-
       const tier = resolveTier(authors.get(post.author_id)?.tier);
-      return tier != null && query.tiers.includes(tier);
+      const tierOk = query.tiers == null || (tier != null && query.tiers.includes(tier));
+      return tierOk && postedInWindow(post.created_at, query.posted);
     })
     .map((post) =>
       toNote(post, authors.get(post.author_id), viewer, unlocks.has(post.id))

@@ -38,11 +38,13 @@ async function postAi<T>(path: string, body: unknown): Promise<T | null> {
     body: JSON.stringify(body),
   });
 
+  const payload = (await response.json().catch(() => null)) as T | null;
+
   if (!response.ok) {
-    return null;
+    return payload;
   }
 
-  return (await response.json()) as T;
+  return payload;
 }
 
 export function requestNoteBrief(postId: string, refresh = false) {
