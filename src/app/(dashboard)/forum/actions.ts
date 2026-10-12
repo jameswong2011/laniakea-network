@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
+import { forgetAnswers } from "@/lib/ai/ask-note";
 import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { requireUser } from "@/lib/auth/session";
@@ -33,7 +34,7 @@ function refreshSocial(postId?: string) {
   revalidatePath("/search");
 }
 
-export async function toggleReaction(formData: FormData) {
+export async function toggleReaction(formData: FormData): Promise<boolean> {
   const { supabase, userId } = await requireUser();
   const parsed = z
     .object({
@@ -50,7 +51,7 @@ export async function toggleReaction(formData: FormData) {
     });
 
   if (!parsed.success) {
-    return;
+    return false;
   }
 
   const { targetType, targetId, reaction } = parsed.data;
@@ -63,23 +64,23 @@ export async function toggleReaction(formData: FormData) {
     .eq("reaction", reaction)
     .maybeSingle();
 
-  if (existing.data) {
-    await supabase.from("content_reactions").delete().eq("id", existing.data.id);
-  } else if (!existing.error || isMissingForumSchema(existing.error.message)) {
-    const write = await supabase.from("content_reactions").insert({
-      user_id: userId,
-      target_type: targetType,
-      target_id: targetId,
-      reaction,
-    });
-
-    if (write.error && !isMissingForumSchema(write.error.message)) {
-      return;
-    }
+  if (existing.error) {
+    return false;
   }
+
+  const write = existing.data
+    ? await supabase.from("content_reactions").delete().eq("id", existing.data.id)
+    : await supabase.from("content_reactions").insert({
+        user_id: userId,
+        target_type: targetType,
+        target_id: targetId,
+        reaction,
+      });
+
+  return !write.error;
 }
 
-export async function toggleSavedPost(formData: FormData) {
+export async function toggleSavedPost(formData: FormData): Promise<boolean> {
   const { supabase, userId } = await requireUser();
   const parsed = z
     .object({
@@ -88,7 +89,7 @@ export async function toggleSavedPost(formData: FormData) {
     .safeParse({ postId: formData.get("postId") });
 
   if (!parsed.success) {
-    return;
+    return false;
   }
 
   const { postId } = parsed.data;
@@ -99,21 +100,25 @@ export async function toggleSavedPost(formData: FormData) {
     .eq("post_id", postId)
     .maybeSingle();
 
-  if (existing.data) {
-    await supabase
-      .from("saved_posts")
-      .delete()
-      .eq("user_id", userId)
-      .eq("post_id", postId);
-  } else {
-    await supabase.from("saved_posts").insert({
-      user_id: userId,
-      post_id: postId,
-    });
+  if (existing.error) {
+    return false;
   }
+
+  const write = existing.data
+    ? await supabase
+        .from("saved_posts")
+        .delete()
+        .eq("user_id", userId)
+        .eq("post_id", postId)
+    : await supabase.from("saved_posts").insert({
+        user_id: userId,
+        post_id: postId,
+      });
+
+  return !write.error;
 }
 
-export async function togglePostSubscription(formData: FormData) {
+export async function togglePostSubscription(formData: FormData): Promise<boolean> {
   const { supabase, userId } = await requireUser();
   const parsed = z
     .object({
@@ -122,7 +127,7 @@ export async function togglePostSubscription(formData: FormData) {
     .safeParse({ postId: formData.get("postId") });
 
   if (!parsed.success) {
-    return;
+    return false;
   }
 
   const { postId } = parsed.data;
@@ -133,18 +138,22 @@ export async function togglePostSubscription(formData: FormData) {
     .eq("post_id", postId)
     .maybeSingle();
 
-  if (existing.data) {
-    await supabase
-      .from("post_subscriptions")
-      .delete()
-      .eq("user_id", userId)
-      .eq("post_id", postId);
-  } else {
-    await supabase.from("post_subscriptions").insert({
-      user_id: userId,
-      post_id: postId,
-    });
+  if (existing.error) {
+    return false;
   }
+
+  const write = existing.data
+    ? await supabase
+        .from("post_subscriptions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("post_id", postId)
+    : await supabase.from("post_subscriptions").insert({
+        user_id: userId,
+        post_id: postId,
+      });
+
+  return !write.error;
 }
 
 export async function markNotificationsRead() {
@@ -188,7 +197,12 @@ export async function editPostBody(
     return { error: write.error.message, stamp: Date.now() };
   }
 
-  after(() => ensureNoteBrief(parsed.data.postId, { refresh: true, userId }));
+  after(() =>
+    Promise.all([
+      ensureNoteBrief(parsed.data.postId, { refresh: true, userId }),
+      forgetAnswers(parsed.data.postId),
+    ])
+  );
 
   refreshSocial(parsed.data.postId);
   return { message: "Post updated.", stamp: Date.now() };
@@ -268,7 +282,7 @@ export async function editReplyBody(
   return { message: "Reply updated.", stamp: Date.now() };
 }
 
-export async function toggleAuthorFollow(formData: FormData) {
+export async function toggleAuthorFollow(formData: FormData): Promise<boolean> {
   const { supabase, userId } = await requireUser();
   const parsed = z
     .object({
@@ -277,7 +291,7 @@ export async function toggleAuthorFollow(formData: FormData) {
     .safeParse({ authorId: formData.get("authorId") });
 
   if (!parsed.success || parsed.data.authorId === userId) {
-    return;
+    return false;
   }
 
   const { authorId } = parsed.data;
@@ -288,18 +302,22 @@ export async function toggleAuthorFollow(formData: FormData) {
     .eq("author_id", authorId)
     .maybeSingle();
 
-  if (existing.data) {
-    await supabase
-      .from("author_subscriptions")
-      .delete()
-      .eq("subscriber_id", userId)
-      .eq("author_id", authorId);
-  } else {
-    await supabase.from("author_subscriptions").insert({
-      subscriber_id: userId,
-      author_id: authorId,
-    });
+  if (existing.error) {
+    return false;
   }
+
+  const write = existing.data
+    ? await supabase
+        .from("author_subscriptions")
+        .delete()
+        .eq("subscriber_id", userId)
+        .eq("author_id", authorId)
+    : await supabase.from("author_subscriptions").insert({
+        subscriber_id: userId,
+        author_id: authorId,
+      });
+
+  return !write.error;
 }
 
 export async function updateBio(

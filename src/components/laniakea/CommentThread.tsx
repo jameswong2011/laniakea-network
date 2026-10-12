@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { AuthorLink } from "@/components/laniakea/AuthorLink";
 import { CommentComposer } from "@/components/laniakea/CommentComposer";
 import { CopyPermalinkButton } from "@/components/laniakea/CopyPermalinkButton";
 import { EditBodyForm } from "@/components/laniakea/EditBodyForm";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
-import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
 import { ReactionBar } from "@/components/laniakea/ReactionBar";
 import { ReplyComposer } from "@/components/laniakea/ReplyComposer";
 import { TierBadge } from "@/components/laniakea/TierBadge";
@@ -50,6 +49,7 @@ function healthSurface(state: ReturnType<typeof getPostHealthState>) {
 export function CommentThread({
   postId,
   comments,
+  bodies,
   viewerVotes,
   access,
   availableHp,
@@ -66,6 +66,7 @@ export function CommentThread({
 }: {
   postId: string;
   comments: CommentThreadItem[];
+  bodies: Record<string, ReactNode>;
   viewerVotes: Record<string, number>;
   access: FeedAccess;
   availableHp: number;
@@ -243,7 +244,7 @@ export function CommentThread({
                 </p>
               ) : (
                 <>
-                  <MarkdownBody source={comment.body} />
+                  {bodies[comment.id]}
                   {isAuthor ? (
                     <EditBodyForm
                       kind="comment"
@@ -321,7 +322,7 @@ export function CommentThread({
                           path={researchReplyPath(postId, comment.id, reply.id)}
                         />
                       </div>
-                      <MarkdownBody source={reply.body} />
+                      {bodies[reply.id]}
                       {reply.author_id === viewerId ? (
                         <EditBodyForm
                           kind="reply"

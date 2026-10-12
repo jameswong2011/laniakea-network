@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toggleAuthorFollow } from "@/app/(dashboard)/forum/actions";
-import { useSilentRefresh } from "@/lib/ui/silent-refresh";
 
 export function FollowAuthorButton({
   authorId,
@@ -15,15 +14,16 @@ export function FollowAuthorButton({
   followerCount: number;
   showCount?: boolean;
 }) {
-  const refresh = useSilentRefresh();
   const lock = useRef(false);
   const [isFollowing, setIsFollowing] = useState(following);
   const [count, setCount] = useState(followerCount);
+  const [synced, setSynced] = useState({ following, followerCount });
 
-  useEffect(() => {
+  if (synced.following !== following || synced.followerCount !== followerCount) {
+    setSynced({ following, followerCount });
     setIsFollowing(following);
     setCount(followerCount);
-  }, [following, followerCount]);
+  }
 
   async function tap() {
     if (lock.current) {
@@ -36,9 +36,13 @@ export function FollowAuthorButton({
     setCount((current) => Math.max(0, current + (next ? 1 : -1)));
     const form = new FormData();
     form.set("authorId", authorId);
-    await toggleAuthorFollow(form);
+    const saved = await toggleAuthorFollow(form).catch(() => false);
     lock.current = false;
-    refresh();
+
+    if (!saved) {
+      setIsFollowing(!next);
+      setCount((current) => Math.max(0, current + (next ? -1 : 1)));
+    }
   }
 
   return (

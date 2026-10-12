@@ -10,12 +10,12 @@ import {
   View,
 } from "react-native";
 import type { CompositeScreenProps } from "@react-navigation/native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TIERS, resolveTier, type Tier } from "../domain";
 import { DeskAvatar } from "../avatar";
+import { useFocusRefresh } from "../focus-refresh";
 import { colors } from "../theme";
 import { TierMark, TierName } from "../tier-mark";
 import type { AppStackParamList, TabParamList } from "../types";
@@ -66,11 +66,7 @@ export function RankingScreen({ navigation }: Props) {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
+  const { refreshing, onRefresh } = useFocusRefresh(refresh);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
@@ -95,7 +91,7 @@ export function RankingScreen({ navigation }: Props) {
       <FlatList
         data={rows}
         keyExtractor={(row) => row.id}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />}
         ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
         ListEmptyComponent={
           loading ? (

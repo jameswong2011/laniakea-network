@@ -22,7 +22,72 @@ type BriefRow = {
   ai_conviction: string | null;
   ai_claims: unknown;
   ai_risks: unknown;
+  edited_at?: string | null;
+  ai_generated_at?: string | null;
 };
+
+const BRIEF_COLUMNS =
+  "id, title, body, edited_at, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_generated_at";
+const BRIEF_COLUMNS_BASE =
+  "id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks";
+const REFRESH_GAP_MS = 60_000;
+
+async function readBriefRow(client: SupabaseClient, postId: string) {
+  const full = await client.from("research_posts").select(BRIEF_COLUMNS).eq("id", postId).maybeSingle();
+
+  if (!full.error) {
+    return full.data as BriefRow | null;
+  }
+
+  const base = await client
+    .from("research_posts")
+    .select(BRIEF_COLUMNS_BASE)
+    .eq("id", postId)
+    .maybeSingle();
+  return base.error ? null : (base.data as BriefRow | null);
+}
+
+function generatedRecently(row: BriefRow) {
+  const at = row.ai_generated_at ? Date.parse(row.ai_generated_at) : NaN;
+
+  if (!Number.isFinite(at) || Date.now() - at >= REFRESH_GAP_MS) {
+    return false;
+  }
+
+  const edited = row.edited_at ? Date.parse(row.edited_at) : NaN;
+  return !(Number.isFinite(edited) && edited > at);
+}
+
+/** One summary job per note: the claim only lands while the stamp still holds the value this job read. */
+async function claimGeneration(admin: SupabaseClient, row: BriefRow) {
+  if (!("ai_generated_at" in row)) {
+    return true;
+  }
+
+  if (generatedRecently(row)) {
+    return false;
+  }
+
+  const stamp = admin
+    .from("research_posts")
+    .update({ ai_generated_at: new Date().toISOString() })
+    .eq("id", row.id);
+  const claimed = await (row.ai_generated_at
+    ? stamp.eq("ai_generated_at", row.ai_generated_at)
+    : stamp.is("ai_generated_at", null)
+  ).select("id");
+
+  return Boolean(claimed.error) || (claimed.data?.length ?? 0) > 0;
+}
+
+async function releaseGeneration(admin: SupabaseClient, row: BriefRow) {
+  if ("ai_generated_at" in row) {
+    await admin
+      .from("research_posts")
+      .update({ ai_generated_at: row.ai_generated_at ?? null })
+      .eq("id", row.id);
+  }
+}
 
 function fileFacts(body: string) {
   if (!body.startsWith("---")) {
@@ -119,34 +184,36 @@ export async function ensureNoteBrief(
   const admin = createServiceClient();
 
   if (!admin) {
-    if (!source?.body) {
+    const note = source ?? (options.reader ? await readBriefRow(options.reader, postId) : null);
+
+    if (!note?.body) {
       return null;
     }
 
-    const generated = await generateNoteBrief(source.title, source.body, userId);
+    const generated = await generateNoteBrief(note.title, note.body, userId);
     return generated ? withComments(postId, generated, options) : null;
   }
 
-  const { data, error } = await admin
-    .from("research_posts")
-    .select("id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks")
-    .eq("id", postId)
-    .maybeSingle();
+  const row = await readBriefRow(admin, postId);
 
-  if (error || !data) {
+  if (!row) {
     return null;
   }
 
-  const row = data as BriefRow;
   const existing = asBrief(row);
 
   if (existing && !refresh) {
     return withComments(postId, existing, options);
   }
 
+  if (!(await claimGeneration(admin, row))) {
+    return existing ? withComments(postId, existing, options) : null;
+  }
+
   const brief = await generateNoteBrief(row.title, row.body, userId);
 
   if (!brief) {
+    await releaseGeneration(admin, row);
     return existing ? withComments(postId, existing, options) : null;
   }
 

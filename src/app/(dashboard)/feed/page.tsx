@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { PageFrame } from "@/components/layout/PageFrame";
 import { FeedBoard } from "@/components/laniakea/FeedBoard";
 import { requireUser } from "@/lib/auth/session";
 import { getCommentCounts } from "@/lib/research/comments";
 import { VOTE_COST_HP } from "@/lib/research/economy";
 import {
+  feedHref,
+  feedPageHref,
   getLiveResearchFeed,
   getViewerVotes,
+  parseFeedBefore,
   parseFeedPosted,
   parseFeedStatuses,
   parseFeedTiers,
@@ -19,23 +23,32 @@ export const metadata: Metadata = {
   title: "Feed",
 };
 
+function timezoneOffset(value: string | undefined) {
+  const minutes = Number(value);
+  return Number.isFinite(minutes) && Math.abs(minutes) <= 840 ? minutes : 0;
+}
+
 export default async function FeedPage({
   searchParams,
 }: PageProps<"/feed">) {
-  const { topic, tier, status, posted } = await searchParams;
-  const initialQuery = {
+  const { topic, tier, status, posted, before } = await searchParams;
+  const query = {
     topics: parseFeedTopics(topic),
     tiers: parseFeedTiers(tier),
     statuses: parseFeedStatuses(status),
     posted: parseFeedPosted(posted),
   };
-  const { supabase, userId, profile } = await requireUser();
+  const cursor = parseFeedBefore(before);
+  const [{ supabase, userId, profile }, cookieStore] = await Promise.all([
+    requireUser(),
+    cookies(),
+  ]);
   const deskTier = resolveTier(profile?.tier) ?? "Bronze";
-  const { items, error } = await getLiveResearchFeed(supabase, {
-    userId,
-    tier: deskTier,
-    isAdmin: profile?.role === "admin",
-  });
+  const { items, error, nextCursor } = await getLiveResearchFeed(
+    supabase,
+    { userId, tier: deskTier, isAdmin: profile?.role === "admin" },
+    { query, before: cursor, timezoneOffset: timezoneOffset(cookieStore.get("tzo")?.value) }
+  );
   const ids = items.map((item) => item.id);
   const [viewerVotes, commentCounts, savedIds] = await Promise.all([
     getViewerVotes(supabase, userId, ids),
@@ -53,9 +66,11 @@ export default async function FeedPage({
         items={feedItems}
         error={error}
         deskTier={deskTier}
-        initialQuery={initialQuery}
+        query={query}
+        olderHref={nextCursor ? feedPageHref(query, nextCursor) : null}
+        newestHref={cursor ? feedHref(query) : null}
         viewerVotes={viewerVotes}
-        savedIds={[...savedIds]}
+        savedIds={savedIds}
         canVote={(profile?.current_hp ?? 0) >= VOTE_COST_HP}
         availableHp={profile?.current_hp ?? 0}
         availableTokens={profile?.utility_tokens ?? 0}

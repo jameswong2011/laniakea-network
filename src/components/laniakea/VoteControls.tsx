@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   voteOnPost,
   type FeedActionState,
@@ -8,7 +8,6 @@ import {
 import { voteOnComment } from "@/app/(dashboard)/feed/[postId]/actions";
 import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
 import { voteCostHp } from "@/lib/research/economy";
-import { useSilentRefresh } from "@/lib/ui/silent-refresh";
 import {
   VOTE_STRENGTH_MAX,
   VOTE_STRENGTH_MIN,
@@ -34,7 +33,6 @@ export function VoteControls({
   availableHp: number;
   lockReason?: string;
 }) {
-  const refresh = useSilentRefresh();
   const inflight = useRef(false);
   const maxStrength = Math.min(
     VOTE_STRENGTH_MAX,
@@ -43,14 +41,17 @@ export function VoteControls({
   const [strength, setStrength] = useState(() => Math.min(3, maxStrength));
   const [recordedVote, setRecordedVote] = useState(currentVote);
   const [state, setState] = useState<FeedActionState>({});
+  const [syncedVote, setSyncedVote] = useState(currentVote);
 
-  useEffect(() => {
+  if (currentVote !== syncedVote) {
+    setSyncedVote(currentVote);
+
     if (currentVote !== null) {
       setRecordedVote(currentVote);
     }
-  }, [currentVote]);
+  }
 
-  const locked = recordedVote !== null || !canVote || inflight.current;
+  const locked = recordedVote !== null || !canVote;
   const recorded = recordedVote !== null ? voteStrength(recordedVote) : null;
   const cost = voteCostHp(strength);
 
@@ -85,7 +86,6 @@ export function VoteControls({
     }
 
     setState(result);
-    refresh();
   }
 
   return (

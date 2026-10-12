@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { runFullCalibration, summarizeCalibration } from "@/lib/research/calibration";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export type CalibrationState = {
   error?: string;
@@ -23,7 +24,7 @@ export async function runCalibration(
   _formData: FormData
 ): Promise<CalibrationState> {
   const { supabase } = await requireAdmin();
-  const { moves, error } = await runFullCalibration(supabase);
+  const { moves, error } = await runFullCalibration(createServiceClient() ?? supabase);
 
   if (error) {
     return { error, stamp: Date.now() };

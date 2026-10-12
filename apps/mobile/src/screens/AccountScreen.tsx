@@ -10,11 +10,11 @@ import {
   View,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { INVITE_PURCHASE_UTL, inviteSharePath } from "../../../../src/lib/research/referral";
 import { DeskAvatar } from "../avatar";
 import { useDesk, useDeskRefresh } from "../desk";
+import { useFocusRefresh } from "../focus-refresh";
 import { formatWhen } from "../format";
 import { loadProfile, type DeskProfile } from "../floor";
 import { loadAccountNotes, loadInvites, type AccountNote, type InviteCode } from "../library";
@@ -79,18 +79,14 @@ export function AccountScreen({
     }
   }, [signedIn.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
+  const { reload, refreshing, onRefresh } = useFocusRefresh(refresh);
 
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />
       }
     >
       <Pressable
@@ -158,7 +154,7 @@ export function AccountScreen({
             setNotice(result.message ?? null);
             if (!result.error) {
               void refreshDesk();
-              await refresh();
+              await reload();
             }
           });
         }}

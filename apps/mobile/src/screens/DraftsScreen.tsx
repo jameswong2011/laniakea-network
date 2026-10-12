@@ -8,9 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useDesk } from "../desk";
+import { useFocusRefresh } from "../focus-refresh";
 import { formatWhen } from "../format";
 import { deleteDraft, loadDrafts, type DraftItem } from "../library";
 import { colors, radius } from "../theme";
@@ -40,11 +40,7 @@ export function DraftsScreen({
     }
   }, [profile.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
+  const { refreshing, onRefresh } = useFocusRefresh(refresh);
 
   async function remove(id: string) {
     setError(null);
@@ -62,7 +58,7 @@ export function DraftsScreen({
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />
       }
     >
       <Text style={styles.lede}>Unpublished notes open in the composer. Comment drafts open the note.</Text>

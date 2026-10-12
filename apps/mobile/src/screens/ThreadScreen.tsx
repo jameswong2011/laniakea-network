@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type ListRenderItem,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useFocusEffect } from "@react-navigation/native";
@@ -23,6 +24,7 @@ import {
   unlockNote,
   type FloorComment,
   type FloorNote,
+  type FloorReply,
 } from "../floor";
 import { isPostSaved, toggleSaved } from "../library";
 import { AiButton } from "../note-ai";
@@ -56,6 +58,7 @@ import {
   voteOnNote,
   type ReactionCount,
   type ReactionKey,
+  type WriteResult,
 } from "../writes";
 import type { VoteDirection } from "../../../../src/types";
 
@@ -295,47 +298,538 @@ function ActionBar({
   );
 }
 
+type ReactTarget = "post" | "comment" | "reply";
+
+const NO_REACTIONS = emptyReactionCounts();
+
+type ThreadActions = {
+  react: (targetType: ReactTarget, targetId: string, key: ReactionKey) => void;
+  voteComment: (commentId: string, direction: VoteDirection, amount: number) => Promise<WriteResult>;
+  editComment: (commentId: string, body: string) => Promise<WriteResult>;
+  editReply: (replyId: string, body: string) => Promise<WriteResult>;
+  sendReply: (commentId: string, body: string) => Promise<WriteResult>;
+  setScaleActive: (active: boolean) => void;
+  setVotePanel: (commentId: string, open: boolean) => void;
+};
+
+type HeaderActions = {
+  openAuthor: () => void;
+  toggleSaved: () => void;
+  toggleFollow: () => void;
+  toggleThreadFollow: () => void;
+  react: (targetType: ReactTarget, targetId: string, key: ReactionKey) => void;
+  castVote: (direction: VoteDirection, strength: number) => void;
+  editPost: (body: string) => Promise<WriteResult>;
+  toggleDock: () => void;
+  setScaleActive: (active: boolean) => void;
+  setVoteOpen: (open: boolean) => void;
+};
+
+type DockDraft = { body: string; stake: number };
+
+function commentKey(comment: FloorComment) {
+  return comment.id;
+}
+
+const NoteHeader = memo(function NoteHeader({
+  note,
+  viewerId,
+  hp,
+  saved,
+  following,
+  threadFollow,
+  reactions,
+  recorded,
+  pending,
+  error,
+  notice,
+  dockOpen,
+  hasComments,
+  actions,
+}: {
+  note: FloorNote;
+  viewerId: string;
+  hp: number;
+  saved: boolean;
+  following: boolean;
+  threadFollow: boolean;
+  reactions: ReactionCount[];
+  recorded: number | null;
+  pending: boolean;
+  error: string | null;
+  notice: string | null;
+  dockOpen: boolean;
+  hasComments: boolean;
+  actions: HeaderActions;
+}) {
+  const [strength, setStrength] = useState<number>(VOTE_STRENGTH_MIN);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const isAuthor = note.authorId === viewerId;
+  const canWrite = canWriteDesk(note.access);
+  const canEngage = note.status === RESEARCH_POST_STATUS_LIVE && canWrite;
+  const canEdit = isAuthor && note.access !== "hidden" && draft == null;
+
+  async function save(body: string) {
+    setSaving(true);
+    const result = await actions.editPost(body);
+    setSaving(false);
+
+    if (!result.error) {
+      setDraft(null);
+    }
+  }
+
+  return (
+    <View>
+      <Pressable onPress={actions.openAuthor} style={styles.byline}>
+        <DeskAvatar url={note.authorAvatar} name={note.authorName} size={28} />
+        <Text style={styles.meta}>{note.authorName}</Text>
+        {note.authorTier ? <TierName tier={note.authorTier} /> : null}
+        {note.subTopic ? <Text style={styles.meta}>{note.subTopic}</Text> : null}
+      </Pressable>
+      <Text style={styles.title}>{note.title}</Text>
+      <View style={styles.actions}>
+        <Pressable
+          onPress={actions.toggleSaved}
+          style={({ pressed }) => [styles.actionButton, saved && styles.actionButtonOn, pressed && styles.pressed]}
+        >
+          <Text numberOfLines={2} style={[styles.actionLabel, saved && styles.actionLabelOn]}>
+            {saved ? "Saved" : "Save"}
+          </Text>
+        </Pressable>
+        {isAuthor ? null : (
+          <Pressable
+            onPress={actions.toggleFollow}
+            style={({ pressed }) => [styles.actionButton, following && styles.actionButtonOn, pressed && styles.pressed]}
+          >
+            <Text numberOfLines={2} style={[styles.actionLabel, following && styles.actionLabelOn]}>
+              {following ? "Following user" : "Follow user"}
+            </Text>
+          </Pressable>
+        )}
+        <Pressable
+          onPress={actions.toggleThreadFollow}
+          style={({ pressed }) => [styles.actionButton, threadFollow && styles.actionButtonOn, pressed && styles.pressed]}
+        >
+          <Text numberOfLines={2} style={[styles.actionLabel, threadFollow && styles.actionLabelOn]}>
+            {threadFollow ? "Following thread" : "Follow thread"}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            const url = `https://www.laniakea.finance/feed/${note.id}`;
+            void Clipboard.setStringAsync(url).then(() => Share.share({ message: url }));
+          }}
+          style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+        >
+          <Text numberOfLines={2} style={styles.actionLabel}>Share</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.health}>
+        {note.healthLabel} · {note.currentHealth} / {ascentLine(note.originalStake)} HP
+      </Text>
+      <View style={styles.meter}>
+        <View style={[styles.meterFill, { width: `${note.healthPercent}%` }]} />
+      </View>
+      {draft != null ? (
+        <View>
+          <TextInput value={draft} onChangeText={setDraft} multiline style={styles.area} />
+          <Pressable
+            disabled={saving}
+            onPress={() => void save(draft)}
+            style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
+          >
+            <Text style={styles.inlineActionLabel}>Save edit</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <NoteBody body={note.body} />
+      )}
+      <ReactionTally counts={reactions} />
+      {canEdit || canWrite || canEngage ? (
+        <ActionBar
+          onComment={canEngage ? actions.toggleDock : undefined}
+          commentOpen={dockOpen}
+          onEdit={canEdit ? () => setDraft(note.body) : undefined}
+          showReact={canWrite}
+          counts={reactions}
+          onToggle={(key) => actions.react("post", note.id, key)}
+          showVote={canEngage}
+          amount={strength}
+          maxAmount={Math.min(VOTE_STRENGTH_MAX, Math.max(0, hp))}
+          recorded={recorded}
+          pending={pending}
+          error={error}
+          onAmount={setStrength}
+          onCast={(direction) => actions.castVote(direction, strength)}
+          onScaleActive={actions.setScaleActive}
+          onVoteOpenChange={actions.setVoteOpen}
+        />
+      ) : null}
+      {!dockOpen && error ? <Text style={styles.error}>{error}</Text> : null}
+      {!dockOpen && notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {hasComments ? <Text style={styles.section}>Comments</Text> : null}
+    </View>
+  );
+});
+
+const ReplyItem = memo(function ReplyItem({
+  reply,
+  viewerId,
+  canWrite,
+  reactions,
+  drafts,
+  actions,
+}: {
+  reply: FloorReply;
+  viewerId: string;
+  canWrite: boolean;
+  reactions: ReactionCount[];
+  drafts: Map<string, string>;
+  actions: ThreadActions;
+}) {
+  const draftKey = `edit:${reply.id}`;
+  const [draft, setDraft] = useState(() => drafts.get(draftKey) ?? null);
+  const [saving, setSaving] = useState(false);
+  const isAuthor = reply.authorId === viewerId;
+
+  function change(value: string) {
+    drafts.set(draftKey, value);
+    setDraft(value);
+  }
+
+  async function save(body: string) {
+    setSaving(true);
+    const result = await actions.editReply(reply.id, body);
+    setSaving(false);
+
+    if (!result.error) {
+      drafts.delete(draftKey);
+      setDraft(null);
+    }
+  }
+
+  return (
+    <View style={styles.replyItem}>
+      <View style={styles.replyByline}>
+        <DeskAvatar url={reply.authorAvatar} name={reply.authorName} size={16} />
+        <Text style={styles.replyName}>{reply.authorName}</Text>
+      </View>
+      {draft != null ? (
+        <TextInput value={draft} onChangeText={change} multiline style={styles.replyEdit} />
+      ) : (
+        <NoteBody body={reply.body} />
+      )}
+      <ReactionTally counts={reactions} />
+      {canWrite || isAuthor ? (
+        <View style={styles.replyActions}>
+          {canWrite ? (
+            <ReactMenu inline counts={reactions} onToggle={(key) => actions.react("reply", reply.id, key)} />
+          ) : null}
+          {isAuthor ? (
+            <Pressable
+              disabled={saving}
+              onPress={() => {
+                if (draft != null) {
+                  void save(draft);
+                  return;
+                }
+                change(reply.body);
+              }}
+              style={({ pressed }) => [styles.replyChip, pressed && styles.pressed]}
+            >
+              <Text style={styles.replyChipLabel}>{draft != null ? "Save" : "Edit"}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
+function ReplyComposer({
+  commentId,
+  drafts,
+  actions,
+}: {
+  commentId: string;
+  drafts: Map<string, string>;
+  actions: ThreadActions;
+}) {
+  const draftKey = `reply:${commentId}`;
+  const [body, setBody] = useState(() => drafts.get(draftKey) ?? "");
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    setSending(true);
+    const result = await actions.sendReply(commentId, body);
+    setSending(false);
+
+    if (!result.error) {
+      drafts.delete(draftKey);
+      setBody("");
+    }
+  }
+
+  return (
+    <View style={styles.replyCompose}>
+      <TextInput
+        value={body}
+        onChangeText={(value) => {
+          drafts.set(draftKey, value);
+          setBody(value);
+        }}
+        placeholder="Reply"
+        placeholderTextColor={colors.muted}
+        style={styles.replyField}
+      />
+      <Pressable
+        disabled={sending}
+        onPress={() => void send()}
+        style={({ pressed }) => [styles.replySend, pressed && styles.pressed]}
+      >
+        <Text style={styles.replySendLabel}>Send</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const CommentRow = memo(function CommentRow({
+  comment,
+  viewerId,
+  hp,
+  canEngage,
+  canWrite,
+  recorded,
+  reactions,
+  replyReactions,
+  drafts,
+  actions,
+}: {
+  comment: FloorComment;
+  viewerId: string;
+  hp: number;
+  canEngage: boolean;
+  canWrite: boolean;
+  recorded: number | null;
+  reactions: ReactionCount[];
+  replyReactions: Record<string, ReactionCount[]>;
+  drafts: Map<string, string>;
+  actions: ThreadActions;
+}) {
+  const draftKey = `edit:${comment.id}`;
+  const [draft, setDraft] = useState(() => drafts.get(draftKey) ?? null);
+  const [saving, setSaving] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(() => drafts.has(`reply:${comment.id}`));
+  const [amount, setAmount] = useState<number>(VOTE_STRENGTH_MIN);
+  const [voting, setVoting] = useState(false);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const isAuthor = comment.authorId === viewerId;
+  const maxAmount = Math.min(VOTE_STRENGTH_MAX, Math.max(0, hp));
+
+  function change(value: string) {
+    drafts.set(draftKey, value);
+    setDraft(value);
+  }
+
+  async function save(body: string) {
+    setSaving(true);
+    const result = await actions.editComment(comment.id, body);
+    setSaving(false);
+
+    if (!result.error) {
+      drafts.delete(draftKey);
+      setDraft(null);
+    }
+  }
+
+  async function cast(direction: VoteDirection) {
+    setVoting(true);
+    setVoteError(null);
+    const result = await actions.voteComment(comment.id, direction, amount);
+    setVoting(false);
+    setVoteError(result.error ?? null);
+  }
+
+  return (
+    <View style={styles.comment}>
+      <View style={styles.byline}>
+        <DeskAvatar url={comment.authorAvatar} name={comment.authorName} size={22} />
+        <Text style={styles.meta}>{comment.authorName}</Text>
+      </View>
+      <Text style={styles.commentHealth}>
+        {comment.healthLabel} · {comment.currentHealth} / {ascentLine(comment.originalStake)} HP
+      </Text>
+      <View style={styles.meter}>
+        <View style={[styles.meterFill, { width: `${comment.healthPercent}%` }]} />
+      </View>
+      {draft != null ? (
+        <View>
+          <TextInput value={draft} onChangeText={change} multiline style={styles.input} />
+          <Pressable
+            disabled={saving}
+            onPress={() => void save(draft)}
+            style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
+          >
+            <Text style={styles.inlineActionLabel}>Save comment</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <NoteBody body={comment.body} />
+      )}
+      <ReactionTally counts={reactions} />
+      {canEngage || (isAuthor && draft == null) || canWrite ? (
+        <ActionBar
+          onReply={canEngage ? () => setReplyOpen((current) => !current) : undefined}
+          replyOpen={replyOpen}
+          onEdit={isAuthor && draft == null ? () => change(comment.body) : undefined}
+          editOnRight
+          showReact={canWrite}
+          counts={reactions}
+          onToggle={(key) => actions.react("comment", comment.id, key)}
+          showVote={(canEngage && comment.status === RESEARCH_POST_STATUS_LIVE) || recorded != null}
+          amount={Math.min(
+            Math.min(VOTE_STRENGTH_MAX, Math.max(VOTE_STRENGTH_MIN, hp)),
+            Math.max(VOTE_STRENGTH_MIN, amount)
+          )}
+          maxAmount={maxAmount}
+          recorded={recorded}
+          pending={voting}
+          error={voteError}
+          onAmount={setAmount}
+          onCast={(direction) => void cast(direction)}
+          onScaleActive={actions.setScaleActive}
+          onVoteOpenChange={(open) => actions.setVotePanel(comment.id, open)}
+        />
+      ) : null}
+      {comment.replies.length > 0 || (canEngage && replyOpen) ? (
+        <View style={styles.replies}>
+          {comment.replies.map((reply) => (
+            <ReplyItem
+              key={reply.id}
+              reply={reply}
+              viewerId={viewerId}
+              canWrite={canWrite}
+              reactions={replyReactions[reply.id] ?? NO_REACTIONS}
+              drafts={drafts}
+              actions={actions}
+            />
+          ))}
+          {canEngage && replyOpen ? (
+            <ReplyComposer commentId={comment.id} drafts={drafts} actions={actions} />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
+function CommentDock({
+  hp,
+  pending,
+  error,
+  notice,
+  store,
+  onPublish,
+  onSaveDraft,
+}: {
+  hp: number;
+  pending: boolean;
+  error: string | null;
+  notice: string | null;
+  store: DockDraft;
+  onPublish: (body: string, stake: number) => Promise<void>;
+  onSaveDraft: (body: string, stake: number) => Promise<void>;
+}) {
+  const stakeMax = Math.min(MAX_STAKE_HP, Math.max(1, hp));
+  const [body, setBody] = useState(store.body);
+  const [stake, setStake] = useState(store.stake);
+
+  return (
+    <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Comment</Text>
+      <TextInput
+        value={body}
+        onChangeText={(value) => {
+          store.body = value;
+          setBody(value);
+        }}
+        multiline
+        placeholder="Stake a comment"
+        placeholderTextColor={colors.muted}
+        style={styles.area}
+      />
+      <VoteScale
+        value={stake}
+        minimum={1}
+        maximum={stakeMax}
+        limit={stakeMax}
+        disabled={pending || hp < 1}
+        label="Stake HP"
+        onChange={(value) => {
+          store.stake = value;
+          setStake(value);
+        }}
+      />
+      <Pressable
+        disabled={pending}
+        onPress={() => void onPublish(body, Math.min(stake, stakeMax))}
+        style={styles.button}
+      >
+        <Text style={styles.buttonLabel}>{pending ? "Posting" : "Post comment"}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => void onSaveDraft(body, stake)}
+        style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
+      >
+        <Text style={styles.inlineActionLabel}>Save comment draft</Text>
+      </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+    </View>
+  );
+}
+
 export function ThreadScreen({
   navigation,
   route,
 }: NativeStackScreenProps<AppStackParamList, "Thread">) {
   const profile = useDesk();
+  const refreshDesk = useDeskRefresh();
   const insets = useSafeAreaInsets();
   const { postId } = route.params;
+  const viewerId = profile.id;
+  const viewerTier = profile.tier;
+  const viewerRole = profile.role;
+  const hp = profile.current_hp;
   const [note, setNote] = useState<FloorNote | null>(null);
   const [comments, setComments] = useState<FloorComment[]>([]);
   const [saved, setSaved] = useState(false);
   const [following, setFollowing] = useState(false);
   const [threadFollow, setThreadFollow] = useState(false);
-  const [editingPost, setEditingPost] = useState(false);
-  const [draftBody, setDraftBody] = useState("");
-  const [edits, setEdits] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
-  const [strength, setStrength] = useState(VOTE_STRENGTH_MIN);
-  const [scaleDragging, setScaleDragging] = useState(false);
-  const [postVoteOpen, setPostVoteOpen] = useState(false);
-  const [commentVoteOpen, setCommentVoteOpen] = useState(false);
-  const openCommentVotes = useRef(new Set<string>());
-
-  const setCommentVotePanel = useCallback((commentId: string, open: boolean) => {
-    if (open) {
-      openCommentVotes.current.add(commentId);
-    } else {
-      openCommentVotes.current.delete(commentId);
-    }
-    setCommentVoteOpen(openCommentVotes.current.size > 0);
-  }, []);
-
-  const [commentBody, setCommentBody] = useState("");
-  const commentStakeMax = Math.min(MAX_STAKE_HP, Math.max(1, profile.current_hp));
-  const [commentStake, setCommentStake] = useState(() =>
-    Math.min(DEFAULT_COMMENT_STAKE_HP, Math.min(MAX_STAKE_HP, Math.max(1, profile.current_hp)))
-  );
-  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
-  const [replyOpen, setReplyOpen] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [dock, setDock] = useState<"comment" | null>(null);
+  const [scaleDragging, setScaleDragging] = useState(false);
+  const [postVoteOpen, setPostVoteOpen] = useState(false);
+  const [commentVoteOpen, setCommentVoteOpen] = useState(false);
+  const [commentVotes, setCommentVotes] = useState<Record<string, number>>({});
+  const [noteVote, setNoteVote] = useState<number | null>(null);
+  const [postReactions, setPostReactions] = useState<ReactionCount[]>(NO_REACTIONS);
+  const [commentReactions, setCommentReactions] = useState<Record<string, ReactionCount[]>>({});
+  const [replyReactions, setReplyReactions] = useState<Record<string, ReactionCount[]>>({});
+  const [drafts] = useState(() => new Map<string, string>());
+  const [dockDraft] = useState<DockDraft>(() => ({
+    body: "",
+    stake: Math.min(DEFAULT_COMMENT_STAKE_HP, Math.min(MAX_STAKE_HP, Math.max(1, hp))),
+  }));
+  const openCommentVotes = useRef(new Set<string>());
+  const reactionLocks = useRef(new Set<string>());
+  const lastLoaded = useRef({ postId: "", at: 0 });
+  const live = useRef({ note, hp });
+  live.current = { note, hp };
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -343,21 +837,11 @@ export function ThreadScreen({
       gestureEnabled: dock == null && !commentVoteOpen && !postVoteOpen,
     });
   }, [commentVoteOpen, dock, navigation, postVoteOpen]);
-  const [commentVotes, setCommentVotes] = useState<Record<string, number>>({});
-  const [commentAmounts, setCommentAmounts] = useState<Record<string, number>>({});
-  const [commentVoteErrors, setCommentVoteErrors] = useState<Record<string, string | null>>({});
-  const [votingCommentId, setVotingCommentId] = useState<string | null>(null);
-  const [postReactions, setPostReactions] = useState<ReactionCount[]>(emptyReactionCounts());
-  const [commentReactions, setCommentReactions] = useState<Record<string, ReactionCount[]>>({});
-  const [replyReactions, setReplyReactions] = useState<Record<string, ReactionCount[]>>({});
-  const reactionLocks = useRef(new Set<string>());
 
-  const [noteVote, setNoteVote] = useState<number | null>(null);
-  const refreshDesk = useDeskRefresh();
-  const lastLoaded = useRef({ postId: "", at: 0 });
-  const viewerId = profile.id;
-  const viewerTier = profile.tier;
-  const viewerRole = profile.role;
+  const report = useCallback((result: WriteResult) => {
+    setError(result.error ?? null);
+    setNotice(result.message ?? null);
+  }, []);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -382,7 +866,7 @@ export function ThreadScreen({
       setSaved(isSaved);
       setFollowing(followsAuthor);
       setThreadFollow(followsThread);
-      setPostReactions(postMap[postId] ?? emptyReactionCounts());
+      setPostReactions(postMap[postId] ?? NO_REACTIONS);
       setCommentReactions(commentMap);
       setReplyReactions(replyMap);
       setCommentVotes(votes);
@@ -405,7 +889,16 @@ export function ThreadScreen({
     }, [postId, refresh])
   );
 
-  async function react(targetType: "post" | "comment" | "reply", targetId: string, key: ReactionKey) {
+  const setCommentVotePanel = useCallback((commentId: string, open: boolean) => {
+    if (open) {
+      openCommentVotes.current.add(commentId);
+    } else {
+      openCommentVotes.current.delete(commentId);
+    }
+    setCommentVoteOpen(openCommentVotes.current.size > 0);
+  }, []);
+
+  const react = useCallback(async (targetType: ReactTarget, targetId: string, key: ReactionKey) => {
     const lock = `${targetType}:${targetId}:${key}`;
 
     if (reactionLocks.current.has(lock)) {
@@ -419,16 +912,16 @@ export function ThreadScreen({
     } else if (targetType === "comment") {
       setCommentReactions((current) => ({
         ...current,
-        [targetId]: applyReactionToggle(current[targetId] ?? emptyReactionCounts(), key),
+        [targetId]: applyReactionToggle(current[targetId] ?? NO_REACTIONS, key),
       }));
     } else {
       setReplyReactions((current) => ({
         ...current,
-        [targetId]: applyReactionToggle(current[targetId] ?? emptyReactionCounts(), key),
+        [targetId]: applyReactionToggle(current[targetId] ?? NO_REACTIONS, key),
       }));
     }
 
-    const result = await toggleReaction(profile.id, targetType, targetId, key);
+    const result = await toggleReaction(viewerId, targetType, targetId, key);
     reactionLocks.current.delete(lock);
 
     if (!result.error) {
@@ -437,8 +930,8 @@ export function ThreadScreen({
     }
 
     setError(result.error);
-    const fresh = await loadReactions(targetType, [targetId], profile.id);
-    const counts = fresh[targetId] ?? emptyReactionCounts();
+    const fresh = await loadReactions(targetType, [targetId], viewerId);
+    const counts = fresh[targetId] ?? NO_REACTIONS;
 
     if (targetType === "post") {
       setPostReactions(counts);
@@ -447,7 +940,230 @@ export function ThreadScreen({
     } else {
       setReplyReactions((current) => ({ ...current, [targetId]: counts }));
     }
-  }
+  }, [viewerId]);
+
+  const castVote = useCallback(async (voteDirection: VoteDirection, requested: number) => {
+    const current = live.current.note;
+
+    if (!current) {
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    const affordable = Math.min(VOTE_STRENGTH_MAX, live.current.hp);
+    if (affordable < VOTE_STRENGTH_MIN) {
+      setPending(false);
+      setError("Need 1 HP to vote.");
+      return;
+    }
+
+    const result = await voteOnNote({
+      userId: viewerId,
+      postId,
+      direction: voteDirection,
+      strength: Math.min(requested, affordable),
+      access: current.access,
+    });
+    void refreshDesk();
+    setPending(false);
+    report(result);
+
+    if (!result.error) {
+      setPostVoteOpen(false);
+      await refresh();
+    }
+  }, [postId, refresh, refreshDesk, report, viewerId]);
+
+  const voteComment = useCallback(async (commentId: string, voteDirection: VoteDirection, requested: number) => {
+    const current = live.current.note;
+
+    if (!current) {
+      return { error: "Could not open this note." };
+    }
+
+    const maxAmount = Math.min(VOTE_STRENGTH_MAX, Math.max(0, live.current.hp));
+    const result = await voteOnComment({
+      userId: viewerId,
+      postId,
+      commentId,
+      direction: voteDirection,
+      strength: Math.min(maxAmount, Math.max(VOTE_STRENGTH_MIN, requested)),
+      access: current.access,
+      postStatus: current.status,
+      subTopic: current.subTopic,
+    });
+    void refreshDesk();
+    setNotice(result.error ? null : (result.message ?? null));
+
+    if (!result.error) {
+      await refresh();
+    }
+
+    return result;
+  }, [postId, refresh, refreshDesk, viewerId]);
+
+  const editPost = useCallback(async (body: string) => {
+    const result = await editPostBody(viewerId, postId, body);
+    report(result);
+
+    if (!result.error) {
+      await refresh();
+    }
+
+    return result;
+  }, [postId, refresh, report, viewerId]);
+
+  const editComment = useCallback(async (commentId: string, body: string) => {
+    const result = await editCommentBody(viewerId, commentId, body);
+    report(result);
+
+    if (!result.error) {
+      await refresh();
+    }
+
+    return result;
+  }, [refresh, report, viewerId]);
+
+  const editReply = useCallback(async (replyId: string, body: string) => {
+    const result = await editReplyBody(viewerId, replyId, body);
+    report(result);
+
+    if (!result.error) {
+      await refresh();
+    }
+
+    return result;
+  }, [refresh, report, viewerId]);
+
+  const sendReply = useCallback(async (commentId: string, body: string) => {
+    const current = live.current.note;
+
+    if (!current) {
+      return { error: "Could not open this note." };
+    }
+
+    const result = await publishReply({
+      userId: viewerId,
+      postId,
+      commentId,
+      body,
+      access: current.access,
+    });
+    report(result);
+
+    if (!result.error) {
+      await refresh();
+    }
+
+    return result;
+  }, [postId, refresh, report, viewerId]);
+
+  const sendComment = useCallback(async (body: string, stake: number) => {
+    const current = live.current.note;
+
+    if (!current) {
+      return;
+    }
+
+    setPending(true);
+    const result = await publishComment({
+      userId: viewerId,
+      postId,
+      body,
+      stakeHp: stake,
+      access: current.access,
+      postStatus: current.status,
+      subTopic: current.subTopic,
+      postAuthorId: current.authorId,
+    });
+    void refreshDesk();
+    setPending(false);
+    report(result);
+
+    if (!result.error) {
+      dockDraft.body = "";
+      setDock(null);
+      await refresh();
+    }
+  }, [dockDraft, postId, refresh, refreshDesk, report, viewerId]);
+
+  const saveDraft = useCallback(async (body: string, stake: number) => {
+    report(await saveCommentDraft({ userId: viewerId, postId, body, stakeHp: stake }));
+  }, [postId, report, viewerId]);
+
+  const threadActions = useMemo<ThreadActions>(
+    () => ({
+      react,
+      voteComment,
+      editComment,
+      editReply,
+      sendReply,
+      setScaleActive: setScaleDragging,
+      setVotePanel: setCommentVotePanel,
+    }),
+    [editComment, editReply, react, sendReply, setCommentVotePanel, voteComment]
+  );
+
+  const headerActions = useMemo<HeaderActions>(
+    () => ({
+      openAuthor: () => {
+        const current = live.current.note;
+
+        if (current) {
+          navigation.navigate("Desk", { username: current.authorUsername });
+        }
+      },
+      toggleSaved: () => {
+        void toggleSaved(viewerId, postId)
+          .then(setSaved)
+          .catch((cause: unknown) => {
+            setError(cause instanceof Error ? cause.message : "Could not save this note.");
+          });
+      },
+      toggleFollow: () => {
+        const current = live.current.note;
+
+        if (current) {
+          void toggleFollow(viewerId, current.authorId).then(setFollowing);
+        }
+      },
+      toggleThreadFollow: () => {
+        void toggleThreadFollow(viewerId, postId).then(setThreadFollow);
+      },
+      react,
+      castVote: (voteDirection, strength) => {
+        void castVote(voteDirection, strength);
+      },
+      editPost,
+      toggleDock: () => setDock((current) => (current === "comment" ? null : "comment")),
+      setScaleActive: setScaleDragging,
+      setVoteOpen: setPostVoteOpen,
+    }),
+    [castVote, editPost, navigation, postId, react, viewerId]
+  );
+
+  const canWrite = note ? canWriteDesk(note.access) : false;
+  const canEngage = note ? note.status === RESEARCH_POST_STATUS_LIVE && canWrite : false;
+
+  const renderComment = useCallback<ListRenderItem<FloorComment>>(
+    ({ item }) => (
+      <CommentRow
+        comment={item}
+        viewerId={viewerId}
+        hp={hp}
+        canEngage={canEngage}
+        canWrite={canWrite}
+        recorded={commentVotes[item.id] ?? null}
+        reactions={commentReactions[item.id] ?? NO_REACTIONS}
+        replyReactions={replyReactions}
+        drafts={drafts}
+        actions={threadActions}
+      />
+    ),
+    [canEngage, canWrite, commentReactions, commentVotes, drafts, hp, replyReactions, threadActions, viewerId]
+  );
 
   async function unlock() {
     setPending(true);
@@ -472,438 +1188,53 @@ export function ThreadScreen({
     );
   }
 
-  const canEngage = note.status === RESEARCH_POST_STATUS_LIVE && canWriteDesk(note.access);
-
-  async function castVote(voteDirection: VoteDirection) {
-    setPending(true);
-    setError(null);
-    setNotice(null);
-    const affordable = Math.min(VOTE_STRENGTH_MAX, profile.current_hp);
-    if (affordable < VOTE_STRENGTH_MIN) {
-      setPending(false);
-      setError("Need 1 HP to vote.");
-      return;
-    }
-
-    const result = await voteOnNote({
-      userId: profile.id,
-      postId,
-      direction: voteDirection,
-      strength: Math.min(strength, affordable),
-      access: note.access,
-    });
-    void refreshDesk();
-    setPending(false);
-    setError(result.error ?? null);
-    setNotice(result.message ?? null);
-
-    if (!result.error) {
-      setPostVoteOpen(false);
-      await refresh();
-    }
-  }
-
-  async function castCommentVote(commentId: string, voteDirection: VoteDirection) {
-    const maxAmount = Math.min(VOTE_STRENGTH_MAX, Math.max(0, profile.current_hp));
-    const amount = Math.min(maxAmount, Math.max(VOTE_STRENGTH_MIN, commentAmounts[commentId] ?? VOTE_STRENGTH_MIN));
-    setVotingCommentId(commentId);
-    setCommentVoteErrors((current) => ({ ...current, [commentId]: null }));
-    const result = await voteOnComment({
-      userId: profile.id,
-      postId,
-      commentId,
-      direction: voteDirection,
-      strength: amount,
-      access: note.access,
-      postStatus: note.status,
-      subTopic: note.subTopic,
-    });
-    void refreshDesk();
-    setVotingCommentId(null);
-    setCommentVoteErrors((current) => ({ ...current, [commentId]: result.error ?? null }));
-    setNotice(result.error ? null : (result.message ?? null));
-
-    if (!result.error) {
-      await refresh();
-    }
-  }
-
   return (
     <View style={styles.screen}>
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-    <ScrollView
+    <FlatList
       style={styles.screen}
       contentContainerStyle={styles.content}
-      directionalLockEnabled
-      scrollEnabled={!scaleDragging}
-    >
-      <Pressable
-        onPress={() => navigation.navigate("Desk", { username: note.authorUsername })}
-        style={styles.byline}
-      >
-        <DeskAvatar url={note.authorAvatar} name={note.authorName} size={28} />
-        <Text style={styles.meta}>{note.authorName}</Text>
-        {note.authorTier ? <TierName tier={note.authorTier} /> : null}
-        {note.subTopic ? <Text style={styles.meta}>{note.subTopic}</Text> : null}
-      </Pressable>
-      <Text style={styles.title}>{note.title}</Text>
-      <View style={styles.actions}>
-      <Pressable
-        onPress={() => {
-          void toggleSaved(profile.id, postId)
-            .then(setSaved)
-            .catch((cause: unknown) => {
-              setError(cause instanceof Error ? cause.message : "Could not save this note.");
-            });
-        }}
-        style={({ pressed }) => [styles.actionButton, saved && styles.actionButtonOn, pressed && styles.pressed]}
-      >
-        <Text numberOfLines={2} style={[styles.actionLabel, saved && styles.actionLabelOn]}>
-          {saved ? "Saved" : "Save"}
-        </Text>
-      </Pressable>
-      {note.authorId !== profile.id ? (
-        <Pressable
-          onPress={() => {
-            void toggleFollow(profile.id, note.authorId).then(setFollowing);
-          }}
-          style={({ pressed }) => [styles.actionButton, following && styles.actionButtonOn, pressed && styles.pressed]}
-        >
-          <Text numberOfLines={2} style={[styles.actionLabel, following && styles.actionLabelOn]}>
-            {following ? "Following user" : "Follow user"}
-          </Text>
-        </Pressable>
-      ) : null}
-      <Pressable
-        onPress={() => {
-          void toggleThreadFollow(profile.id, postId).then(setThreadFollow);
-        }}
-        style={({ pressed }) => [styles.actionButton, threadFollow && styles.actionButtonOn, pressed && styles.pressed]}
-      >
-        <Text numberOfLines={2} style={[styles.actionLabel, threadFollow && styles.actionLabelOn]}>
-          {threadFollow ? "Following thread" : "Follow thread"}
-        </Text>
-      </Pressable>
-      <Pressable
-        onPress={() => {
-          const url = `https://www.laniakea.finance/feed/${postId}`;
-          void Clipboard.setStringAsync(url).then(() => Share.share({ message: url }));
-        }}
-        style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
-      >
-        <Text numberOfLines={2} style={styles.actionLabel}>Share</Text>
-      </Pressable>
-      </View>
-      <Text style={styles.health}>
-        {note.healthLabel} · {note.currentHealth} / {ascentLine(note.originalStake)} HP
-      </Text>
-      <View style={styles.meter}>
-        <View style={[styles.meterFill, { width: `${note.healthPercent}%` }]} />
-      </View>
-      {editingPost ? (
-        <View>
-          <TextInput value={draftBody} onChangeText={setDraftBody} multiline style={styles.area} />
-          <Pressable
-            onPress={() => {
-              void editPostBody(profile.id, postId, draftBody).then(async (result) => {
-                setError(result.error ?? null);
-                setNotice(result.message ?? null);
-                if (!result.error) {
-                  setEditingPost(false);
-                  await refresh();
-                }
-              });
-            }}
-            style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
-          >
-            <Text style={styles.inlineActionLabel}>Save edit</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <NoteBody body={note.body} />
-      )}
-      <ReactionTally counts={postReactions} />
-      {(note.authorId === profile.id && note.access !== "hidden" && !editingPost) || canWriteDesk(note.access) || canEngage ? (
-        <ActionBar
-          onComment={
-            canEngage
-              ? () => setDock((current) => (current === "comment" ? null : "comment"))
-              : undefined
-          }
-          commentOpen={dock === "comment"}
-          onEdit={
-            note.authorId === profile.id && note.access !== "hidden" && !editingPost
-              ? () => {
-                  setDraftBody(note.body);
-                  setEditingPost(true);
-                }
-              : undefined
-          }
-          showReact={canWriteDesk(note.access)}
-          counts={postReactions}
-          onToggle={(key) => void react("post", postId, key)}
-          showVote={canEngage}
-          amount={strength}
-          maxAmount={Math.min(VOTE_STRENGTH_MAX, Math.max(0, profile.current_hp))}
+      data={comments}
+      keyExtractor={commentKey}
+      renderItem={renderComment}
+      ListHeaderComponent={
+        <NoteHeader
+          note={note}
+          viewerId={viewerId}
+          hp={hp}
+          saved={saved}
+          following={following}
+          threadFollow={threadFollow}
+          reactions={postReactions}
           recorded={noteVote}
           pending={pending}
           error={error}
-          onAmount={setStrength}
-          onCast={(voteDirection) => void castVote(voteDirection)}
-          onScaleActive={setScaleDragging}
-          onVoteOpenChange={setPostVoteOpen}
+          notice={notice}
+          dockOpen={dock != null}
+          hasComments={comments.length > 0}
+          actions={headerActions}
         />
-      ) : null}
-      {dock == null && error ? <Text style={styles.error}>{error}</Text> : null}
-      {dock == null && notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      {comments.length > 0 ? <Text style={styles.section}>Comments</Text> : null}
-      {comments.map((comment) => (
-        <View key={comment.id} style={styles.comment}>
-          <View style={styles.byline}>
-            <DeskAvatar url={comment.authorAvatar} name={comment.authorName} size={22} />
-            <Text style={styles.meta}>{comment.authorName}</Text>
-          </View>
-          <Text style={styles.commentHealth}>
-            {comment.healthLabel} · {comment.currentHealth} / {ascentLine(comment.originalStake)} HP
-          </Text>
-          <View style={styles.meter}>
-            <View style={[styles.meterFill, { width: `${comment.healthPercent}%` }]} />
-          </View>
-          {edits[comment.id] != null ? (
-            <View>
-              <TextInput
-                value={edits[comment.id]}
-                onChangeText={(value) => setEdits((current) => ({ ...current, [comment.id]: value }))}
-                multiline
-                style={styles.input}
-              />
-              <Pressable
-                onPress={() => {
-                  void editCommentBody(profile.id, comment.id, edits[comment.id] ?? "").then(async (result) => {
-                    setError(result.error ?? null);
-                    setNotice(result.message ?? null);
-                    if (!result.error) {
-                      setEdits((current) => {
-                        const next = { ...current };
-                        delete next[comment.id];
-                        return next;
-                      });
-                      await refresh();
-                    }
-                  });
-                }}
-                style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
-              >
-                <Text style={styles.inlineActionLabel}>Save comment</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <NoteBody body={comment.body} />
-          )}
-          <ReactionTally counts={commentReactions[comment.id] ?? []} />
-          {canEngage || (comment.authorId === profile.id && edits[comment.id] == null) || canWriteDesk(note.access) ? (
-            <ActionBar
-              onReply={
-                canEngage
-                  ? () => setReplyOpen((current) => ({ ...current, [comment.id]: !current[comment.id] }))
-                  : undefined
-              }
-              replyOpen={replyOpen[comment.id] === true}
-              onEdit={
-                comment.authorId === profile.id && edits[comment.id] == null
-                  ? () => setEdits((current) => ({ ...current, [comment.id]: comment.body }))
-                  : undefined
-              }
-              editOnRight
-              showReact={canWriteDesk(note.access)}
-              counts={commentReactions[comment.id] ?? emptyReactionCounts()}
-              onToggle={(key) => void react("comment", comment.id, key)}
-              showVote={(canEngage && comment.status === RESEARCH_POST_STATUS_LIVE) || commentVotes[comment.id] != null}
-              amount={Math.min(
-                Math.min(VOTE_STRENGTH_MAX, Math.max(VOTE_STRENGTH_MIN, profile.current_hp)),
-                Math.max(VOTE_STRENGTH_MIN, commentAmounts[comment.id] ?? VOTE_STRENGTH_MIN)
-              )}
-              maxAmount={Math.min(VOTE_STRENGTH_MAX, Math.max(0, profile.current_hp))}
-              recorded={commentVotes[comment.id] ?? null}
-              pending={votingCommentId === comment.id}
-              error={commentVoteErrors[comment.id] ?? null}
-              onAmount={(amount) =>
-                setCommentAmounts((current) => ({ ...current, [comment.id]: amount }))
-              }
-              onCast={(voteDirection) => void castCommentVote(comment.id, voteDirection)}
-              onScaleActive={setScaleDragging}
-              onVoteOpenChange={(open) => setCommentVotePanel(comment.id, open)}
-            />
-          ) : null}
-          {comment.replies.length > 0 || (canEngage && replyOpen[comment.id]) ? (
-            <View style={styles.replies}>
-              {comment.replies.map((reply) => (
-                <View key={reply.id} style={styles.replyItem}>
-                  <View style={styles.replyByline}>
-                    <DeskAvatar url={reply.authorAvatar} name={reply.authorName} size={16} />
-                    <Text style={styles.replyName}>{reply.authorName}</Text>
-                  </View>
-                  {edits[reply.id] != null ? (
-                    <TextInput
-                      value={edits[reply.id]}
-                      onChangeText={(value) => setEdits((current) => ({ ...current, [reply.id]: value }))}
-                      multiline
-                      style={styles.replyEdit}
-                    />
-                  ) : (
-                    <NoteBody body={reply.body} />
-                  )}
-                  <ReactionTally counts={replyReactions[reply.id] ?? []} />
-                  {canWriteDesk(note.access) || reply.authorId === profile.id ? (
-                  <View style={styles.replyActions}>
-                    {canWriteDesk(note.access) ? (
-                      <ReactMenu
-                        inline
-                        counts={replyReactions[reply.id] ?? emptyReactionCounts()}
-                        onToggle={(key) => void react("reply", reply.id, key)}
-                      />
-                    ) : null}
-                    {reply.authorId === profile.id ? (
-                      <Pressable
-                        onPress={() => {
-                          if (edits[reply.id] != null) {
-                            void editReplyBody(profile.id, reply.id, edits[reply.id] ?? "").then(async (result) => {
-                              setError(result.error ?? null);
-                              setNotice(result.message ?? null);
-                              if (!result.error) {
-                                setEdits((current) => {
-                                  const next = { ...current };
-                                  delete next[reply.id];
-                                  return next;
-                                });
-                                await refresh();
-                              }
-                            });
-                            return;
-                          }
-                          setEdits((current) => ({ ...current, [reply.id]: reply.body }));
-                        }}
-                        style={({ pressed }) => [styles.replyChip, pressed && styles.pressed]}
-                      >
-                        <Text style={styles.replyChipLabel}>
-                          {edits[reply.id] != null ? "Save" : "Edit"}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                  ) : null}
-                </View>
-              ))}
-              {canEngage && replyOpen[comment.id] ? (
-                <View style={styles.replyCompose}>
-                  <TextInput
-                    value={replyDrafts[comment.id] ?? ""}
-                    onChangeText={(value) =>
-                      setReplyDrafts((current) => ({ ...current, [comment.id]: value }))
-                    }
-                    placeholder="Reply"
-                    placeholderTextColor={colors.muted}
-                    style={styles.replyField}
-                  />
-                  <Pressable
-                    onPress={() => {
-                      void publishReply({
-                        userId: profile.id,
-                        postId,
-                        commentId: comment.id,
-                        body: replyDrafts[comment.id] ?? "",
-                        access: note.access,
-                      }).then(async (result) => {
-                        setError(result.error ?? null);
-                        setNotice(result.message ?? null);
-                        if (!result.error) {
-                          setReplyDrafts((current) => ({ ...current, [comment.id]: "" }));
-                          await refresh();
-                        }
-                      });
-                    }}
-                    style={({ pressed }) => [styles.replySend, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.replySendLabel}>Send</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      ))}
-    </ScrollView>
+      }
+      directionalLockEnabled
+      keyboardShouldPersistTaps="handled"
+      scrollEnabled={!scaleDragging}
+      initialNumToRender={6}
+      maxToRenderPerBatch={6}
+      windowSize={9}
+    />
     {dock === "comment" ? (
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Comment</Text>
-        <TextInput
-          value={commentBody}
-          onChangeText={setCommentBody}
-          multiline
-          placeholder="Stake a comment"
-          placeholderTextColor={colors.muted}
-          style={styles.area}
-        />
-        <VoteScale
-          value={commentStake}
-          minimum={1}
-          maximum={commentStakeMax}
-          limit={commentStakeMax}
-          disabled={pending || profile.current_hp < 1}
-          label="Stake HP"
-          onChange={setCommentStake}
-        />
-        <Pressable
-          disabled={pending}
-          onPress={() => {
-            setPending(true);
-            void publishComment({
-              userId: profile.id,
-              postId,
-              body: commentBody,
-              stakeHp: commentStake,
-              access: note.access,
-              postStatus: note.status,
-              subTopic: note.subTopic,
-              postAuthorId: note.authorId,
-            }).then(async (result) => {
-              void refreshDesk();
-              setPending(false);
-              setError(result.error ?? null);
-              setNotice(result.message ?? null);
-              if (!result.error) {
-                setCommentBody("");
-                setDock(null);
-                await refresh();
-              }
-            });
-          }}
-          style={styles.button}
-        >
-          <Text style={styles.buttonLabel}>{pending ? "Posting" : "Post comment"}</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            void saveCommentDraft({
-              userId: profile.id,
-              postId,
-              body: commentBody,
-              stakeHp: commentStake,
-            }).then((result) => {
-              setError(result.error ?? null);
-              setNotice(result.message ?? null);
-            });
-          }}
-          style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
-        >
-          <Text style={styles.inlineActionLabel}>Save comment draft</Text>
-        </Pressable>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      </View>
+      <CommentDock
+        hp={hp}
+        pending={pending}
+        error={error}
+        notice={notice}
+        store={dockDraft}
+        onPublish={sendComment}
+        onSaveDraft={saveDraft}
+      />
     ) : null}
     {note.unlockQuote ? (
       <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 8) }]}>

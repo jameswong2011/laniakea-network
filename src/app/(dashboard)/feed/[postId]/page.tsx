@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, type ReactNode } from "react";
 import { format } from "date-fns";
 import { PageFrame, PageHeading } from "@/components/layout/PageFrame";
 import { AuthorLink } from "@/components/laniakea/AuthorLink";
@@ -172,6 +172,15 @@ export default async function ResearchPostPage({
     loadReactions(supabase, "reply", replyIds, userId),
   ]);
   const availableHp = profile?.current_hp ?? 0;
+  const bodies: Record<string, ReactNode> = {};
+
+  for (const comment of thread.comments) {
+    bodies[comment.id] = <MarkdownBody source={comment.body} />;
+
+    for (const reply of comment.replies) {
+      bodies[reply.id] = <MarkdownBody source={reply.body} />;
+    }
+  }
 
   return (
     <PageFrame>
@@ -319,6 +328,7 @@ export default async function ResearchPostPage({
       <CommentThread
         postId={item.id}
         comments={thread.comments}
+        bodies={bodies}
         viewerVotes={commentVotes}
         access={item.access}
         availableHp={availableHp}

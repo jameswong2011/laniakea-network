@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toggleReaction } from "@/app/(dashboard)/forum/actions";
 import {
   REACTION_KEYS,
@@ -9,7 +9,6 @@ import {
   type ReactionKey,
   type ReactionTarget,
 } from "@/lib/research/forum";
-import { useSilentRefresh } from "@/lib/ui/silent-refresh";
 
 function toggleLocal(
   counts: ReactionCount[],
@@ -42,13 +41,17 @@ export function ReactionBar({
   counts: ReactionCount[];
   canReact?: boolean;
 }) {
-  const refresh = useSilentRefresh();
   const pending = useRef(new Set<ReactionKey>());
   const [local, setLocal] = useState(counts);
+  const signature = counts
+    .map((row) => `${row.key}:${row.count}:${row.mine ? 1 : 0}`)
+    .join(",");
+  const [synced, setSynced] = useState(signature);
 
-  useEffect(() => {
+  if (signature !== synced) {
+    setSynced(signature);
     setLocal(counts);
-  }, [counts]);
+  }
 
   const byKey = new Map(local.map((row) => [row.key, row]));
 
@@ -65,9 +68,12 @@ export function ReactionBar({
     form.set("targetId", targetId);
     form.set("reaction", key);
     form.set("postId", postId);
-    await toggleReaction(form);
+    const saved = await toggleReaction(form).catch(() => false);
     pending.current.delete(key);
-    refresh();
+
+    if (!saved) {
+      setLocal((current) => toggleLocal(current, key));
+    }
   }
 
   return (

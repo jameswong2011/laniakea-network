@@ -1,35 +1,22 @@
+import { memo, useMemo } from "react";
 import { Image, StyleSheet } from "react-native";
-import Markdown from "react-native-markdown-display";
+import Markdown, { MarkdownIt, type RenderRules } from "react-native-markdown-display";
 import { prepareNoteMarkdown } from "./domain";
 import { colors, radius } from "./theme";
 
-export function NoteBody({ body }: { body: string }) {
-  const source = prepareNoteMarkdown(body);
+export const NoteBody = memo(function NoteBody({ body }: { body: string }) {
+  const source = useMemo(() => prepareNoteMarkdown(body), [body]);
 
   if (!source) {
     return null;
   }
 
   return (
-    <Markdown
-      style={styles}
-      rules={{
-        image: (node) => (
-          <Image
-            key={node.key}
-            source={{ uri: node.attributes.src }}
-            accessibilityLabel={node.attributes.alt}
-            accessibilityIgnoresInvertColors
-            resizeMode="cover"
-            style={imageStyle}
-          />
-        ),
-      }}
-    >
+    <Markdown style={styles} rules={rules} markdownit={parser}>
       {source}
     </Markdown>
   );
-}
+});
 
 const imageStyle = {
   width: "100%" as const,
@@ -37,6 +24,21 @@ const imageStyle = {
   marginVertical: 12,
   borderRadius: radius.card,
   backgroundColor: colors.surface,
+};
+
+const parser = MarkdownIt({ typographer: true });
+
+const rules: RenderRules = {
+  image: (node) => (
+    <Image
+      key={node.key}
+      source={{ uri: node.attributes.src }}
+      accessibilityLabel={node.attributes.alt}
+      accessibilityIgnoresInvertColors
+      resizeMode="cover"
+      style={imageStyle}
+    />
+  ),
 };
 
 const styles = StyleSheet.create({

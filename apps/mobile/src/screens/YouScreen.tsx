@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DeskAvatar } from "../avatar";
 import { useDesk } from "../desk";
+import { useFocusRefresh } from "../focus-refresh";
 import { loadProfile } from "../floor";
 import { supabase } from "../supabase";
 import { colors, radius } from "../theme";
@@ -28,12 +29,11 @@ export function YouScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const insets = useSafeAreaInsets();
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? null);
+  const loadAvatar = useCallback(async () => {
+    setAvatarUrl((await loadProfile(profile.id)).avatar_url);
+  }, [profile.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadProfile(profile.id).then((next) => setAvatarUrl(next.avatar_url));
-    }, [profile.id])
-  );
+  useFocusRefresh(loadAvatar);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 24 }}>

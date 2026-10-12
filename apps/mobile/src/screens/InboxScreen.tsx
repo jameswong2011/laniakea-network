@@ -8,9 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useDesk } from "../desk";
+import { useFocusRefresh } from "../focus-refresh";
 import { formatWhen } from "../format";
 import { loadInbox, markInboxRead, type InboxItem } from "../library";
 import { colors, radius } from "../theme";
@@ -39,11 +39,7 @@ export function InboxScreen({
     }
   }, [profile.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
+  const { reload, refreshing, onRefresh } = useFocusRefresh(refresh);
 
   return (
     <View style={styles.screen}>
@@ -51,7 +47,7 @@ export function InboxScreen({
         <Pressable
           style={styles.mark}
           onPress={() => {
-            void markInboxRead(profile.id).then(refresh);
+            void markInboxRead(profile.id).then(reload);
           }}
         >
           <Text style={styles.markLabel}>Mark read</Text>
@@ -65,7 +61,7 @@ export function InboxScreen({
           data={items}
           keyExtractor={(item) => item.id}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />
           }
           ListEmptyComponent={<Empty label="No replies yet." />}
           renderItem={({ item }) => (

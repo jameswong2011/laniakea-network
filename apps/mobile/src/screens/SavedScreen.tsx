@@ -7,9 +7,9 @@ import {
   StyleSheet,
   Text,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useDesk } from "../desk";
+import { useFocusRefresh } from "../focus-refresh";
 import { formatWhen } from "../format";
 import { loadSaved, type SavedItem } from "../library";
 import { ReactionTally } from "../reaction-tally";
@@ -42,11 +42,7 @@ export function SavedScreen({
     }
   }, [profile.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
+  const { refreshing, onRefresh } = useFocusRefresh(refresh);
 
   if (loading && items.length === 0) {
     return <ActivityIndicator color={colors.fg} style={styles.spinner} />;
@@ -58,7 +54,7 @@ export function SavedScreen({
       data={items}
       keyExtractor={(item) => item.id}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />
       }
       ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
       ListEmptyComponent={<Empty label="Nothing saved yet. Use Save on a note." />}

@@ -3,19 +3,24 @@ import type { DeskProfile } from "./floor";
 
 const DeskContext = createContext<DeskProfile | null>(null);
 const DeskRefreshContext = createContext<() => Promise<void>>(async () => {});
+const DeskChangedContext = createContext(0);
 
 export function DeskProvider({
   profile,
   refresh,
+  changedAt,
   children,
 }: {
   profile: DeskProfile;
   refresh: () => Promise<void>;
+  changedAt: number;
   children: ReactNode;
 }) {
   return (
     <DeskRefreshContext.Provider value={refresh}>
-      <DeskContext.Provider value={profile}>{children}</DeskContext.Provider>
+      <DeskChangedContext.Provider value={changedAt}>
+        <DeskContext.Provider value={profile}>{children}</DeskContext.Provider>
+      </DeskChangedContext.Provider>
     </DeskRefreshContext.Provider>
   );
 }
@@ -32,4 +37,8 @@ export function useDesk() {
 
 export function useDeskRefresh() {
   return useContext(DeskRefreshContext);
+}
+
+export function useDeskChangedAt() {
+  return useContext(DeskChangedContext);
 }

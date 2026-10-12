@@ -1,11 +1,12 @@
 "use server";
 
 import { after } from "next/server";
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { canWriteDesk } from "@/lib/research/access";
+import { callBalanceFunction } from "@/lib/research/balance-rpc";
 import {
   DEFAULT_STAKE_HP,
   MAX_STAKE_HP,
@@ -108,6 +109,24 @@ function refreshFeed() {
   revalidatePath("/wallet");
 }
 
+async function finishPublish(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+  postId: string,
+  draftId: string
+) {
+  if (draftId) {
+    await supabase
+      .from("content_drafts")
+      .delete()
+      .eq("id", draftId)
+      .eq("user_id", userId)
+      .eq("kind", "post");
+  }
+
+  await notifyAuthorFollowers(supabase, { actorId: userId, postId });
+}
+
 export async function createResearchPost(
   _prevState: FeedActionState,
   formData: FormData
@@ -133,6 +152,32 @@ export async function createResearchPost(
   const unlockRateMultiple = resolveUnlockRateMultiple(
     parsed.data.unlockRateMultiple
   );
+  const draftId = String(formData.get("draftId") ?? "");
+  const staked = await callBalanceFunction(supabase, "stake_note", {
+    p_title: title,
+    p_body: body,
+    p_sub_topic: subTopic,
+    p_stake: stakeHp,
+    p_unlock_rate_multiple: unlockRateMultiple,
+  });
+
+  if (!("missing" in staked)) {
+    if ("error" in staked) {
+      return { error: staked.error, stamp: Date.now() };
+    }
+
+    const postId = staked.receipt.id;
+
+    if (!postId) {
+      return { error: "Failed to publish research post.", stamp: Date.now() };
+    }
+
+    after(() => ensureNoteBrief(postId, { userId }));
+    await finishPublish(supabase, userId, postId, draftId);
+    refreshFeed();
+    redirect(researchPostPath(postId));
+  }
+
   const debit = await debitProfileHp(supabase, userId, stakeHp);
 
   if (!debit.ok) {
@@ -223,22 +268,7 @@ export async function createResearchPost(
     stakeHp
   );
 
-  const draftId = String(formData.get("draftId") ?? "");
-
-  if (draftId) {
-    await supabase
-      .from("content_drafts")
-      .delete()
-      .eq("id", draftId)
-      .eq("user_id", userId)
-      .eq("kind", "post");
-  }
-
-  await notifyAuthorFollowers(supabase, {
-    actorId: userId,
-    postId: post.id,
-  });
-
+  await finishPublish(supabase, userId, post.id, draftId);
   refreshFeed();
 
   if (topic.error) {
@@ -270,6 +300,23 @@ export async function voteOnPost(
   }
 
   const { postId, direction, strength } = parsed.data;
+  const cast = await callBalanceFunction(supabase, "cast_note_vote", {
+    p_post_id: postId,
+    p_direction: direction,
+    p_strength: strength,
+  });
+
+  if (!("missing" in cast)) {
+    if ("error" in cast) {
+      return { error: cast.error, stamp: Date.now() };
+    }
+
+    refresh();
+    return cast.receipt.error
+      ? { error: cast.receipt.error, stamp: Date.now() }
+      : { message: cast.receipt.message ?? "Vote recorded.", stamp: Date.now() };
+  }
+
   const value = signedVoteValue(direction, strength);
   const cost = voteCostHp(strength);
 
@@ -384,6 +431,8 @@ export async function voteOnPost(
     }
     return { error: formatVoteInsertError(voteError), stamp: Date.now() };
   }
+
+  refresh();
 
   let nextHealth = post.current_health + voteHealthDelta(value);
   let nextStatus = RESEARCH_POST_STATUS_LIVE;

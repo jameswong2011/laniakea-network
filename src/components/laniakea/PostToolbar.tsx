@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   togglePostSubscription,
   toggleSavedPost,
 } from "@/app/(dashboard)/forum/actions";
-import { useSilentRefresh } from "@/lib/ui/silent-refresh";
 
 export function PostToolbar({
   postId,
@@ -18,20 +17,18 @@ export function PostToolbar({
   subscribed?: boolean | null;
   sharePath: string;
 }) {
-  const refresh = useSilentRefresh();
   const saveLock = useRef(false);
   const followLock = useRef(false);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(saved);
   const [isSubscribed, setIsSubscribed] = useState(subscribed);
+  const [synced, setSynced] = useState({ saved, subscribed });
 
-  useEffect(() => {
+  if (synced.saved !== saved || synced.subscribed !== subscribed) {
+    setSynced({ saved, subscribed });
     setIsSaved(saved);
-  }, [saved]);
-
-  useEffect(() => {
     setIsSubscribed(subscribed);
-  }, [subscribed]);
+  }
 
   async function copyLink() {
     const url =
@@ -58,9 +55,12 @@ export function PostToolbar({
     setIsSaved(!previous);
     const form = new FormData();
     form.set("postId", postId);
-    await toggleSavedPost(form);
+    const saved = await toggleSavedPost(form).catch(() => false);
     saveLock.current = false;
-    refresh();
+
+    if (!saved) {
+      setIsSaved(previous);
+    }
   }
 
   async function toggleFollow() {
@@ -73,9 +73,12 @@ export function PostToolbar({
     setIsSubscribed(!previous);
     const form = new FormData();
     form.set("postId", postId);
-    await togglePostSubscription(form);
+    const saved = await togglePostSubscription(form).catch(() => false);
     followLock.current = false;
-    refresh();
+
+    if (!saved) {
+      setIsSubscribed(previous);
+    }
   }
 
   return (

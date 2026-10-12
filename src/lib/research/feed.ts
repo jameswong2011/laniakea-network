@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { researchExcerpt as excerptNote, postedInWindow, resolveFeedPosted, FEED_POSTED_LABELS, type FeedPosted } from "@laniakea/domain";
+import { researchExcerpt as excerptNote, postedInWindow, postedSince, resolveFeedPosted, FEED_POSTED_LABELS, type FeedPosted } from "@laniakea/domain";
 import { getDeskAccess } from "@/lib/research/access";
 import {
   loadViewerUnlockIds,
@@ -188,29 +188,6 @@ export type FeedQuery = {
   posted: FeedPosted | null;
 };
 
-export function parseFeedQueryFromSearch(search: string | URLSearchParams): FeedQuery {
-  const params =
-    typeof search === "string"
-      ? new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
-      : search;
-
-  return {
-    topics: params.has("topic")
-      ? parseFeedTopics(params.getAll("topic"))
-      : null,
-    tiers: params.has("tier") ? parseFeedTiers(params.getAll("tier")) : null,
-    statuses: params.has("status")
-      ? parseFeedStatuses(params.getAll("status"))
-      : null,
-    posted: params.has("posted") ? parseFeedPosted(params.get("posted") ?? undefined) : null,
-  };
-}
-
-export function parseFeedQueryFromHref(href: string): FeedQuery {
-  const url = new URL(href, "https://laniakea.local");
-  return parseFeedQueryFromSearch(url.searchParams);
-}
-
 export function feedHeadingTitle(query: FeedQuery) {
   if (query.topics?.length === 1 && query.tiers?.length === 1) {
     return `${query.tiers[0]} · ${query.topics[0]}`;
@@ -361,25 +338,6 @@ export function feedTopicsHref(
   return feedHref({ topics: selected, tiers, statuses, posted });
 }
 
-export function itemMatchesFeedPosted(
-  item: Pick<ResearchPost, "created_at">,
-  posted: FeedPosted | null
-) {
-  return postedInWindow(item.created_at, posted);
-}
-
-export function itemMatchesFeedTopics(
-  item: Pick<ResearchPost, "sub_topic">,
-  selected: SubTopic[] | null
-) {
-  if (selected == null) {
-    return true;
-  }
-
-  const topic = resolveSubTopic(item.sub_topic);
-  return Boolean(topic && selected.includes(topic));
-}
-
 export function itemMatchesFeedTiers(
   item: Pick<ResearchFeedItem, "deskTier">,
   selected: Tier[] | null
@@ -391,14 +349,6 @@ export function itemMatchesFeedTiers(
   return Boolean(item.deskTier && selected.includes(item.deskTier));
 }
 
-export function itemMatchesFeedStatuses(
-  item: Pick<ResearchPost, "status">,
-  selected: FeedStatus[] | null
-) {
-  const outcome = feedStatusOf(item.status);
-  return Boolean(outcome && activeFeedStatuses(selected).includes(outcome));
-}
-
 const POST_COLUMNS =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
 
@@ -406,12 +356,6 @@ const POST_COLUMNS_AI = `${POST_COLUMNS}, ai_summary, ai_ticker, ai_conviction, 
 
 const POST_COLUMNS_WITHOUT_UNLOCK =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, created_at, updated_at";
-
-const FEED_POST_STATUSES = [
-  RESEARCH_POST_STATUS_LIVE,
-  RESEARCH_POST_STATUS_ASCENDED,
-  RESEARCH_POST_STATUS_ARCHIVED,
-];
 
 type FeedViewer = {
   userId?: string;
@@ -522,63 +466,158 @@ function toFeedItem(
   };
 }
 
-export async function getLiveResearchFeed(
-  supabase: SupabaseClient,
-  viewer?: FeedViewer
-): Promise<{ items: ResearchFeedItem[]; error: string | null }> {
-  const withAi = await supabase
-    .from("research_posts")
-    .select(POST_COLUMNS_AI)
-    .in("status", FEED_POST_STATUSES)
-    .order("created_at", { ascending: false });
+export const FEED_PAGE_SIZE = 40;
 
-  const withUnlock =
-    withAi.error && withAi.error.message.includes("ai_summary")
-      ? await supabase
-          .from("research_posts")
-          .select(POST_COLUMNS)
-          .in("status", FEED_POST_STATUSES)
-          .order("created_at", { ascending: false })
-      : withAi;
+const CARD_COLUMNS =
+  "id, author_id, title, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
 
-  const withTopic =
-    withUnlock.error && withUnlock.error.message.includes("unlock_rate_multiple")
-      ? await supabase
-          .from("research_posts")
-          .select(POST_COLUMNS_WITHOUT_UNLOCK)
-          .in("status", FEED_POST_STATUSES)
-          .order("created_at", { ascending: false })
-      : withUnlock;
+const FEED_COLUMN_SETS = [
+  `${CARD_COLUMNS}, body_preview, ai_summary`,
+  `${CARD_COLUMNS}, body, ai_summary`,
+  `${CARD_COLUMNS}, body`,
+  POST_COLUMNS_WITHOUT_UNLOCK,
+  "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at",
+];
 
-  const withoutStake =
-    withTopic.error && withTopic.error.message.includes("original_stake")
-      ? await supabase
-          .from("research_posts")
-          .select(
-            "id, author_id, title, body, status, current_health, sub_topic, created_at, updated_at"
-          )
-          .in("status", FEED_POST_STATUSES)
-          .order("created_at", { ascending: false })
-      : withTopic;
+const FEED_DB_STATUS: Record<FeedStatus, string> = {
+  battleground: RESEARCH_POST_STATUS_LIVE,
+  ascended: RESEARCH_POST_STATUS_ASCENDED,
+  hunted: RESEARCH_POST_STATUS_ARCHIVED,
+};
 
-  const legacy =
-    withoutStake.error && withoutStake.error.message.includes("sub_topic")
-      ? await supabase
-          .from("research_posts")
-          .select(
-            "id, author_id, title, body, status, current_health, created_at, updated_at"
-          )
-          .eq("status", RESEARCH_POST_STATUS_LIVE)
-          .order("created_at", { ascending: false })
-      : null;
+export type FeedPageOptions = {
+  query: FeedQuery;
+  before?: string | null;
+  timezoneOffset?: number;
+  limit?: number;
+};
 
-  const { data, error } = legacy ?? withoutStake;
+export type FeedPage = {
+  items: ResearchFeedItem[];
+  error: string | null;
+  nextCursor: string | null;
+};
 
-  if (error) {
-    return { items: [], error: error.message };
+/** Today starts at the reader's midnight, from their UTC offset in minutes. */
+export function feedPostedSince(posted: FeedPosted, timezoneOffset = 0, now = new Date()) {
+  if (posted !== "today") {
+    return postedSince(posted, now);
   }
 
-  const posts = normalizePosts(data as RawPost[] | null);
+  const local = new Date(now.getTime() - timezoneOffset * 60_000);
+  local.setUTCHours(0, 0, 0, 0);
+  return new Date(local.getTime() + timezoneOffset * 60_000);
+}
+
+export function parseFeedBefore(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  if (!raw) {
+    return null;
+  }
+
+  const time = Date.parse(raw);
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
+
+export function feedPageHref(query: FeedQuery, before: string) {
+  const base = feedHref(query);
+  const join = base.includes("?") ? "&" : "?";
+  return `${base}${join}before=${encodeURIComponent(before)}`;
+}
+
+function isSchemaError(error: { code?: string; message: string }) {
+  return (
+    ["42703", "42883", "PGRST100", "PGRST200", "PGRST201"].includes(error.code ?? "") ||
+    /does not exist|could not find|schema cache|relationship/i.test(error.message)
+  );
+}
+
+function feedRequest(
+  supabase: SupabaseClient,
+  columns: string,
+  options: FeedPageOptions,
+  statuses: string[],
+  tierJoin: boolean
+) {
+  const { query } = options;
+  let request = supabase
+    .from("research_posts")
+    .select(tierJoin ? `${columns}, profiles!inner(tier)` : columns)
+    .in("status", statuses)
+    .order("created_at", { ascending: false })
+    .limit((options.limit ?? FEED_PAGE_SIZE) + 1);
+
+  if (query.topics) {
+    request = request.in("sub_topic", query.topics);
+  }
+
+  if (query.posted) {
+    request = request.gte(
+      "created_at",
+      feedPostedSince(query.posted, options.timezoneOffset).toISOString()
+    );
+  }
+
+  if (options.before) {
+    request = request.lt("created_at", options.before);
+  }
+
+  if (tierJoin && query.tiers) {
+    request = request.in(
+      "profiles.tier",
+      [...new Set(query.tiers.flatMap((tier) => [tier, tier.toLowerCase()]))]
+    );
+  }
+
+  return request;
+}
+
+export async function getLiveResearchFeed(
+  supabase: SupabaseClient,
+  viewer: FeedViewer | undefined,
+  options: FeedPageOptions
+): Promise<FeedPage> {
+  const { query } = options;
+  const statuses = activeFeedStatuses(query.statuses).map((status) => FEED_DB_STATUS[status]);
+
+  if (statuses.length === 0 || query.topics?.length === 0 || query.tiers?.length === 0) {
+    return { items: [], error: null, nextCursor: null };
+  }
+
+  const limit = options.limit ?? FEED_PAGE_SIZE;
+  let tierJoin = query.tiers != null;
+  let columnSet = 0;
+  let result = await feedRequest(supabase, FEED_COLUMN_SETS[columnSet], options, statuses, tierJoin);
+
+  while (result.error && isSchemaError(result.error)) {
+    if (tierJoin && /profiles|relationship/i.test(result.error.message)) {
+      tierJoin = false;
+    } else if (columnSet < FEED_COLUMN_SETS.length - 1) {
+      columnSet += 1;
+    } else {
+      break;
+    }
+
+    result = await feedRequest(supabase, FEED_COLUMN_SETS[columnSet], options, statuses, tierJoin);
+  }
+
+  if (result.error) {
+    return { items: [], error: result.error.message, nextCursor: null };
+  }
+
+  const rows = (result.data ?? []) as unknown as (RawPost & {
+    body?: string | null;
+    body_preview?: string | null;
+    profiles?: unknown;
+  })[];
+  const page = rows.slice(0, limit).map((row) => {
+    const post = { ...row, body: row.body ?? row.body_preview ?? "" };
+    delete post.body_preview;
+    delete post.profiles;
+    return post;
+  });
+  const posts = normalizePosts(page as RawPost[]);
   const [{ authorsById, topicTiers }, unlockIds] = await Promise.all([
     loadAuthorMeta(supabase, [...new Set(posts.map((post) => post.author_id))]),
     loadViewerUnlockIds(
@@ -597,9 +636,10 @@ export async function getLiveResearchFeed(
         topicTiers,
         unlockIds.has(post.id)
       );
-      return item ? [item] : [];
+      return item && (tierJoin || itemMatchesFeedTiers(item, query.tiers)) ? [item] : [];
     }),
     error: null,
+    nextCursor: rows.length > limit ? (page[page.length - 1]?.created_at ?? null) : null,
   };
 }
 

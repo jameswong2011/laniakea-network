@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { fetchRetryingFutureJwt } from "@/lib/supabase/retry-fetch";
 import {
   DEMO_POSTS,
@@ -565,9 +566,10 @@ async function recordTopicQuietly(
 }
 
 export async function seedDemoData(
-  supabase: SupabaseClient,
+  adminClient: SupabaseClient,
   adminUserId: string
 ): Promise<DemoSeedResult> {
+  const supabase = createServiceClient() ?? adminClient;
   const result: DemoSeedResult = {
     usersCreated: 0,
     usersUpdated: 0,
@@ -601,7 +603,7 @@ export async function seedDemoData(
     }
   }
 
-  const rpc = await applyCatalogViaRpc(supabase);
+  const rpc = await applyCatalogViaRpc(adminClient);
 
   if (rpc.error) {
     result.warnings.push(rpc.error);

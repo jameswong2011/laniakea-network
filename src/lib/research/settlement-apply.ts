@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { callBalanceFunction } from "@/lib/research/balance-rpc";
 import { creditProfileHp } from "@/lib/research/hp";
 import type { SettlementVote } from "@/lib/research/settlement";
 import { isMissingCommentsSchema } from "@/lib/research/comments";
@@ -261,6 +262,14 @@ export async function settleCommentsOnHuntedPost(
   supabase: SupabaseClient,
   postId: string
 ) {
+  const cascade = await callBalanceFunction(supabase, "settle_comments_on_hunted_post", {
+    p_post_id: postId,
+  });
+
+  if (!("missing" in cascade)) {
+    return { error: "error" in cascade ? cascade.error : null };
+  }
+
   const { data, error } = await supabase
     .from("research_comments")
     .select("id, author_id, current_health, original_stake, status")

@@ -191,11 +191,14 @@ export default function App() {
       });
   }, [session]);
 
+  const [changedAt, setChangedAt] = useState(0);
   const sessionUserId = session?.user.id;
   const refreshProfile = useCallback(async () => {
     if (!sessionUserId) {
       return;
     }
+
+    setChangedAt(Date.now());
 
     try {
       setProfile(await loadProfile(sessionUserId));
@@ -267,7 +270,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-    <DeskProvider profile={profile} refresh={refreshProfile}>
+    <DeskProvider profile={profile} refresh={refreshProfile} changedAt={changedAt}>
       <NavigationContainer theme={navTheme}>
         <StatusBar style="light" />
         <AppStack.Navigator initialRouteName="Main" screenOptions={screenOptions}>

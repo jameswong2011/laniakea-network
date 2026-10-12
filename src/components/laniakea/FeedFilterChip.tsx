@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LinkPending } from "@/components/laniakea/LinkPending";
 
 export function FeedFilterChip({
   href,
@@ -28,8 +29,9 @@ export function FeedFilterChip({
   }
 
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={`relative ${className}`}>
       {children}
+      <LinkPending />
     </Link>
   );
 }

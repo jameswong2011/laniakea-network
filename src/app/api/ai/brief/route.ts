@@ -3,9 +3,9 @@ import { ensureNoteBrief, lockedBrief, storedNoteBrief } from "@/lib/ai/note-bri
 import { readerAccess, viewerFromRequest } from "@/lib/ai/viewer";
 
 const STORED_COLUMNS =
-  "author_id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_comment_agreement, ai_comment_objection";
+  "author_id, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_comment_agreement, ai_comment_objection";
 const STORED_COLUMNS_WITHOUT_COMMENTS =
-  "author_id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks";
+  "author_id, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks";
 
 export async function POST(request: Request) {
   const viewer = await viewerFromRequest(request);
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return Response.json({ brief: null });
   }
 
-  const note = read.data as { author_id: string; title: string; body: string };
+  const note = read.data as { author_id: string };
   const { access, isAdmin } = await readerAccess(viewer.supabase, viewer.userId, {
     id: postId,
     author_id: note.author_id,
@@ -62,14 +62,20 @@ export async function POST(request: Request) {
 
   const brief = await ensureNoteBrief(postId, {
     refresh: true,
-    source: { title: note.title, body: note.body },
     comments: true,
     reader: viewer.supabase,
     userId: viewer.userId,
   });
 
   if (!brief) {
-    return Response.json({ error: "No brief yet. Add OPENROUTER_API_KEY and run the note AI SQL." }, { status: 503 });
+    return Response.json(
+      {
+        error: process.env.OPENROUTER_API_KEY
+          ? "The summary is still being written. Try again in a minute."
+          : "OpenRouter is not set on the server.",
+      },
+      { status: 503 }
+    );
   }
 
   return Response.json({ brief });

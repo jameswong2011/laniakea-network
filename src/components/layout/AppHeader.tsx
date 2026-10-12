@@ -182,10 +182,12 @@ function HeaderMenu({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [openedAt, setOpenedAt] = useState(pathname);
 
-  useEffect(() => {
+  if (openedAt !== pathname) {
+    setOpenedAt(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   if (!isAuthenticated) {
     return null;
@@ -272,6 +274,10 @@ export function AppHeader({
   unreadCount?: number;
 }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    document.cookie = `tzo=${new Date().getTimezoneOffset()}; path=/; max-age=31536000; samesite=lax`;
+  }, []);
 
   return (
     <header className="relative shrink-0 border-b border-border bg-surface/90 backdrop-blur">

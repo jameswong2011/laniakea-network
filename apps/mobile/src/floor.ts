@@ -26,6 +26,11 @@ const POST_COLUMNS =
 
 const POST_COLUMNS_AI = `${POST_COLUMNS}, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks`;
 
+const CARD_COLUMNS =
+  "id, author_id, title, body_preview, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at, ai_summary, ai_ticker, ai_conviction";
+
+export const FEED_PAGE_SIZE = 40;
+
 export type DeskProfile = {
   id: string;
   username: string;
@@ -163,7 +168,7 @@ async function loadUnlockIds(userId: string, postIds: string[]) {
   return new Set((data ?? []).map((row) => row.post_id as string));
 }
 
-type FloorViewer = Pick<DeskProfile, "id" | "tier" | "role">;
+export type FloorViewer = Pick<DeskProfile, "id" | "tier" | "role">;
 
 function toNote(
   post: PostRow,
@@ -250,18 +255,26 @@ function databaseStatuses(query: FeedQuery) {
   return statuses;
 }
 
+function isSchemaError(error: { code?: string; message: string }) {
+  return (
+    ["42703", "42883", "PGRST100", "PGRST200", "PGRST201"].includes(error.code ?? "") ||
+    /does not exist|could not find|schema cache|relationship/i.test(error.message)
+  );
+}
+
 function feedRequest(
   columns: string,
   query: FeedQuery,
   statuses: string[],
-  tierJoin: boolean
+  tierJoin: boolean,
+  before: string | null
 ) {
   let request = supabase
     .from("research_posts")
     .select(tierJoin ? `${columns}, profiles!inner(tier)` : columns)
     .in("status", statuses)
     .order("created_at", { ascending: false })
-    .limit(80);
+    .limit(FEED_PAGE_SIZE + 1);
 
   if (query.topics != null) {
     request = request.in("sub_topic", query.topics);
@@ -269,6 +282,10 @@ function feedRequest(
 
   if (query.posted) {
     request = request.gte("created_at", postedSince(query.posted).toISOString());
+  }
+
+  if (before) {
+    request = request.lt("created_at", before);
   }
 
   if (tierJoin && query.tiers != null) {
@@ -281,36 +298,41 @@ function feedRequest(
   return request;
 }
 
-export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
+export type FeedPage = {
+  notes: FloorNote[];
+  nextCursor: string | null;
+};
+
+export async function loadFeed(
+  viewer: FloorViewer,
+  query: FeedQuery,
+  before: string | null = null
+): Promise<FeedPage> {
   const statuses = databaseStatuses(query);
 
   if (statuses.length === 0 || (query.topics != null && query.topics.length === 0)) {
-    return [];
+    return { notes: [], nextCursor: null };
   }
 
   if (query.tiers != null && query.tiers.length === 0) {
-    return [];
+    return { notes: [], nextCursor: null };
   }
 
-  const tierJoin = query.tiers != null;
-  const attempts: [string, boolean][] = tierJoin
-    ? [
-        [POST_COLUMNS_AI, true],
-        [POST_COLUMNS_AI, false],
-        [POST_COLUMNS, false],
-      ]
-    : [
-        [POST_COLUMNS_AI, false],
-        [POST_COLUMNS, false],
-      ];
-  let result = await feedRequest(attempts[0][0], query, statuses, attempts[0][1]);
+  const columnSets = [CARD_COLUMNS, POST_COLUMNS_AI, POST_COLUMNS];
+  let columnSet = 0;
+  let tierJoin = query.tiers != null;
+  let result = await feedRequest(columnSets[columnSet], query, statuses, tierJoin, before);
 
-  for (const [columns, join] of attempts.slice(1)) {
-    if (!result.error) {
+  while (result.error && isSchemaError(result.error)) {
+    if (tierJoin && /profiles|relationship/i.test(result.error.message)) {
+      tierJoin = false;
+    } else if (columnSet < columnSets.length - 1) {
+      columnSet += 1;
+    } else {
       break;
     }
 
-    result = await feedRequest(columns, query, statuses, join);
+    result = await feedRequest(columnSets[columnSet], query, statuses, tierJoin, before);
   }
 
   const { data, error } = result;
@@ -319,7 +341,14 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
     throw new Error(error.message);
   }
 
-  const posts = (data ?? []) as unknown as PostRow[];
+  const rows = (data ?? []) as unknown as (Omit<PostRow, "body"> & {
+    body?: string | null;
+    body_preview?: string | null;
+  })[];
+  const posts: PostRow[] = rows.slice(0, FEED_PAGE_SIZE).map((row) => ({
+    ...row,
+    body: row.body ?? row.body_preview ?? "",
+  }));
   const [authors, unlocks] = await Promise.all([
     loadAuthors(posts.map((post) => post.author_id)),
     loadUnlockIds(
@@ -328,15 +357,19 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
     ),
   ]);
 
-  return posts
-    .filter((post) => {
-      const tier = resolveTier(authors.get(post.author_id)?.tier);
-      const tierOk = query.tiers == null || (tier != null && query.tiers.includes(tier));
-      return tierOk && postedInWindow(post.created_at, query.posted);
-    })
-    .map((post) =>
-      toNote(post, authors.get(post.author_id), viewer, unlocks.has(post.id))
-    );
+  return {
+    notes: posts
+      .filter((post) => {
+        const tier = resolveTier(authors.get(post.author_id)?.tier);
+        const tierOk = query.tiers == null || (tier != null && query.tiers.includes(tier));
+        return tierOk && postedInWindow(post.created_at, query.posted);
+      })
+      .map((post) =>
+        toNote(post, authors.get(post.author_id), viewer, unlocks.has(post.id))
+      ),
+    nextCursor:
+      rows.length > FEED_PAGE_SIZE ? (posts[posts.length - 1]?.created_at ?? null) : null,
+  };
 }
 
 export async function loadThread(viewer: FloorViewer, postId: string) {

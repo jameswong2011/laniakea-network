@@ -1,31 +1,29 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 import { PageHeading } from "@/components/layout/PageFrame";
 import { FeedPostedFilter } from "@/components/laniakea/FeedPostedFilter";
 import { FeedStatusFilter } from "@/components/laniakea/FeedStatusFilter";
 import { FeedTierFilter } from "@/components/laniakea/FeedTierFilter";
 import { FeedTopicFilter } from "@/components/laniakea/FeedTopicFilter";
+import { LinkPending } from "@/components/laniakea/LinkPending";
 import { ResearchFeed } from "@/components/laniakea/ResearchFeed";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import {
   feedHeadingTitle,
-  itemMatchesFeedPosted,
-  itemMatchesFeedStatuses,
-  itemMatchesFeedTiers,
-  itemMatchesFeedTopics,
-  parseFeedQueryFromHref,
   researchComposePath,
   type FeedQuery,
 } from "@/lib/research/feed";
 import type { ResearchFeedItem, Tier } from "@/types";
 
+const pageLinkClassName =
+  "relative inline-flex h-9 items-center rounded-md border border-border bg-secondary px-3 text-[13px] font-medium text-foreground hover:bg-muted";
+
 export function FeedBoard({
   items,
   error,
   deskTier,
-  initialQuery,
+  query,
+  olderHref,
+  newestHref,
   viewerVotes,
   savedIds,
   canVote,
@@ -35,38 +33,15 @@ export function FeedBoard({
   items: ResearchFeedItem[];
   error: string | null;
   deskTier: Tier;
-  initialQuery: FeedQuery;
+  query: FeedQuery;
+  olderHref: string | null;
+  newestHref: string | null;
   viewerVotes: Record<string, number>;
-  savedIds: string[];
+  savedIds: Set<string>;
   canVote: boolean;
   availableHp: number;
   availableTokens: number;
 }) {
-  const [query, setQuery] = useState(initialQuery);
-  const saved = useMemo(() => new Set(savedIds), [savedIds]);
-
-  useEffect(() => {
-    function onPop() {
-      setQuery(parseFeedQueryFromHref(window.location.href));
-    }
-
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-
-  function apply(href: string) {
-    setQuery(parseFeedQueryFromHref(href));
-    window.history.pushState(window.history.state, "", href);
-  }
-
-  const visibleItems = items.filter(
-    (item) =>
-      itemMatchesFeedTopics(item, query.topics) &&
-      itemMatchesFeedTiers(item, query.tiers) &&
-      itemMatchesFeedStatuses(item, query.statuses) &&
-      itemMatchesFeedPosted(item, query.posted)
-  );
-
   return (
     <>
       <PageHeading
@@ -77,7 +52,8 @@ export function FeedBoard({
           <>
             <TierBadge tier={deskTier} size="md" />
             <span className="text-[13px] text-muted-foreground">
-              {visibleItems.length} notes
+              {items.length}
+              {olderHref ? "+" : ""} notes
             </span>
             <Link
               href={researchComposePath()}
@@ -95,28 +71,24 @@ export function FeedBoard({
           selectedTopics={query.topics}
           selectedTiers={query.tiers}
           selectedPosted={query.posted}
-          onSelect={apply}
         />
         <FeedPostedFilter
           selectedPosted={query.posted}
           selectedTopics={query.topics}
           selectedTiers={query.tiers}
           selectedStatuses={query.statuses}
-          onSelect={apply}
         />
         <FeedTierFilter
           selectedTiers={query.tiers}
           selectedTopics={query.topics}
           selectedStatuses={query.statuses}
           selectedPosted={query.posted}
-          onSelect={apply}
         />
         <FeedTopicFilter
           selected={query.topics}
           selectedTiers={query.tiers}
           selectedStatuses={query.statuses}
           selectedPosted={query.posted}
-          onSelect={apply}
         />
       </div>
 
@@ -137,14 +109,34 @@ export function FeedBoard({
           Select battleground, ascended, or hunted.
         </p>
       ) : (
-        <ResearchFeed
-          items={visibleItems}
-          viewerVotes={viewerVotes}
-          canVote={canVote}
-          availableHp={availableHp}
-          availableTokens={availableTokens}
-          savedIds={saved}
-        />
+        <>
+          <ResearchFeed
+            items={items}
+            viewerVotes={viewerVotes}
+            canVote={canVote}
+            availableHp={availableHp}
+            availableTokens={availableTokens}
+            savedIds={savedIds}
+          />
+          {olderHref || newestHref ? (
+            <nav aria-label="Feed pages" className="flex items-center justify-between gap-3">
+              {newestHref ? (
+                <Link href={newestHref} className={pageLinkClassName}>
+                  Newest notes
+                  <LinkPending />
+                </Link>
+              ) : (
+                <span />
+              )}
+              {olderHref ? (
+                <Link href={olderHref} className={pageLinkClassName}>
+                  Older notes
+                  <LinkPending />
+                </Link>
+              ) : null}
+            </nav>
+          ) : null}
+        </>
       )}
     </>
   );

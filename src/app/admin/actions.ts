@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
+import { forgetAnswers } from "@/lib/ai/ask-note";
 import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { requireAdmin } from "@/lib/auth/session";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { seedDemoData } from "@/lib/research/demo-data";
 import { runPassiveDrain } from "@/lib/research/drain";
 import { MAX_STAKE_HP, PASSIVE_DRAIN_HP } from "@/lib/research/economy";
@@ -73,6 +75,12 @@ const seedPostSchema = z.object({
 
 function firstIssue(error: z.ZodError) {
   return error.issues[0]?.message ?? "Invalid form data.";
+}
+
+/** Signed-in users cannot write balances, health, ledgers or other users' content, so admin tools write with the server key. */
+async function requireAdminWriter() {
+  const context = await requireAdmin();
+  return { ...context, writer: createServiceClient() ?? context.supabase };
 }
 
 export async function updateProfile(
@@ -158,7 +166,7 @@ export async function seedResearchPost(
   _prevState: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase } = await requireAdmin();
+  const { supabase, writer } = await requireAdminWriter();
   const parsed = seedPostSchema.safeParse({
     title: formData.get("title"),
     body: formData.get("body"),
@@ -183,7 +191,7 @@ export async function seedResearchPost(
     return { error: "Author profile was not found.", stamp: Date.now() };
   }
 
-  const { data: post, error: postError } = await supabase
+  const { data: post, error: postError } = await writer
     .from("research_posts")
     .insert({
       author_id: authorId,
@@ -206,7 +214,7 @@ export async function seedResearchPost(
 
   after(() => ensureNoteBrief(post.id));
 
-  const { error: txError } = await supabase.from("hp_transactions").insert({
+  const { error: txError } = await writer.from("hp_transactions").insert({
     user_id: authorId,
     amount: initialHpStake,
     type: "stake",
@@ -222,7 +230,7 @@ export async function seedResearchPost(
   }
 
   const topic = await recordSubtopicParticipation(
-    supabase,
+    writer,
     authorId,
     subTopic,
     initialHpStake
@@ -247,8 +255,8 @@ export async function applyPassiveDrain(
   _prevState: AdminActionState,
   _formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase } = await requireAdmin();
-  const result = await runPassiveDrain(supabase);
+  const { writer } = await requireAdminWriter();
+  const result = await runPassiveDrain(writer);
 
   if (result.error) {
     return { error: result.error, stamp: Date.now() };
@@ -391,7 +399,7 @@ export async function updateResearchPost(
   _prevState: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase } = await requireAdmin();
+  const { supabase, writer } = await requireAdminWriter();
   const parsed = postEditSchema.safeParse({
     id: formData.get("id"),
     title: formData.get("title"),
@@ -408,7 +416,7 @@ export async function updateResearchPost(
     .select("title, body")
     .eq("id", parsed.data.id)
     .maybeSingle();
-  const { error } = await supabase
+  const { error } = await writer
     .from("research_posts")
     .update({
       title: parsed.data.title,
@@ -426,7 +434,12 @@ export async function updateResearchPost(
   }
 
   if (before && (before.title !== parsed.data.title || before.body !== parsed.data.body)) {
-    after(() => ensureNoteBrief(parsed.data.id, { refresh: true }));
+    after(() =>
+      Promise.all([
+        ensureNoteBrief(parsed.data.id, { refresh: true }),
+        forgetAnswers(parsed.data.id),
+      ])
+    );
   }
 
   return { message: "Note updated.", stamp: Date.now() };
@@ -436,15 +449,15 @@ export async function deleteResearchPost(
   _prevState: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase } = await requireAdmin();
+  const { writer } = await requireAdminWriter();
   const id = String(formData.get("id") ?? "");
 
   if (!z.string().uuid().safeParse(id).success) {
     return { error: "Missing note.", stamp: Date.now() };
   }
 
-  await supabase.from("research_comments").delete().eq("post_id", id);
-  const { error } = await supabase.from("research_posts").delete().eq("id", id);
+  await writer.from("research_comments").delete().eq("post_id", id);
+  const { error } = await writer.from("research_posts").delete().eq("id", id);
 
   revalidatePath("/admin/content");
   revalidatePath("/feed");
@@ -460,7 +473,7 @@ export async function updateResearchComment(
   _prevState: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase } = await requireAdmin();
+  const { writer } = await requireAdminWriter();
   const parsed = commentEditSchema.safeParse({
     id: formData.get("id"),
     body: formData.get("body"),
@@ -470,7 +483,7 @@ export async function updateResearchComment(
     return { error: firstIssue(parsed.error), stamp: Date.now() };
   }
 
-  const { data: updated, error } = await supabase
+  const { data: updated, error } = await writer
     .from("research_comments")
     .update({ body: parsed.data.body, updated_at: new Date().toISOString() })
     .eq("id", parsed.data.id)
@@ -495,14 +508,14 @@ export async function deleteResearchComment(
   _prevState: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
-  const { supabase } = await requireAdmin();
+  const { writer } = await requireAdminWriter();
   const id = String(formData.get("id") ?? "");
 
   if (!z.string().uuid().safeParse(id).success) {
     return { error: "Missing comment.", stamp: Date.now() };
   }
 
-  const { data: removed, error } = await supabase
+  const { data: removed, error } = await writer
     .from("research_comments")
     .delete()
     .eq("id", id)

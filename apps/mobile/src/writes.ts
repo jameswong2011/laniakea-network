@@ -8,7 +8,6 @@ import {
   RESEARCH_POST_STATUS_ASCENDED,
   RESEARCH_POST_STATUS_LIVE,
   RESEARCH_POST_STATUS_REFUNDED,
-  STARTING_HP,
   UNLOCK_RATE_MULTIPLE_MAX,
   UNLOCK_RATE_MULTIPLE_MIN,
   ascentLine,
@@ -101,6 +100,31 @@ export function applyReactionToggle(counts: ReactionCount[], key: ReactionKey): 
 
 function clean(message: string) {
   return message.replace(/^ERROR:\s*/i, "").replace(/\s+CONTEXT:[\s\S]*$/, "");
+}
+
+type BalanceReceipt = {
+  id?: string;
+  postAuthorId?: string;
+  message?: string;
+  error?: string | null;
+};
+
+/** Falls through to the older code path only while the SQL function is absent from the database. */
+async function callBalanceFunction(
+  name: string,
+  args: Record<string, unknown>
+): Promise<{ missing: true } | { error: string } | { receipt: BalanceReceipt }> {
+  const { data, error } = await supabase.rpc(name, args);
+
+  if (error) {
+    if (error.code === "PGRST202" || (error.code === "42883" && error.message.includes(name))) {
+      return { missing: true };
+    }
+
+    return { error: clean(error.message) };
+  }
+
+  return { receipt: (data ?? {}) as BalanceReceipt };
 }
 
 function whole(value: number, label: string) {
@@ -329,6 +353,35 @@ async function walletMove(userId: string, hpDelta: number, tokenDelta: number) {
   };
 }
 
+async function afterPublish(userId: string, postId: string, draftId?: string) {
+  if (draftId) {
+    await supabase
+      .from("content_drafts")
+      .delete()
+      .eq("id", draftId)
+      .eq("user_id", userId)
+      .eq("kind", "post");
+  }
+
+  const followers = await supabase
+    .from("author_subscriptions")
+    .select("subscriber_id")
+    .eq("author_id", userId);
+
+  if (!followers.error && followers.data?.length) {
+    await supabase.from("notifications").insert(
+      followers.data.map((row) => ({
+        user_id: row.subscriber_id,
+        actor_id: userId,
+        kind: "author_post",
+        post_id: postId,
+      }))
+    );
+  }
+
+  void requestNoteBrief(postId, true);
+}
+
 export async function publishNote(input: {
   userId: string;
   title: string;
@@ -366,13 +419,36 @@ export async function publishNote(input: {
     return { error: `Unlock rate is ${UNLOCK_RATE_MULTIPLE_MIN}–${UNLOCK_RATE_MULTIPLE_MAX}×.` };
   }
 
+  const multiple = resolveUnlockRateMultiple(input.unlockRateMultiple);
+  const staked = await callBalanceFunction("stake_note", {
+    p_title: title,
+    p_body: body,
+    p_sub_topic: input.subTopic,
+    p_stake: input.stakeHp,
+    p_unlock_rate_multiple: multiple,
+  });
+
+  if (!("missing" in staked)) {
+    if ("error" in staked) {
+      return { error: staked.error };
+    }
+
+    const postId = staked.receipt.id;
+
+    if (!postId) {
+      return { error: "Failed to publish." };
+    }
+
+    await afterPublish(input.userId, postId, input.draftId);
+    return { id: postId, message: staked.receipt.message ?? "Note published." };
+  }
+
   const debit = await debitHp(input.userId, input.stakeHp);
 
   if (!debit.ok) {
     return { error: debit.error };
   }
 
-  const multiple = resolveUnlockRateMultiple(input.unlockRateMultiple);
   const inserted = await supabase
     .from("research_posts")
     .insert({
@@ -402,33 +478,7 @@ export async function publishNote(input: {
   });
 
   const topicError = await recordTopic(input.userId, input.subTopic, input.stakeHp);
-
-  if (input.draftId) {
-    await supabase
-      .from("content_drafts")
-      .delete()
-      .eq("id", input.draftId)
-      .eq("user_id", input.userId)
-      .eq("kind", "post");
-  }
-
-  const followers = await supabase
-    .from("author_subscriptions")
-    .select("subscriber_id")
-    .eq("author_id", input.userId);
-
-  if (!followers.error && followers.data?.length) {
-    await supabase.from("notifications").insert(
-      followers.data.map((row) => ({
-        user_id: row.subscriber_id,
-        actor_id: input.userId,
-        kind: "author_post",
-        post_id: inserted.data.id,
-      }))
-    );
-  }
-
-  void requestNoteBrief(inserted.data.id, true);
+  await afterPublish(input.userId, inserted.data.id, input.draftId);
 
   if (topicError) {
     return { id: inserted.data.id, error: `Post published, but topic rank failed: ${topicError}` };
@@ -489,6 +539,12 @@ export async function saveNoteDraft(input: {
 }
 
 async function settlePostComments(postId: string) {
+  const cascade = await callBalanceFunction("settle_comments_on_hunted_post", { p_post_id: postId });
+
+  if (!("missing" in cascade)) {
+    return "error" in cascade ? cascade.error : null;
+  }
+
   const { data, error } = await supabase
     .from("research_comments")
     .select("id, author_id, current_health, original_stake, status")
@@ -600,6 +656,22 @@ export async function voteOnNote(input: {
 
   if (!canWriteDesk(input.access)) {
     return { error: "Higher-tier users are view-only until you unlock them." };
+  }
+
+  const cast = await callBalanceFunction("cast_note_vote", {
+    p_post_id: input.postId,
+    p_direction: input.direction,
+    p_strength: input.strength,
+  });
+
+  if (!("missing" in cast)) {
+    if ("error" in cast) {
+      return { error: cast.error };
+    }
+
+    return cast.receipt.error
+      ? { error: cast.receipt.error }
+      : { message: cast.receipt.message ?? "Vote recorded." };
   }
 
   const value = signedVoteValue(input.direction, input.strength);
@@ -760,6 +832,27 @@ export async function publishComment(input: {
     return { error: "This post has been hunted. Comments are closed." };
   }
 
+  const staked = await callBalanceFunction("stake_comment", {
+    p_post_id: input.postId,
+    p_body: body,
+    p_stake: input.stakeHp,
+  });
+
+  if (!("missing" in staked)) {
+    if ("error" in staked) {
+      return { error: staked.error };
+    }
+
+    const commentId = staked.receipt.id;
+
+    if (!commentId) {
+      return { error: "Failed to post comment." };
+    }
+
+    await afterComment(input.userId, input.postId, commentId, staked.receipt.postAuthorId ?? input.postAuthorId);
+    return { id: commentId, message: staked.receipt.message ?? "Comment posted." };
+  }
+
   const debit = await debitHp(input.userId, input.stakeHp);
 
   if (!debit.ok) {
@@ -797,50 +890,53 @@ export async function publishComment(input: {
     await recordTopic(input.userId, input.subTopic, input.stakeHp);
   }
 
+  await afterComment(input.userId, input.postId, inserted.data.id, input.postAuthorId);
+  return { id: inserted.data.id, message: "Comment posted." };
+}
+
+async function afterComment(userId: string, postId: string, commentId: string, postAuthorId: string) {
   await supabase
     .from("content_drafts")
     .delete()
-    .eq("user_id", input.userId)
+    .eq("user_id", userId)
     .eq("kind", "comment")
-    .eq("post_id", input.postId);
+    .eq("post_id", postId);
 
   const recipients = new Set<string>();
 
-  if (input.postAuthorId !== input.userId) {
-    recipients.add(input.postAuthorId);
+  if (postAuthorId !== userId) {
+    recipients.add(postAuthorId);
   }
 
   const subs = await supabase
     .from("post_subscriptions")
     .select("user_id")
-    .eq("post_id", input.postId);
+    .eq("post_id", postId);
 
   for (const row of subs.data ?? []) {
-    if (row.user_id !== input.userId) {
+    if (row.user_id !== userId) {
       recipients.add(row.user_id as string);
     }
   }
 
   if (recipients.size > 0) {
     await supabase.from("notifications").insert(
-      [...recipients].map((userId) => ({
-        user_id: userId,
-        actor_id: input.userId,
+      [...recipients].map((recipient) => ({
+        user_id: recipient,
+        actor_id: userId,
         kind: "comment_on_post",
-        post_id: input.postId,
-        comment_id: inserted.data.id,
+        post_id: postId,
+        comment_id: commentId,
       }))
     );
   }
 
   await supabase.from("post_subscriptions").upsert(
-    { user_id: input.userId, post_id: input.postId },
+    { user_id: userId, post_id: postId },
     { onConflict: "user_id,post_id" }
   );
 
-  void requestCommentBrief(input.postId);
-
-  return { id: inserted.data.id, message: "Comment posted." };
+  void requestCommentBrief(postId);
 }
 
 export async function loadCommentVotes(userId: string, commentIds: string[]) {
@@ -894,6 +990,22 @@ export async function voteOnComment(input: {
 
   if (input.postStatus === RESEARCH_POST_STATUS_ARCHIVED) {
     return { error: "This post has been hunted. Comment votes are closed." };
+  }
+
+  const cast = await callBalanceFunction("cast_comment_vote", {
+    p_comment_id: input.commentId,
+    p_direction: input.direction,
+    p_strength: input.strength,
+  });
+
+  if (!("missing" in cast)) {
+    if ("error" in cast) {
+      return { error: cast.error };
+    }
+
+    return cast.receipt.error
+      ? { error: cast.receipt.error }
+      : { message: cast.receipt.message ?? "Vote recorded." };
   }
 
   const existing = await supabase
@@ -1143,6 +1255,14 @@ export async function cashOutHp(input: { userId: string; tier: string; hp: numbe
   }
 
   const tokens = input.hp / HP_PER_UTILITY_TOKEN;
+  const cashed = await callBalanceFunction("cash_out_hp", { p_hp: input.hp });
+
+  if (!("missing" in cashed)) {
+    return "error" in cashed
+      ? { error: cashed.error }
+      : { message: cashed.receipt.message ?? `Cashed out ${input.hp} HP for ${tokens} UTL.` };
+  }
+
   const move = await walletMove(input.userId, -input.hp, tokens);
 
   if (!move.ok) {
@@ -1424,7 +1544,7 @@ export async function signUp(input: {
   if (data.user) {
     await supabase
       .from("profiles")
-      .update({ username, display_name: displayName, current_hp: STARTING_HP })
+      .update({ username, display_name: displayName })
       .eq("id", data.user.id);
   }
 
@@ -1466,7 +1586,7 @@ export async function searchFloor(query: string) {
     return request;
   }
 
-  const [titles, bodies, comments, names, users] = await Promise.all([
+  const [titles, bodies, comments, names, users] = (await Promise.all([
     matchColumn("research_posts", "title", "id, title, body, sub_topic, created_at")
       .order("created_at", { ascending: false })
       .limit(20),
@@ -1482,7 +1602,7 @@ export async function searchFloor(query: string) {
     matchColumn("profiles", "username", "id, username, display_name, tier, avatar_url")
       .neq("username", "laniakea_treasury")
       .limit(12),
-  ]);
+  ])) as unknown as { data: Record<string, unknown>[] | null }[];
 
   const ordered = orderSearchPosts(
     [

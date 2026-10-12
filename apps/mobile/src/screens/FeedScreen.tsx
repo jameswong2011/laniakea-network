@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,9 +9,9 @@ import {
   StyleSheet,
   Text,
   View,
+  type ListRenderItem,
 } from "react-native";
 import type { CompositeScreenProps } from "@react-navigation/native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,6 +33,7 @@ import {
   type FeedStatus,
 } from "../feed-query";
 import { loadFeed, type FloorNote } from "../floor";
+import { useFocusRefresh } from "../focus-refresh";
 import { colors, radius } from "../theme";
 import type { AppStackParamList, TabParamList } from "../types";
 import { DeskAvatar } from "../avatar";
@@ -88,6 +89,56 @@ function tapeLabel(query: FeedQuery) {
   return `${outcome} · ${desk} · ${sectors} · ${posted}`;
 }
 
+const NO_REACTIONS: ReactionCount[] = [];
+
+function noteKey(note: FloorNote) {
+  return note.id;
+}
+
+const FeedCard = memo(function FeedCard({
+  note,
+  reactions,
+  onOpen,
+  onAuthor,
+}: {
+  note: FloorNote;
+  reactions: ReactionCount[];
+  onOpen: (postId: string) => void;
+  onAuthor: (username: string) => void;
+}) {
+  return (
+    <Pressable onPress={() => onOpen(note.id)} style={styles.card}>
+      <Pressable
+        onPress={() => {
+          if (note.authorUsername) {
+            onAuthor(note.authorUsername);
+          }
+        }}
+      >
+        <View style={styles.cardMetaRow}>
+          <DeskAvatar url={note.authorAvatar} name={note.authorName} size={28} />
+          <View style={styles.cardWho}>
+            <Text style={styles.cardAuthor}>{note.authorName}</Text>
+            <View style={styles.cardMetaLine}>
+              {note.authorTier ? <TierName tier={note.authorTier} /> : null}
+              <View style={[styles.access, { backgroundColor: railColor(note.access) }]} />
+              <Text style={styles.cardMeta} numberOfLines={1}>
+                {note.subTopic ? `${note.subTopic} · ` : ""}
+                {note.healthLabel}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Pressable>
+      <Text style={styles.cardTitle}>{note.title}</Text>
+      <Text style={styles.cardBody}>
+        {note.summary || researchExcerpt(note.body, 360)}
+      </Text>
+      <ReactionTally counts={reactions} />
+    </Pressable>
+  );
+});
+
 export function FeedScreen({ navigation }: Props) {
   const profile = useDesk();
   const insets = useSafeAreaInsets();
@@ -97,27 +148,95 @@ export function FeedScreen({ navigation }: Props) {
   const [reactions, setReactions] = useState<Record<string, ReactionCount[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const generation = useRef(0);
+  const moreInFlight = useRef(false);
   const activeStatuses = query.statuses ?? DEFAULT_FEED_STATUSES;
+  const viewerId = profile.id;
+  const viewerTier = profile.tier;
+  const viewerRole = profile.role;
 
   const refresh = useCallback(async () => {
+    const run = ++generation.current;
     setLoading(true);
     setError(null);
 
     try {
-      const next = await loadFeed(profile, query);
-      setNotes(next);
-      setReactions(await loadReactions("post", next.map((note) => note.id), profile.id));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load the tape.");
-    } finally {
-      setLoading(false);
-    }
-  }, [profile, query]);
+      const page = await loadFeed({ id: viewerId, tier: viewerTier, role: viewerRole }, query);
+      const counts = await loadReactions("post", page.notes.map((note) => note.id), viewerId);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
+      if (run !== generation.current) {
+        return;
+      }
+
+      setNotes(page.notes);
+      setCursor(page.nextCursor);
+      setReactions(counts);
+    } catch (cause) {
+      if (run === generation.current) {
+        setError(cause instanceof Error ? cause.message : "Could not load the tape.");
+      }
+    } finally {
+      if (run === generation.current) {
+        setLoading(false);
+      }
+    }
+  }, [query, viewerId, viewerRole, viewerTier]);
+
+  const { refreshing, onRefresh } = useFocusRefresh(refresh);
+
+  const loadMore = useCallback(async () => {
+    if (!cursor || moreInFlight.current) {
+      return;
+    }
+
+    const run = generation.current;
+    moreInFlight.current = true;
+    setLoadingMore(true);
+
+    try {
+      const page = await loadFeed({ id: viewerId, tier: viewerTier, role: viewerRole }, query, cursor);
+      const counts = await loadReactions("post", page.notes.map((note) => note.id), viewerId);
+
+      if (run !== generation.current) {
+        return;
+      }
+
+      setNotes((current) => {
+        const seen = new Set(current.map((note) => note.id));
+        return [...current, ...page.notes.filter((note) => !seen.has(note.id))];
+      });
+      setReactions((current) => ({ ...current, ...counts }));
+      setCursor(page.nextCursor);
+    } catch (cause) {
+      if (run === generation.current) {
+        setError(cause instanceof Error ? cause.message : "Could not load more of the tape.");
+      }
+    } finally {
+      moreInFlight.current = false;
+      setLoadingMore(false);
+    }
+  }, [cursor, query, viewerId, viewerRole, viewerTier]);
+
+  const openNote = useCallback(
+    (postId: string) => navigation.navigate("Thread", { postId }),
+    [navigation]
+  );
+  const openAuthor = useCallback(
+    (username: string) => navigation.navigate("Desk", { username }),
+    [navigation]
+  );
+  const renderNote = useCallback<ListRenderItem<FloorNote>>(
+    ({ item }) => (
+      <FeedCard
+        note={item}
+        reactions={reactions[item.id] ?? NO_REACTIONS}
+        onOpen={openNote}
+        onAuthor={openAuthor}
+      />
+    ),
+    [openAuthor, openNote, reactions]
   );
 
   return (
@@ -135,46 +254,18 @@ export function FeedScreen({ navigation }: Props) {
       ) : (
         <FlatList
           data={notes}
-          keyExtractor={(note) => note.id}
+          keyExtractor={noteKey}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />
           }
           contentContainerStyle={styles.list}
           ListEmptyComponent={<Empty label="No notes match this tape." />}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => navigation.navigate("Thread", { postId: item.id })}
-              style={styles.card}
-            >
-              <Pressable
-                onPress={() => {
-                  if (item.authorUsername) {
-                    navigation.navigate("Desk", { username: item.authorUsername });
-                  }
-                }}
-              >
-                <View style={styles.cardMetaRow}>
-                  <DeskAvatar url={item.authorAvatar} name={item.authorName} size={28} />
-                  <View style={styles.cardWho}>
-                    <Text style={styles.cardAuthor}>{item.authorName}</Text>
-                    <View style={styles.cardMetaLine}>
-                      {item.authorTier ? <TierName tier={item.authorTier} /> : null}
-                      <View style={[styles.access, { backgroundColor: railColor(item.access) }]} />
-                      <Text style={styles.cardMeta} numberOfLines={1}>
-                        {item.subTopic ? `${item.subTopic} · ` : ""}
-                        {item.healthLabel}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </Pressable>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardBody}>
-                {item.summary || researchExcerpt(item.body, 360)}
-              </Text>
-              <ReactionTally counts={reactions[item.id] ?? []} />
-            </Pressable>
-          )}
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator color={colors.fg} style={styles.more} /> : null
+          }
+          onEndReached={() => void loadMore()}
+          onEndReachedThreshold={0.6}
+          renderItem={renderNote}
         />
       )}
       <Modal
@@ -324,6 +415,9 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginTop: 32,
+  },
+  more: {
+    marginVertical: 16,
   },
   list: {
     paddingHorizontal: 16,

@@ -1,11 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { requireUser } from "@/lib/auth/session";
 import { canWriteDesk } from "@/lib/research/access";
+import { callBalanceFunction } from "@/lib/research/balance-rpc";
 import { resolvePostDeskAccess } from "@/lib/research/unlock";
 import {
   DEFAULT_COMMENT_STAKE_HP,
@@ -178,6 +179,29 @@ export async function createComment(
   }
 
   const { postId, body, stakeHp } = parsed.data;
+  const staked = await callBalanceFunction(supabase, "stake_comment", {
+    p_post_id: postId,
+    p_body: body,
+    p_stake: stakeHp,
+  });
+
+  if (!("missing" in staked)) {
+    if ("error" in staked) {
+      return { error: staked.error, stamp: Date.now() };
+    }
+
+    const commentId = staked.receipt.id;
+
+    if (!commentId) {
+      return { error: "Failed to post comment.", stamp: Date.now() };
+    }
+
+    after(() => ensureCommentBrief(postId, undefined, userId));
+    await finishComment(supabase, userId, postId, commentId, staked.receipt.postAuthorId ?? null);
+    refreshThread(postId);
+    return { message: staked.receipt.message ?? "Comment posted.", stamp: Date.now() };
+  }
+
   const visible = await loadVisiblePost(supabase, postId, profile ?? {});
 
   if (visible.error || !visible.post) {
@@ -265,6 +289,18 @@ export async function createComment(
     }
   }
 
+  await finishComment(supabase, userId, postId, comment.id, visible.post.author_id);
+  refreshThread(postId);
+  return { message: "Comment posted.", stamp: Date.now() };
+}
+
+async function finishComment(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+  postId: string,
+  commentId: string,
+  postAuthorId: string | null
+) {
   await supabase
     .from("content_drafts")
     .delete()
@@ -272,15 +308,14 @@ export async function createComment(
     .eq("kind", "comment")
     .eq("post_id", postId);
 
-  await notifyCommentOnPost(supabase, {
-    actorId: userId,
-    postId,
-    commentId: comment.id,
-    postAuthorId: visible.post.author_id,
-  });
-
-  refreshThread(postId);
-  return { message: "Comment posted.", stamp: Date.now() };
+  if (postAuthorId) {
+    await notifyCommentOnPost(supabase, {
+      actorId: userId,
+      postId,
+      commentId,
+      postAuthorId,
+    });
+  }
 }
 
 export async function voteOnComment(
@@ -303,6 +338,23 @@ export async function voteOnComment(
   }
 
   const { postId, commentId, direction, strength } = parsed.data;
+  const cast = await callBalanceFunction(supabase, "cast_comment_vote", {
+    p_comment_id: commentId,
+    p_direction: direction,
+    p_strength: strength,
+  });
+
+  if (!("missing" in cast)) {
+    if ("error" in cast) {
+      return { error: cast.error, stamp: Date.now() };
+    }
+
+    refresh();
+    return cast.receipt.error
+      ? { error: cast.receipt.error, stamp: Date.now() }
+      : { message: cast.receipt.message ?? "Vote recorded.", stamp: Date.now() };
+  }
+
   const value = signedVoteValue(direction, strength);
   const cost = voteCostHp(strength);
   const visible = await loadVisiblePost(supabase, postId, profile ?? {});
@@ -389,6 +441,8 @@ export async function voteOnComment(
     }
     return { error: formatVoteInsertError(voteError), stamp: Date.now() };
   }
+
+  refresh();
 
   let nextHealth = comment.current_health + voteHealthDelta(value);
   let nextStatus = RESEARCH_POST_STATUS_LIVE;

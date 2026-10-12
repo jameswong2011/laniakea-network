@@ -8,10 +8,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { DeskAvatar } from "../avatar";
 import { useDesk } from "../desk";
+import { useFocusRefresh } from "../focus-refresh";
 import { formatWhen } from "../format";
 import { ReactionTally } from "../reaction-tally";
 import { TierName } from "../tier-mark";
@@ -50,11 +50,7 @@ export function DeskScreen({
     setLoading(false);
   }, [route.params.username, viewer.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
+  const { refreshing, onRefresh } = useFocusRefresh(refresh);
 
   if (loading && !desk) {
     return (
@@ -78,7 +74,7 @@ export function DeskScreen({
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />}
     >
       <View style={styles.identity}>
         <DeskAvatar url={desk.avatarUrl} name={desk.displayName} size={64} />

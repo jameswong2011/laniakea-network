@@ -9,9 +9,9 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useDesk, useDeskRefresh } from "../desk";
+import { useFocusRefresh } from "../focus-refresh";
 import { formatWhen } from "../format";
 import { loadProfile } from "../floor";
 import { loadWallet, type WalletEntry } from "../library";
@@ -61,11 +61,7 @@ export function WalletScreen({
     }
   }, [profile.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
+  const { reload, refreshing, onRefresh } = useFocusRefresh(refresh);
 
   const room = resolveTier(tier);
   const showBuy = room === "Bronze";
@@ -77,7 +73,7 @@ export function WalletScreen({
       data={entries}
       keyExtractor={(entry) => entry.id}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor={colors.fg} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fg} />
       }
       ListHeaderComponent={
         <View>
@@ -116,7 +112,7 @@ export function WalletScreen({
                     setNotice(result.message ?? null);
                     if (!result.error) {
                       void refreshDesk();
-                      await refresh();
+                      await reload();
                     }
                   });
                 }}
@@ -150,7 +146,7 @@ export function WalletScreen({
                     setNotice(result.message ?? null);
                     if (!result.error) {
                       void refreshDesk();
-                      await refresh();
+                      await reload();
                     }
                   });
                 }}

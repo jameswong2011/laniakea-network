@@ -10,6 +10,7 @@ import {
   MASTERS_CASHOUT_RESERVE_HP,
   maxBuyHpTokens,
 } from "@/lib/research/economy";
+import { callBalanceFunction } from "@/lib/research/balance-rpc";
 import { applyWalletMove } from "@/lib/research/hp";
 import { isMissingInviteSchema } from "@/lib/research/invite";
 import { isMissingUtilityTokenColumn, missingUtilityTokenMessage } from "@/lib/research/tokens";
@@ -188,6 +189,20 @@ export async function cashOutHp(
   }
 
   const tokens = hp / HP_PER_UTILITY_TOKEN;
+  const cashed = await callBalanceFunction(supabase, "cash_out_hp", { p_hp: hp });
+
+  if (!("missing" in cashed)) {
+    if ("error" in cashed) {
+      return { error: cashed.error, stamp: Date.now() };
+    }
+
+    refreshWallet();
+    return {
+      message: cashed.receipt.message ?? `Cashed out ${hp} HP for ${tokens} UTL.`,
+      stamp: Date.now(),
+    };
+  }
+
   const move = await applyWalletMove(supabase, userId, {
     hpDelta: -hp,
     tokenDelta: tokens,
