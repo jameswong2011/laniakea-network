@@ -87,8 +87,8 @@ export default async function RankingPage({
         title="Ranking"
         description={
           selectedTier
-            ? `${selectedTier} desks, ordered by HP.`
-            : `Overall book by research tier, then HP in that desk. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time, and resets swept desks to 1000 HP.`
+            ? `${selectedTier} users, ordered by HP.`
+            : `Overall book by research tier, then HP among those users. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time, and resets swept users to 1000 HP.`
         }
         meta={isAdmin ? <CalibrationButton /> : null}
       />
@@ -104,7 +104,7 @@ export default async function RankingPage({
           </p>
         ) : rows.length === 0 ? (
           <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
-            {selectedTier ? `No desks in ${selectedTier}.` : "No profiles found."}
+            {selectedTier ? `No users in ${selectedTier}.` : "No profiles found."}
           </p>
         ) : (
           <table className="w-full text-left">

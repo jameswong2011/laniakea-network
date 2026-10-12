@@ -75,7 +75,7 @@ function tapeLabel(query: FeedQuery) {
     query.statuses == null
       ? "Live tape"
       : query.statuses.map((status) => FEED_STATUS_LABELS[status]).join(", ");
-  const desk = query.tiers == null ? "All desks" : query.tiers.join(", ");
+  const desk = query.tiers == null ? "All users" : query.tiers.join(", ");
   const sectors =
     query.topics == null
       ? "All sectors"
@@ -169,7 +169,7 @@ export function FeedScreen({ navigation }: Props) {
                 </View>
               </Pressable>
               <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text numberOfLines={6} style={styles.cardBody}>
+              <Text style={styles.cardBody}>
                 {item.summary || researchExcerpt(item.body, 360)}
               </Text>
               <ReactionTally counts={reactions[item.id] ?? []} />
@@ -230,7 +230,7 @@ export function FeedScreen({ navigation }: Props) {
                   />
                 ))}
               </View>
-              <SectionLabel label="Desk" hint="Author overall tier." />
+              <SectionLabel label="User" hint="Author overall tier." />
               <View style={styles.wrap}>
                 <Chip
                   label="All"

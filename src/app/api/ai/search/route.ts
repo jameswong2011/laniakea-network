@@ -15,6 +15,6 @@ export async function POST(request: Request) {
     return Response.json({ hits: [] });
   }
 
-  const hits = await rankNotesByMeaning(query, viewer.supabase);
+  const hits = await rankNotesByMeaning(query, viewer.supabase, viewer.userId);
   return Response.json({ hits });
 }

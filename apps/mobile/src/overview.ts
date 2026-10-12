@@ -56,7 +56,7 @@ export const SEATS = [
       },
       {
         title: "Pay per note",
-        body: "Unlock is one UTL purchase per note. Follow a desk. Save a thread. Search the library. Hunted notes leave the default tape.",
+        body: "Unlock is one UTL purchase per note. Follow a user. Save a thread. Search the library. Hunted notes leave the default tape.",
       },
       {
         title: "Judgment is optional",
@@ -77,7 +77,7 @@ export const FLOOR_RULES = [
   },
   {
     title: "HP is inventory, not a score",
-    body: `You start with ${STARTING_HP} HP. You spend it to publish, comment, and vote. Idle desks lose a little every Monday. Masters can cash HP into UTL. Bronze can restore HP, never past the grant.`,
+    body: `You start with ${STARTING_HP} HP. You spend it to publish, comment, and vote. Idle users lose a little every Monday. Masters can cash HP into UTL. Bronze can restore HP, never past the grant.`,
   },
   {
     title: "Notes settle in public",
@@ -85,7 +85,7 @@ export const FLOOR_RULES = [
   },
   {
     title: "The floor is invite-only",
-    body: `Every desk gets ${SIGNUP_INVITE_GRANT} codes. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Residual on UTL spends walks the invite line. HP spends do not.`,
+    body: `Every user gets ${SIGNUP_INVITE_GRANT} codes. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Residual on UTL spends walks the invite line. HP spends do not.`,
   },
 ] as const;
 

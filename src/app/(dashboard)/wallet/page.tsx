@@ -81,7 +81,7 @@ export default async function WalletPage() {
       ) : null}
       {showCashout ? (
         <Panel>
-          <PanelHeader label="Cash out HP" meta="Masters desk" />
+          <PanelHeader label="Cash out HP" meta="Masters user" />
           <TokenDesk
             mode="cashout"
             availableHp={profile?.current_hp ?? 0}

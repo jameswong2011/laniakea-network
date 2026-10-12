@@ -227,7 +227,7 @@ export default async function SearchPage({
           ) : null}
           {desks.length > 0 ? (
             <Panel>
-              <PanelHeader label="Desks" meta={desks.length} />
+              <PanelHeader label="Users" meta={desks.length} />
               <div className="divide-y divide-border">
                 {desks.map((desk) => (
                   <article key={desk.id} className="px-4 py-4">

@@ -11,7 +11,7 @@ export function SearchBox({
         name="q"
         type="search"
         defaultValue={defaultValue}
-        placeholder="Search notes, comments, desks"
+        placeholder="Search notes, comments, users"
         className={
           compact
             ? "h-8 w-52 rounded-md border border-border bg-background px-2.5 text-[13px] outline-none focus-visible:border-ring"

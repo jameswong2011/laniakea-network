@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { requireAdmin } from "@/lib/auth/session";
 import { seedDemoData } from "@/lib/research/demo-data";
 import { runPassiveDrain } from "@/lib/research/drain";
@@ -201,6 +202,8 @@ export async function seedResearchPost(
     };
   }
 
+  void ensureNoteBrief(post.id);
+
   const { error: txError } = await supabase.from("hp_transactions").insert({
     user_id: authorId,
     amount: initialHpStake,
@@ -365,7 +368,131 @@ export async function wipeForumContent(
       : {};
 
   return {
-    message: `Tape emptied. Posts ${counts.posts ?? 0} · comments ${counts.comments ?? 0} · drafts ${counts.drafts ?? 0}. Desks, HP, UTL, and invites are unchanged.`,
+    message: `Tape emptied. Posts ${counts.posts ?? 0} · comments ${counts.comments ?? 0} · drafts ${counts.drafts ?? 0}. Users, HP, UTL, and invites are unchanged.`,
     stamp: Date.now(),
   };
+}
+
+const postEditSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(20000),
+  status: z.enum(["live", "archived", "ascended", "refunded"]),
+});
+
+const commentEditSchema = z.object({
+  id: z.string().uuid(),
+  body: z.string().trim().min(1).max(8000),
+});
+
+export async function updateResearchPost(
+  _prevState: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const { supabase } = await requireAdmin();
+  const parsed = postEditSchema.safeParse({
+    id: formData.get("id"),
+    title: formData.get("title"),
+    body: formData.get("body"),
+    status: formData.get("status"),
+  });
+
+  if (!parsed.success) {
+    return { error: firstIssue(parsed.error), stamp: Date.now() };
+  }
+
+  const { error } = await supabase
+    .from("research_posts")
+    .update({
+      title: parsed.data.title,
+      body: parsed.data.body,
+      status: parsed.data.status,
+    })
+    .eq("id", parsed.data.id);
+
+  revalidatePath("/admin/content");
+  revalidatePath("/feed");
+  revalidatePath(`/feed/${parsed.data.id}`);
+
+  if (error) {
+    return { error: error.message, stamp: Date.now() };
+  }
+
+  return { message: "Note updated.", stamp: Date.now() };
+}
+
+export async function deleteResearchPost(
+  _prevState: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const { supabase } = await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+
+  if (!z.string().uuid().safeParse(id).success) {
+    return { error: "Missing note.", stamp: Date.now() };
+  }
+
+  await supabase.from("research_comments").delete().eq("post_id", id);
+  const { error } = await supabase.from("research_posts").delete().eq("id", id);
+
+  revalidatePath("/admin/content");
+  revalidatePath("/feed");
+
+  if (error) {
+    return { error: error.message, stamp: Date.now() };
+  }
+
+  return { message: "Note deleted.", stamp: Date.now() };
+}
+
+export async function updateResearchComment(
+  _prevState: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const { supabase } = await requireAdmin();
+  const parsed = commentEditSchema.safeParse({
+    id: formData.get("id"),
+    body: formData.get("body"),
+  });
+
+  if (!parsed.success) {
+    return { error: firstIssue(parsed.error), stamp: Date.now() };
+  }
+
+  const { error } = await supabase
+    .from("research_comments")
+    .update({ body: parsed.data.body })
+    .eq("id", parsed.data.id);
+
+  revalidatePath("/admin/content");
+  revalidatePath("/feed");
+
+  if (error) {
+    return { error: error.message, stamp: Date.now() };
+  }
+
+  return { message: "Comment updated.", stamp: Date.now() };
+}
+
+export async function deleteResearchComment(
+  _prevState: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const { supabase } = await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+
+  if (!z.string().uuid().safeParse(id).success) {
+    return { error: "Missing comment.", stamp: Date.now() };
+  }
+
+  const { error } = await supabase.from("research_comments").delete().eq("id", id);
+
+  revalidatePath("/admin/content");
+  revalidatePath("/feed");
+
+  if (error) {
+    return { error: error.message, stamp: Date.now() };
+  }
+
+  return { message: "Comment deleted.", stamp: Date.now() };
 }

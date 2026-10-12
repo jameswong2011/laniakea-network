@@ -48,7 +48,7 @@ export function FollowAuthorButton({
         onClick={() => void tap()}
         className="rounded-md bg-secondary px-3 py-1.5 text-[13px] text-foreground hover:bg-muted"
       >
-        {isFollowing ? "Following" : "Follow"}
+        {isFollowing ? "Following user" : "Follow user"}
       </button>
       {showCount ? (
         <span className="text-[12px] text-muted-foreground">

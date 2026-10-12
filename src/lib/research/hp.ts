@@ -108,7 +108,7 @@ export async function creditProfileHp(
     return {
       ok: false,
       error:
-        "Could not credit this desk. Paste the settlement apply SQL, then open the hunted note again.",
+        "Could not credit this user. Paste the settlement apply SQL, then open the hunted note again.",
     };
   }
 

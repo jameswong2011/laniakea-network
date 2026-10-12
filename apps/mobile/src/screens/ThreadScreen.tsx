@@ -512,6 +512,7 @@ export function ThreadScreen({
   }
 
   return (
+    <View style={styles.screen}>
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -555,7 +556,7 @@ export function ThreadScreen({
           style={({ pressed }) => [styles.actionButton, following && styles.actionButtonOn, pressed && styles.pressed]}
         >
           <Text numberOfLines={2} style={[styles.actionLabel, following && styles.actionLabelOn]}>
-            {following ? "Following" : "Follow desk"}
+            {following ? "Following user" : "Follow user"}
           </Text>
         </Pressable>
       ) : null}
@@ -901,17 +902,22 @@ export function ThreadScreen({
         </Pressable>
       </View>
     ) : null}
-    <AiButton
-      postId={postId}
-      locked={note.access === "hidden"}
-      summary={note.summary}
-      ticker={note.ticker}
-      conviction={note.conviction}
-      claims={note.claims}
-      risks={note.risks}
-      commentCount={comments.length}
-    />
     </KeyboardAvoidingView>
+    <AiButton
+      onPress={() =>
+        navigation.navigate("Assistant", {
+          postId,
+          locked: note.access === "hidden",
+          summary: note.summary,
+          ticker: note.ticker,
+          conviction: note.conviction,
+          claims: note.claims,
+          risks: note.risks,
+          commentCount: comments.length,
+        })
+      }
+    />
+    </View>
   );
 }
 

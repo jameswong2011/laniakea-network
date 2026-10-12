@@ -1,6 +1,13 @@
+import { createServiceClient } from "@/lib/supabase/admin";
+
 const MODEL = "z-ai/glm-5.3";
 
-export async function completeJson(prompt: string, maxTokens = 900) {
+export type AiCall = {
+  feature: "ask" | "brief" | "comments" | "search";
+  userId?: string | null;
+};
+
+export async function completeJson(prompt: string, maxTokens = 900, call?: AiCall) {
   const key = process.env.OPENROUTER_API_KEY;
 
   if (!key) {
@@ -33,10 +40,50 @@ export async function completeJson(prompt: string, maxTokens = 900) {
 
   const payload = (await response.json()) as {
     choices?: { message?: { content?: string | null; reasoning?: string | null } }[];
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+      cost?: number;
+    };
   };
+  void recordUsage(call, payload.usage);
   const message = payload.choices?.[0]?.message;
   const text = message?.content || message?.reasoning || "";
   return readJson(text);
+}
+
+async function recordUsage(
+  call: AiCall | undefined,
+  usage: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    cost?: number;
+  } | undefined
+) {
+  if (!call) {
+    return;
+  }
+
+  const admin = createServiceClient();
+
+  if (!admin) {
+    return;
+  }
+
+  const promptTokens = usage?.prompt_tokens ?? 0;
+  const completionTokens = usage?.completion_tokens ?? 0;
+
+  await admin.from("ai_usage").insert({
+    user_id: call.userId ?? null,
+    feature: call.feature,
+    model: MODEL,
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: usage?.total_tokens ?? promptTokens + completionTokens,
+    cost_usd: usage?.cost ?? 0,
+  });
 }
 
 function readJson(text: string): Record<string, unknown> | null {

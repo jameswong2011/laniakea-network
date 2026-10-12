@@ -221,7 +221,7 @@ export function feedHeadingTitle(query: FeedQuery) {
   }
 
   if (query.tiers?.length === 1) {
-    return `${query.tiers[0]} desks`;
+    return `${query.tiers[0]} users`;
   }
 
   if (query.statuses?.length === 1) {

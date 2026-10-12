@@ -14,7 +14,7 @@ import type { AppStackParamList } from "../types";
 type HubRoute = "Inbox" | "Drafts" | "Saved" | "Wallet" | "Account" | "Overview" | "Landing";
 
 const LINKS: { route: HubRoute; label: string; hint: string }[] = [
-  { route: "Inbox", label: "Inbox", hint: "Replies and new notes from desks you follow" },
+  { route: "Inbox", label: "Inbox", hint: "Replies and new notes from users you follow" },
   { route: "Drafts", label: "Drafts", hint: "Unpublished notes and comments" },
   { route: "Saved", label: "Saved", hint: "Notes you marked to come back to" },
   { route: "Wallet", label: "Wallet", hint: "HP, UTL, buy, and cash out" },

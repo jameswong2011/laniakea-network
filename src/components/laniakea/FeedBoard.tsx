@@ -72,7 +72,7 @@ export function FeedBoard({
       <PageHeading
         kicker="Market"
         title={feedHeadingTitle(query)}
-        description="Read, vote, and comment. Lower desks can unlock a higher note with UTL."
+        description="Read, vote, and comment. Lower users can unlock a higher note with UTL."
         meta={
           <>
             <TierBadge tier={deskTier} size="md" />
@@ -130,7 +130,7 @@ export function FeedBoard({
         </p>
       ) : query.tiers?.length === 0 ? (
         <p className="rounded-xl border border-border bg-panel px-5 py-8 text-[15px] text-muted-foreground">
-          Select at least one desk.
+          Select at least one user.
         </p>
       ) : query.statuses?.length === 0 ? (
         <p className="rounded-xl border border-border bg-panel px-5 py-8 text-[15px] text-muted-foreground">

@@ -16,7 +16,8 @@ export function wantsMeaningSearch(query: string) {
 
 export async function rankNotesByMeaning(
   query: string,
-  reader?: SupabaseClient
+  reader?: SupabaseClient,
+  userId?: string | null
 ): Promise<MeaningHit[]> {
   if (!wantsMeaningSearch(query)) {
     return [];
@@ -62,7 +63,8 @@ export async function rankNotesByMeaning(
       `Question: ${query.trim().slice(0, 300)}`,
       notes.map((note) => `${note.id} | ${note.title} | ${note.summary}`).join("\n"),
     ].join("\n\n"),
-    500
+    500,
+    { feature: "search", userId }
   );
   const allowed = new Set(notes.map((note) => note.id));
   const ids = textList(json?.ids, 8).filter((id) => allowed.has(id));

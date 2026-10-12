@@ -51,8 +51,8 @@ export default async function SignupPage({
         title="Create account"
         description={
           preview?.ok
-            ? `Invite from ${preview.displayName ?? "a desk"}. You start at ${preview.tier ?? "their"} tier.`
-            : "Public signup starts Bronze. Paste an invite to start on the inviter’s desk."
+            ? `Invite from ${preview.displayName ?? "a user"}. You start at ${preview.tier ?? "their"} tier.`
+            : "Public signup starts Bronze. Paste an invite to start at that user’s tier."
         }
       />
       <Panel className="p-2.5">

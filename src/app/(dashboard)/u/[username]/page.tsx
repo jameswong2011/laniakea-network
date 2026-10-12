@@ -79,7 +79,7 @@ export default async function PublicProfilePage({
     await Promise.all([
     supabase
       .from("research_posts")
-      .select("id, title, body, sub_topic, created_at, status")
+      .select("id, title, body, ai_summary, sub_topic, created_at, status")
       .eq("author_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -103,7 +103,7 @@ export default async function PublicProfilePage({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <DeskAvatar url={profile.avatar_url} name={profile.display_name} size="lg" />
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] text-muted-foreground">Desk</p>
+          <p className="text-[12px] text-muted-foreground">User</p>
           <h1 className="mt-1 font-heading text-[28px] leading-tight text-foreground">
             {profile.display_name}
           </h1>
@@ -158,9 +158,9 @@ export default async function PublicProfilePage({
                     {post.title}
                   </Link>
                 </h2>
-                {post.body ? (
-                  <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed text-muted-foreground">
-                    {researchExcerpt(post.body, 180)}
+                {post.ai_summary || post.body ? (
+                  <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
+                    {post.ai_summary?.trim() || researchExcerpt(post.body, 180)}
                   </p>
                 ) : null}
               </article>

@@ -8,11 +8,8 @@ export type NoteBrief = {
   conviction: string | null;
   claims: string[];
   risks: string[];
-};
-
-export type CommentBrief = {
-  agreement: string;
-  objection: string;
+  agreement?: string | null;
+  objection?: string | null;
 };
 
 export type MeaningHit = {
@@ -47,12 +44,8 @@ async function postAi<T>(path: string, body: unknown): Promise<T | null> {
   return payload;
 }
 
-export function requestNoteBrief(postId: string, refresh = false) {
-  return postAi<{ brief?: NoteBrief }>(`/api/ai/brief`, { postId, refresh });
-}
-
-export function requestCommentBrief(postId: string) {
-  return postAi<{ brief?: CommentBrief | null }>(`/api/ai/comments`, { postId });
+export function requestNoteBrief(postId: string, refresh = false, locked = false) {
+  return postAi<{ brief?: NoteBrief }>(`/api/ai/brief`, { postId, refresh, locked });
 }
 
 export function askNote(postId: string, question: string) {

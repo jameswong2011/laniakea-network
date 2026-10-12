@@ -150,7 +150,7 @@ async function loadVisiblePost(
     return {
       post: null,
       access: null,
-      error: "This desk is locked. Unlock it with UTL to read and engage.",
+      error: "This user is locked. Unlock it with UTL to read and engage.",
     };
   }
 
@@ -184,7 +184,7 @@ export async function createComment(
 
   if (!canWriteDesk(visible.access)) {
     return {
-      error: "Higher-tier desks are view-only until you unlock them.",
+      error: "Higher-tier users are view-only until you unlock them.",
       stamp: Date.now(),
     };
   }
@@ -309,7 +309,7 @@ export async function voteOnComment(
 
   if (!canWriteDesk(visible.access)) {
     return {
-      error: "Higher-tier desks are view-only until you unlock them.",
+      error: "Higher-tier users are view-only until you unlock them.",
       stamp: Date.now(),
     };
   }
@@ -524,7 +524,7 @@ export async function createReply(
 
   if (!canWriteDesk(visible.access)) {
     return {
-      error: "Higher-tier desks are view-only until you unlock them.",
+      error: "Higher-tier users are view-only until you unlock them.",
       stamp: Date.now(),
     };
   }

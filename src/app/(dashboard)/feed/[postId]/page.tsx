@@ -16,8 +16,7 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
-import { ensureCommentBrief } from "@/lib/ai/comment-brief";
-import { ensureNoteBrief } from "@/lib/ai/note-brief";
+import { storedNoteBrief } from "@/lib/ai/note-brief";
 import { requireUser } from "@/lib/auth/session";
 import { canOpenDesk, deskAccessRailClass } from "@/lib/research/access";
 import {
@@ -96,12 +95,8 @@ export default async function ResearchPostPage({
     notFound();
   }
 
-  const brief = await ensureNoteBrief(
-    item.id,
-    false,
-    item.access === "hidden" ? undefined : { title: item.title, body: item.body }
-  );
   const locked = !canOpenDesk(item.access);
+  const brief = storedNoteBrief(item);
 
   if (locked) {
     return (
@@ -109,7 +104,7 @@ export default async function ResearchPostPage({
         <PageHeading
           kicker="Thread"
           title={item.title}
-          description="This desk is locked. Pay UTL to read and engage, or earn the tier."
+          description="This user is locked. Pay UTL to read and engage, or earn the tier."
           meta={
             <Link
               href="/feed"
@@ -143,7 +138,7 @@ export default async function ResearchPostPage({
             />
           ) : (
             <p className="text-[15px] leading-relaxed text-muted-foreground">
-              Earn {item.deskTier ? TIER_LABELS[item.deskTier] : "this desk"} to
+              Earn {item.deskTier ? TIER_LABELS[item.deskTier] : "this user"} to
               open it.
             </p>
           )}
@@ -155,8 +150,6 @@ export default async function ResearchPostPage({
 
   const viewerVotes = await getViewerVotes(supabase, userId, [item.id]);
   const thread = await getCommentThread(supabase, item.id, userId);
-  const commentBrief =
-    thread.comments.length >= 3 ? await ensureCommentBrief(item.id, supabase) : null;
   const commentVotes = await getViewerCommentVotes(
     supabase,
     userId,
@@ -327,7 +320,7 @@ export default async function ResearchPostPage({
         </div>
       </article>
 
-      <AiDock postId={item.id} brief={brief} commentBrief={commentBrief} />
+      <AiDock postId={item.id} brief={brief} />
 
       <CommentThread
         postId={item.id}

@@ -2,10 +2,18 @@
 
 import { useState } from "react";
 
-export function AskNote({ postId, locked }: { postId: string; locked?: boolean }) {
+export function AskNote({
+  postId,
+  locked,
+  onFocusChange,
+  onAnswer,
+}: {
+  postId: string;
+  locked?: boolean;
+  onFocusChange?: (focused: boolean) => void;
+  onAnswer?: (reply: { text: string; section: string | null } | null) => void;
+}) {
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [section, setSection] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -23,33 +31,34 @@ export function AskNote({ postId, locked }: { postId: string; locked?: boolean }
     setPending(false);
 
     if (!response.ok || !payload?.answer) {
-      setAnswer(null);
-      setSection(null);
+      onAnswer?.(null);
       setError(payload?.error ?? "No answer came back.");
       return;
     }
 
-    setAnswer(payload.answer);
-    setSection(payload.section ?? null);
+    setError(null);
+    onAnswer?.({ text: payload.answer, section: payload.section ?? null });
   }
 
   return (
     <form
-      className="mb-4 flex flex-col gap-2"
+      className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         void ask();
       }}
     >
       <label className="flex flex-col gap-1">
-        <span className="text-[13px] text-muted-foreground">
-          {locked ? "Ask the card" : "Ask this note"}
+        <span className="font-data text-[10px] tracking-[0.14em] text-foreground uppercase">
+          {locked ? "Ask the card" : "Ask"}
         </span>
         <input
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="What is the claim, and what would falsify it?"
-          className="h-10 rounded-lg border border-border bg-background px-3 text-[14px] text-foreground outline-none focus-visible:border-ring"
+          onFocus={() => onFocusChange?.(true)}
+          onBlur={() => onFocusChange?.(false)}
+          placeholder="What are you curious about"
+          className="h-11 rounded-lg border border-foreground/30 bg-panel px-3 text-[16px] text-foreground outline-none focus-visible:border-foreground"
         />
       </label>
       <button
@@ -60,12 +69,6 @@ export function AskNote({ postId, locked }: { postId: string; locked?: boolean }
         {pending ? "Reading…" : "Ask"}
       </button>
       {error ? <p className="text-[13px] text-loss">{error}</p> : null}
-      {answer ? (
-        <p className="text-[14px] leading-relaxed text-foreground">
-          {section ? <span className="text-muted-foreground">{section}. </span> : null}
-          {answer}
-        </p>
-      ) : null}
     </form>
   );
 }

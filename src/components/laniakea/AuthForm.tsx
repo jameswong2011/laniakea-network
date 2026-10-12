@@ -97,7 +97,7 @@ function SignupNameFields({ initialDisplayName }: { initialDisplayName?: string 
             onChange={(event) => setDisplayName(event.target.value)}
             autoComplete="nickname"
             required
-            placeholder="Quiet Desk 4821"
+            placeholder="Quiet User 4821"
             aria-describedby="displayName-hint"
             className={inputClassName}
           />

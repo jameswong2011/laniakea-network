@@ -35,7 +35,7 @@ export function TierBadge({
       }`}
       aria-label={
         lockMark
-          ? `${label} desk, ${locked ? "locked" : "unlocked"}`
+          ? `${label} user, ${locked ? "locked" : "unlocked"}`
           : undefined
       }
     >

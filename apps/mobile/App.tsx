@@ -10,6 +10,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { DeskProvider } from "./src/desk";
 import { loadProfile, type DeskProfile } from "./src/floor";
 import { AccountScreen } from "./src/screens/AccountScreen";
+import { AssistantScreen } from "./src/note-ai";
 import { ComposeScreen } from "./src/screens/ComposeScreen";
 import { DraftsScreen } from "./src/screens/DraftsScreen";
 import { FeedScreen } from "./src/screens/FeedScreen";
@@ -186,7 +187,7 @@ export default function App() {
     loadProfile(userId)
       .then(setProfile)
       .catch((cause: unknown) => {
-        setError(cause instanceof Error ? cause.message : "Could not load this desk.");
+        setError(cause instanceof Error ? cause.message : "Could not load this user.");
       });
   }, [session]);
 
@@ -244,7 +245,7 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <View style={styles.centered}>
-          <Text style={styles.error}>{error ?? "Could not load this desk."}</Text>
+          <Text style={styles.error}>{error ?? "Could not load this user."}</Text>
           <StatusBar style="light" />
         </View>
       </SafeAreaProvider>
@@ -276,12 +277,13 @@ export default function App() {
             component={ThreadScreen}
             options={{ title: "Note", fullScreenGestureEnabled: false }}
           />
-          <AppStack.Screen name="Desk" component={DeskScreen} options={{ title: "Desk" }} />
+          <AppStack.Screen name="Desk" component={DeskScreen} options={{ title: "User" }} />
           <AppStack.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox" }} />
           <AppStack.Screen name="Drafts" component={DraftsScreen} options={{ title: "Drafts" }} />
           <AppStack.Screen name="Saved" component={SavedScreen} options={{ title: "Saved" }} />
           <AppStack.Screen name="Wallet" component={WalletScreen} options={{ title: "Wallet" }} />
           <AppStack.Screen name="Account" component={AccountScreen} options={{ title: "Account" }} />
+          <AppStack.Screen name="Assistant" component={AssistantScreen} options={{ title: "Assistant" }} />
         </AppStack.Navigator>
       </NavigationContainer>
     </DeskProvider>

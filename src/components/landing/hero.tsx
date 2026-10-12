@@ -30,7 +30,7 @@ export function Hero() {
         <p className="mt-6 max-w-2xl text-base text-muted md:text-lg">
           Laniakea is a scarce-speech floor for investment research. Creators
           stake Health Points to publish and to judge. Individual investors
-          follow desks and unlock higher rooms — without having to originate.
+          follow users and unlock higher rooms — without having to originate.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <Link

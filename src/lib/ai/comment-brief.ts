@@ -64,7 +64,8 @@ export async function ensureCommentBrief(
         .map((row, index) => `${index + 1}. ${row.body.slice(0, 700)}`)
         .join("\n\n"),
     ].join("\n\n"),
-    700
+    700,
+    { feature: "comments" }
   );
 
   if (!json) {

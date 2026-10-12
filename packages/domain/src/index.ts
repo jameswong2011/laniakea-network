@@ -135,7 +135,7 @@ export function canWriteDesk(access: DeskAccess) {
 }
 
 export function deskAccessLabel(access: DeskAccess, deskTier?: Tier | null) {
-  const desk = deskTier ? ` · ${TIER_LABELS[deskTier]} desk` : "";
+  const desk = deskTier ? ` · ${TIER_LABELS[deskTier]} user` : "";
 
   if (access === "view_only") {
     return `View only${desk}`;

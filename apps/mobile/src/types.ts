@@ -25,4 +25,17 @@ export type AppStackParamList = {
   Saved: undefined;
   Wallet: undefined;
   Account: undefined;
+  Assistant:
+    | {
+        postId?: string;
+        locked?: boolean;
+        summary?: string | null;
+        ticker?: string | null;
+        conviction?: string | null;
+        claims?: string[];
+        risks?: string[];
+        commentCount?: number;
+        meaning?: { id: string; title: string; summary: string }[] | null;
+      }
+    | undefined;
 };

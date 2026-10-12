@@ -183,7 +183,7 @@ async function creditHp(userId: string, amount: number) {
     .maybeSingle();
 
   if (writeError || !updated) {
-    return { error: writeError?.message ?? "Could not credit this desk." };
+    return { error: writeError?.message ?? "Could not credit this user." };
   }
 
   return { error: null };
@@ -570,11 +570,11 @@ export async function voteOnNote(input: {
   }
 
   if (input.access === "hidden") {
-    return { error: "This desk is locked. Unlock it with UTL to read and engage." };
+    return { error: "This user is locked. Unlock it with UTL to read and engage." };
   }
 
   if (!canWriteDesk(input.access)) {
-    return { error: "Higher-tier desks are view-only until you unlock them." };
+    return { error: "Higher-tier users are view-only until you unlock them." };
   }
 
   const value = signedVoteValue(input.direction, input.strength);
@@ -724,11 +724,11 @@ export async function publishComment(input: {
   }
 
   if (input.access === "hidden") {
-    return { error: "This desk is locked. Unlock it with UTL to read and engage." };
+    return { error: "This user is locked. Unlock it with UTL to read and engage." };
   }
 
   if (!canWriteDesk(input.access)) {
-    return { error: "Higher-tier desks are view-only until you unlock them." };
+    return { error: "Higher-tier users are view-only until you unlock them." };
   }
 
   if (input.postStatus === RESEARCH_POST_STATUS_ARCHIVED) {
@@ -851,7 +851,7 @@ export async function voteOnComment(input: {
   }
 
   if (!canWriteDesk(input.access)) {
-    return { error: "Higher-tier desks are view-only until you unlock them." };
+    return { error: "Higher-tier users are view-only until you unlock them." };
   }
 
   if (input.postStatus === RESEARCH_POST_STATUS_ARCHIVED) {
@@ -986,7 +986,7 @@ export async function publishReply(input: {
   }
 
   if (!canWriteDesk(input.access)) {
-    return { error: "Higher-tier desks are view-only until you unlock them." };
+    return { error: "Higher-tier users are view-only until you unlock them." };
   }
 
   const comment = await supabase
@@ -1762,7 +1762,7 @@ export async function loadDesk(username: string, viewerId: string): Promise<Desk
   const [posts, comments, followers, followed] = await Promise.all([
     supabase
       .from("research_posts")
-      .select("id, title, body, sub_topic, created_at")
+      .select("id, title, body, ai_summary, sub_topic, created_at")
       .eq("author_id", row.id)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -1799,7 +1799,9 @@ export async function loadDesk(username: string, viewerId: string): Promise<Desk
       title: post.title as string,
       subTopic: (post.sub_topic as string | null) ?? null,
       createdAt: post.created_at as string,
-      excerpt: researchExcerpt((post.body as string | null) ?? "", 180),
+      excerpt:
+        (post.ai_summary as string | null)?.trim() ||
+        researchExcerpt((post.body as string | null) ?? "", 180),
     })),
     comments: (comments.data ?? []).map((comment) => ({
       id: comment.id as string,

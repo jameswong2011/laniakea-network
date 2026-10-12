@@ -229,5 +229,5 @@ export function weeklyMaintenanceMessage(result: WeeklyMaintenanceResult) {
     return "Weekly maintenance already ran this week.";
   }
 
-  return `Weekly maintenance complete. Drain ${result.drained} desks. Calibration +${result.promoted} / −${result.demoted}.`;
+  return `Weekly maintenance complete. Drain ${result.drained} users. Calibration +${result.promoted} / −${result.demoted}.`;
 }

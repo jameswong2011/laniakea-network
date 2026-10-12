@@ -187,7 +187,7 @@ function toNote(
     originalStake: stake,
     subTopic: post.sub_topic ?? "",
     createdAt: post.created_at,
-    authorName: author?.display_name || author?.username || "Desk",
+    authorName: author?.display_name || author?.username || "User",
     authorUsername: author?.username ?? "",
     authorTier: resolveTier(author?.tier),
     authorAvatar: author?.avatar_url ?? null,
@@ -381,7 +381,7 @@ export async function loadThread(viewer: DeskProfile, postId: string) {
       id: row.id as string,
       authorId: row.author_id as string,
       body: row.body as string,
-      authorName: author?.display_name || author?.username || "Desk",
+      authorName: author?.display_name || author?.username || "User",
       authorAvatar: author?.avatar_url ?? null,
     });
     repliesByComment.set(row.comment_id as string, list);
@@ -396,7 +396,7 @@ export async function loadThread(viewer: DeskProfile, postId: string) {
       id: row.id as string,
       authorId: row.author_id as string,
       body: row.body as string,
-      authorName: author?.display_name || author?.username || "Desk",
+      authorName: author?.display_name || author?.username || "User",
       authorAvatar: author?.avatar_url ?? null,
       currentHealth: health,
       originalStake: stake,

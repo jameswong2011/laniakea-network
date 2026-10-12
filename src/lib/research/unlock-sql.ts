@@ -190,7 +190,7 @@ begin
   end;
 
   if v_base is null then
-    raise exception 'This desk does not require an unlock.';
+    raise exception 'This user does not require an unlock.';
   end if;
 
   if v_multiple < 1 then

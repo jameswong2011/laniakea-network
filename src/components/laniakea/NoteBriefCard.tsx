@@ -8,7 +8,10 @@ export function NoteBriefCard({
   locked?: boolean;
 }) {
   return (
-    <section className="mb-4 rounded-xl border border-border bg-surface px-4 py-3">
+    <section className="rounded-xl border border-gain/40 bg-gain-muted px-4 py-3">
+      <p className="font-data text-[10px] tracking-[0.14em] text-gain uppercase">
+        Summary
+      </p>
       {brief.ticker || brief.conviction ? (
         <p className="font-data text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
           {[brief.ticker, brief.conviction].filter(Boolean).join(" · ")}
@@ -34,6 +37,18 @@ export function NoteBriefCard({
             ))}
           </ul>
         </div>
+      ) : null}
+      {brief.agreement ? (
+        <p className="mt-3 text-[14px] leading-relaxed text-foreground">
+          <span className="font-medium text-warning">Agreement. </span>
+          {brief.agreement}
+        </p>
+      ) : null}
+      {brief.objection ? (
+        <p className="mt-2 text-[14px] leading-relaxed text-foreground">
+          <span className="font-medium text-loss">Objection. </span>
+          {brief.objection}
+        </p>
       ) : null}
     </section>
   );

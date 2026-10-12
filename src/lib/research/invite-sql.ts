@@ -881,7 +881,7 @@ begin
   v_steps := public.tier_rank(v_author_tier) - public.tier_rank(v_buyer_tier);
 
   if v_steps <= 0 then
-    raise exception 'This desk does not require an unlock.';
+    raise exception 'This user does not require an unlock.';
   end if;
 
   v_base := case v_steps
@@ -893,7 +893,7 @@ begin
   end;
 
   if v_base is null then
-    raise exception 'This desk does not require an unlock.';
+    raise exception 'This user does not require an unlock.';
   end if;
 
   if v_multiple < 1 then

@@ -32,7 +32,7 @@ export function SignupScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.copy}>Same desk as the website. An invite code snapshots the inviter’s room.</Text>
+      <Text style={styles.copy}>Same user as the website. An invite code snapshots the inviter’s room.</Text>
       <Field label="Email" value={email} onChangeText={setEmail} />
       <Field label="Password" value={password} onChangeText={setPassword} secure />
       <Field label="Username" value={username} onChangeText={setUsername} />

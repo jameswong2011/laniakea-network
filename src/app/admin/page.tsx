@@ -1,419 +1,180 @@
 import type { Metadata } from "next";
-import {
-  PageFrame,
-  PageHeading,
-  Panel,
-  PanelHeader,
-} from "@/components/layout/PageFrame";
-import { AdminProfileEditor } from "@/components/laniakea/AdminProfileEditor";
-import { PassiveDrainButton } from "@/components/laniakea/PassiveDrainButton";
-import { SeedDemoDataButton } from "@/components/laniakea/SeedDemoDataButton";
-import { SeedResearchForm } from "@/components/laniakea/SeedResearchForm";
-import { WipeForumButton } from "@/components/laniakea/WipeForumButton";
-import { CopyInviteButton } from "@/components/laniakea/CopyInviteButton";
-import { WeeklyMaintenanceButton } from "@/components/laniakea/WeeklyMaintenanceButton";
-import { DEMO_POSTS, DEMO_USERS } from "@/lib/research/demo-catalog";
-import { ADMIN_PROFILE_WRITE_SQL } from "@/lib/research/admin-write-sql";
-import {
-  DEMO_DISPLAY_NAMES_SQL,
-  DEMO_SEED_WRITE_SQL,
-} from "@/lib/research/demo-sql";
-import { FORUM_WIPE_SQL } from "@/lib/research/forum-wipe-sql";
-import { EXPAND_SUBTOPICS_SQL } from "@/lib/research/subtopics-sql";
-import { VAULT_CATALOG, VAULT_THESES } from "@/lib/research/vault-catalog";
-import {
-  PASSIVE_DRAIN_HP,
-  WEEKLY_CRON_LABEL,
-} from "@/lib/research/economy";
-import {
-  COMMENTS_SQL_POLICIES,
-  COMMENTS_SQL_TABLES,
-} from "@/lib/research/comments-sql";
-import { SETTLEMENT_APPLY_SQL } from "@/lib/research/settlement-apply-sql";
-import { SETTLEMENT_SQL } from "@/lib/research/settlement-sql";
-import { weeklyMaintenanceSql } from "@/lib/research/weekly-sql";
-import { getLatestWeeklyRun } from "@/lib/research/weekly";
-import { loadRevenueTotals } from "@/lib/research/invite";
-import { TREASURY_PROFILE_ID } from "@/lib/research/referral";
+import { AdminNav } from "@/components/laniakea/AdminNav";
+import { PageFrame, PageHeading, Panel, PanelHeader } from "@/components/layout/PageFrame";
+import { loadAdminMetrics, type Pnl } from "@/lib/admin/metrics";
 import { requireAdmin } from "@/lib/auth/session";
-import { SUB_TOPICS, resolveTier, type Profile } from "@/types";
-import { format, subDays } from "date-fns";
 
-export const metadata: Metadata = {
-  title: "Admin",
-};
+export const metadata: Metadata = { title: "Admin" };
 
-export default async function AdminPage() {
+function money(value: number) {
+  return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+}
+
+function rate(value: number) {
+  return value.toLocaleString("en-US", { maximumFractionDigits: 3 });
+}
+
+function PnlRow({ label, row }: { label: string; row: Pnl }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 border-b border-border px-3 py-2 text-[13px] last:border-b-0 md:grid-cols-6">
+      <p className="text-muted-foreground">{label}</p>
+      <p>Gross {row.gross}</p>
+      <p>Creators {row.creator}</p>
+      <p>Invites {row.referral}</p>
+      <p>Burn {row.burn + row.dust}</p>
+      <p>{row.events} events</p>
+    </div>
+  );
+}
+
+export default async function AdminOverviewPage() {
   const { supabase } = await requireAdmin();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, role, tier, current_hp")
-    .order("username", { ascending: true });
-
-  const profiles = (
-    (data ?? []) as Pick<
-      Profile,
-      "id" | "username" | "display_name" | "role" | "tier" | "current_hp"
-    >[]
-  ).filter(
-    (profile) =>
-      profile.id !== TREASURY_PROFILE_ID &&
-      profile.username !== "laniakea_treasury"
-  );
-
-  const demoUsernames = new Set(DEMO_USERS.map((user) => user.username));
-  const demoProfiles = profiles.filter((profile) =>
-    demoUsernames.has(profile.username)
-  );
-  const demoStillBronze =
-    demoProfiles.length > 0 &&
-    demoProfiles.every((profile) => resolveTier(profile.tier) === "Bronze");
-  const catalogNameByUsername = new Map(
-    DEMO_USERS.map((user) => [user.username, user.display_name])
-  );
-  const demoNamesStale = demoProfiles.some(
-    (profile) =>
-      catalogNameByUsername.get(profile.username) !== profile.display_name
-  );
-
-  const weekly = await getLatestWeeklyRun(supabase);
-  const now = new Date();
-  const revenue7d = await loadRevenueTotals(supabase, subDays(now, 7).toISOString());
-  const revenue30d = await loadRevenueTotals(
-    supabase,
-    subDays(now, 30).toISOString()
-  );
-  const stakeProbe = await supabase
-    .from("research_posts")
-    .select("original_stake")
-    .limit(1);
-  const settlementReady = !stakeProbe.error;
-  const applyProbe = await supabase.rpc("settle_hunted_post", {
-    p_post_id: "00000000-0000-4000-8000-000000000000",
-  });
-  const applyReady =
-    !applyProbe.error ||
-    !(
-      applyProbe.error.message.includes("42883") ||
-      applyProbe.error.message.includes("does not exist") ||
-      applyProbe.error.message.includes("schema cache")
-    );
-  const commentsProbe = await supabase
-    .from("research_comments")
-    .select("id")
-    .limit(1);
-  const commentsReady = !commentsProbe.error;
-
-  const { data: livePosts } = await supabase
-    .from("research_posts")
-    .select("id, title, author_id");
-
-  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
-  const catalogByTitle = new Map(DEMO_POSTS.map((post) => [post.title, post]));
-  const catalogPosts = (livePosts ?? []).filter((post) =>
-    catalogByTitle.has(post.title)
-  );
-  const matchedPosts = catalogPosts.filter((post) => {
-    const expected = catalogByTitle.get(post.title);
-    const author = profileById.get(post.author_id);
-    return Boolean(expected && author?.username === expected.authorUsername);
-  });
+  const metrics = await loadAdminMetrics(supabase);
 
   return (
     <PageFrame width="wide">
       <PageHeading
-        kicker="Control"
+        kicker="Superuser"
         title="Admin"
-        description="Seed a full demo book, then adjust desks and single posts if needed."
+        description="Activity, project P&L, and model use. Content edits, user rows, and the invite tree are on the other tabs."
       />
+      <AdminNav current="/admin" />
+      {metrics.error ? <p className="text-[13px] text-loss">{metrics.error}</p> : null}
 
       <Panel>
-        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
-          <div>
-            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Seed Demo Data
-            </p>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              Inserts {DEMO_USERS.length} demo desks (4 per tier) and{" "}
-              {DEMO_POSTS.length} hard-coded research notes across every
-              sub-topic, plus matching HP ledger rows and sample votes. No
-              manual posting and no external model calls. Re-running refreshes
-              demo users and skips titles that already exist. Your admin role
-              is left alone; this desk votes on a subset so Wallet is not empty.
-            </p>
-            <p className="mt-1.5 font-data text-[10px] text-muted-foreground">
-              Demo desks {demoProfiles.length}/{DEMO_USERS.length}
-              {" · "}
-              catalog notes linked to the intended author {matchedPosts.length}/
-              {DEMO_POSTS.length}
-            </p>
-            {demoStillBronze ? (
-              <p className="mt-1.5 text-[12px] text-warning">
-                Demo desks are still Bronze. Signup created them with the
-                default tier; RLS blocked the catalog write. Run the SQL below
-                once, then click Seed Demo Data again.
-              </p>
-            ) : null}
-            {demoNamesStale ? (
-              <p className="mt-1.5 text-[12px] text-warning">
-                Demo desks still have the old human names. Paste the display
-                name SQL once. It does not change HP or login usernames.
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            {demoNamesStale ? (
-              <CopyInviteButton value={DEMO_DISPLAY_NAMES_SQL} label="Names SQL" />
-            ) : null}
-            <SeedDemoDataButton />
-          </div>
-        </div>
-        {demoStillBronze ? (
-          <pre className="max-h-48 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-            {DEMO_SEED_WRITE_SQL}
-          </pre>
-        ) : null}
-        {demoNamesStale ? (
-          <pre className="max-h-40 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-            {DEMO_DISPLAY_NAMES_SQL}
-          </pre>
-        ) : null}
+        <PanelHeader label="Activity" meta="posts, comments, votes" />
+        <dl className="grid grid-cols-2 divide-x divide-y divide-border md:grid-cols-4">
+          <Stat label="DAU" value={String(metrics.dau)} />
+          <Stat label="WAU" value={String(metrics.wau)} />
+          <Stat label="MAU" value={String(metrics.mau)} />
+          <Stat label="Users" value={String(metrics.users)} />
+          <Stat label="Signups 7d" value={String(metrics.signups7)} />
+          <Stat label="Signups 30d" value={String(metrics.signups30)} />
+          <Stat label="Posts / user / hr" value={rate(metrics.postsPerUserHour)} />
+          <Stat label="Comments / user / hr" value={rate(metrics.commentsPerUserHour)} />
+        </dl>
+        <p className="border-t border-border px-3 py-2 text-[12px] text-muted-foreground">
+          Last 24 hours: {metrics.posts24} posts, {metrics.comments24} comments. Rates divide those counts by the people who posted or commented, then by 24 hours.
+        </p>
       </Panel>
 
       <Panel>
-        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
-          <div>
-            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Wipe tape
-            </p>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              Deletes every note, comment, vote, reaction, draft, save, unlock,
-              and topic book. Desks, overall HP, UTL, and invites stay. Do not
-              click Seed Demo Data afterwards if you want the floor empty.
-              Paste the SQL once so the wipe function exists, then type WIPE.
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <CopyInviteButton value={FORUM_WIPE_SQL} label="SQL" />
-            <WipeForumButton />
-          </div>
-        </div>
-        <pre className="max-h-40 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-          {FORUM_WIPE_SQL}
-        </pre>
+        <PanelHeader label="Project P&L" meta="UTL" />
+        <PnlRow label="7 days" row={metrics.pnl7} />
+        <PnlRow label="30 days" row={metrics.pnl30} />
+        <PnlRow label="All time" row={metrics.pnlAll} />
+        <p className="border-t border-border px-3 py-2 text-[12px] text-muted-foreground">
+          Gross is UTL spent. Creators and invites are paid out. Burn plus dust is what the project removes. Outstanding stock: {metrics.hpOutstanding} HP, {metrics.utlOutstanding} UTL. Live notes {metrics.liveNotes}. Comments loaded {metrics.comments}.
+        </p>
       </Panel>
 
       <Panel>
-        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
-          <div>
-            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Sub-topics
-            </p>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              One book list for publish, feed, and ranking.{" "}
-              {VAULT_THESES.length} theses, {VAULT_CATALOG.length} vault files
-              mapped. Paste the topic SQL once so publish does not bounce.
-            </p>
-          </div>
-          <CopyInviteButton value={EXPAND_SUBTOPICS_SQL} label="SQL" />
-        </div>
-        <div className="flex flex-col">
-          {SUB_TOPICS.map((topic) => (
-            <div
-              key={topic}
-              className="flex items-baseline justify-between gap-4 border-b border-border px-2.5 py-2 last:border-b-0"
-            >
-              <div className="min-w-0">
-                <p className="text-[13px] text-foreground">{topic}</p>
-              </div>
-              <p className="shrink-0 font-data text-[11px] text-muted-foreground tabular-nums">
-                {VAULT_CATALOG.filter((entry) => entry.topic === topic).length}
-              </p>
-            </div>
-          ))}
-        </div>
-        <pre className="max-h-32 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-          {EXPAND_SUBTOPICS_SQL}
-        </pre>
-      </Panel>
-
-      <Panel>
-        <PanelHeader label="UTL residual" meta="7d / 30d" />
-        {revenue7d.error ? (
-          <p className="px-2.5 py-2 font-data text-[12px] text-muted-foreground">
-            {revenue7d.error}
+        <PanelHeader label="Model use" meta={metrics.usageMissing ? "SQL missing" : "all calls"} />
+        {metrics.usageMissing ? (
+          <p className="px-3 py-3 text-[13px] text-warning">
+            Run supabase/migrations/20261012190000_ai_usage.sql, and keep the service role key on the server. Calls made before that are not in this table.
           </p>
         ) : (
+          <>
+            <dl className="grid grid-cols-2 divide-x divide-border md:grid-cols-3">
+              <Stat label="Calls" value={String(metrics.llm.calls)} />
+              <Stat label="Tokens" value={String(metrics.llm.tokens)} />
+              <Stat label="Cost USD" value={money(metrics.llm.cost)} />
+              <Stat label="Calls 24h" value={String(metrics.llm.calls24)} />
+              <Stat label="Tokens 24h" value={String(metrics.llm.tokens24)} />
+              <Stat label="Cost 24h" value={money(metrics.llm.cost24)} />
+            </dl>
+            <div className="border-t border-border">
+              {metrics.llmByFeature.length === 0 ? (
+                <p className="px-3 py-3 text-[13px] text-muted-foreground">No model calls recorded yet.</p>
+              ) : (
+                metrics.llmByFeature.map((row) => (
+                  <p key={row.feature} className="border-b border-border px-3 py-2 text-[13px] last:border-b-0">
+                    {row.feature} · {row.calls} calls · {row.tokens} tokens · ${money(row.cost)}
+                    {row.calls > 0 ? ` · $${money(row.cost / row.calls)} each` : ""}
+                  </p>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </Panel>
+
+      <Panel>
+        <PanelHeader label="Cohort retention" meta="still active after joining" />
+        <dl className="grid grid-cols-2 divide-x divide-border">
+          <Stat
+            label="Day 7"
+            value={percent(metrics.retention7.share)}
+            hint={`${metrics.retention7.retained} of ${metrics.retention7.eligible} old enough`}
+          />
+          <Stat
+            label="Day 30"
+            value={percent(metrics.retention30.share)}
+            hint={`${metrics.retention30.retained} of ${metrics.retention30.eligible} old enough`}
+          />
+        </dl>
+        <p className="border-t border-border px-3 py-2 text-[12px] text-muted-foreground">
+          A user counts only after they have been here long enough. They are retained when their latest post, comment, or vote is on or after that day.
+        </p>
+      </Panel>
+
+      <Panel>
+        <PanelHeader label="Invite funnel" />
+        {metrics.funnel.missing ? (
+          <p className="px-3 py-3 text-[13px] text-warning">Invite codes are not in this database yet.</p>
+        ) : (
           <dl className="grid grid-cols-2 divide-x divide-border md:grid-cols-4">
-            <div className="px-2.5 py-2.5">
-              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-                Creator share
-              </dt>
-              <dd className="mt-1 font-data text-[13px] text-foreground">
-                {revenue7d.creatorShare} / {revenue30d.creatorShare}
-              </dd>
-            </div>
-            <div className="px-2.5 py-2.5">
-              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-                Referral pool
-              </dt>
-              <dd className="mt-1 font-data text-[13px] text-foreground">
-                {revenue7d.referralPool} / {revenue30d.referralPool}
-              </dd>
-            </div>
-            <div className="px-2.5 py-2.5">
-              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-                Platform burn
-              </dt>
-              <dd className="mt-1 font-data text-[13px] text-foreground">
-                {revenue7d.platformBurn + revenue7d.dust} /{" "}
-                {revenue30d.platformBurn + revenue30d.dust}
-              </dd>
-            </div>
-            <div className="px-2.5 py-2.5">
-              <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-                Events
-              </dt>
-              <dd className="mt-1 font-data text-[13px] text-foreground">
-                {revenue7d.events} / {revenue30d.events}
-              </dd>
-            </div>
+            <Stat label="Codes minted" value={String(metrics.funnel.minted)} />
+            <Stat label="Redeemed" value={String(metrics.funnel.redeemed)} />
+            <Stat label="Published a note" value={String(metrics.funnel.published)} />
+            <Stat label="Redeemed who publish" value={percent(metrics.funnel.publishShare)} />
           </dl>
         )}
       </Panel>
 
       <Panel>
-        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
-          <div>
-            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Profiles
-            </p>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              Edit role, tier, and HP on any desk. If Save does nothing, paste
-              the Admin write SQL once — it does not reset demo catalog HP.
-            </p>
-          </div>
-          <CopyInviteButton value={ADMIN_PROFILE_WRITE_SQL} label="SQL" />
-        </div>
-        <pre className="max-h-32 overflow-auto border-b border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-          {ADMIN_PROFILE_WRITE_SQL}
-        </pre>
-        {error ? (
-          <p className="px-2.5 py-3 font-data text-[12px] text-loss">
-            {error.message}
-          </p>
-        ) : (
-          <AdminProfileEditor profiles={profiles} />
-        )}
+        <PanelHeader label="Cost per call" meta="USD" />
+        <dl className="grid grid-cols-1 divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0">
+          <Stat label="Ask" value={money(metrics.unitCost.ask.each)} hint={`${metrics.unitCost.ask.calls} calls`} />
+          <Stat label="Summary" value={money(metrics.unitCost.summary.each)} hint={`${metrics.unitCost.summary.calls} calls`} />
+          <Stat label="Meaning search" value={money(metrics.unitCost.search.each)} hint={`${metrics.unitCost.search.calls} calls`} />
+        </dl>
       </Panel>
 
       <Panel>
-        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
-          <div>
-            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Weekly Jobs
-            </p>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              Every {WEEKLY_CRON_LABEL}: drain {PASSIVE_DRAIN_HP} HP from
-              non-admin desks, then promote / demote the top and bottom
-              quartile. Manual buttons below still work. Last run{" "}
-              {weekly.run
-                ? `${format(new Date(weekly.run.ran_at), "MMM d HH:mm")} (${weekly.run.source})`
-                : "not recorded"}
-              .
-            </p>
-            {weekly.missingTable ? (
-              <p className="mt-1.5 text-[12px] text-warning">
-                Run the weekly SQL once so the database cron is armed. Vercel
-                also hits /api/cron/weekly if CRON_SECRET and the service role
-                key are set.
-              </p>
-            ) : null}
-          </div>
-          <WeeklyMaintenanceButton />
-        </div>
-        {weekly.missingTable ? (
-          <pre className="max-h-48 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-            {weeklyMaintenanceSql()}
-          </pre>
-        ) : null}
-      </Panel>
-
-      {settlementReady ? null : (
-        <Panel>
-          <PanelHeader label="Settlement schema" meta="required" />
-          <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-warning">
-            Hunt and ascent payouts need original_stake, health_at_vote, and
-            hunt/ascent ledger types. Run this once.
-          </p>
-          <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-            {SETTLEMENT_SQL}
-          </pre>
-        </Panel>
-      )}
-
-      {applyReady ? null : (
-        <Panel>
-          <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
-            <div>
-              <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-                Settlement apply
-              </p>
-              <p className="mt-1 text-[12px] text-warning">
-                Hunt archived the note, then bounty could not credit desks.
-                Paste this once, then open the hunted note again.
-              </p>
-            </div>
-            <CopyInviteButton value={SETTLEMENT_APPLY_SQL} label="SQL" />
-          </div>
-          <pre className="max-h-48 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-            {SETTLEMENT_APPLY_SQL}
-          </pre>
-        </Panel>
-      )}
-
-      {commentsReady ? null : (
-        <Panel>
-          <PanelHeader label="Comments schema" meta="required" />
-          <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-warning">
-            Run part 1, then part 2, as two separate queries. One combined
-            script can deadlock against live wallet reads.
-          </p>
-          <pre className="max-h-40 overflow-auto bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-            {COMMENTS_SQL_TABLES}
-          </pre>
-          <pre className="max-h-40 overflow-auto border-t border-border bg-panel-elevated p-2.5 font-data text-[10px] leading-relaxed text-foreground">
-            {COMMENTS_SQL_POLICIES}
-          </pre>
-        </Panel>
-      )}
-
-      <Panel>
-        <div className="flex items-start justify-between gap-3 border-b border-border bg-surface px-2.5 py-1.5">
-          <div>
-            <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-              Passive HP Drain
-            </p>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              Deducts up to {PASSIVE_DRAIN_HP} HP from every non-admin account
-              with a positive balance and writes a{" "}
-              <span className="font-data text-foreground">drain</span> ledger
-              row. This is the same {PASSIVE_DRAIN_HP} HP tax the weekly job
-              applies.
-            </p>
-          </div>
-          <PassiveDrainButton />
-        </div>
+        <PanelHeader label="HP concentration" />
+        <dl className="grid grid-cols-2 divide-x divide-border">
+          <Stat label="Top 10 share" value={percent(metrics.hpTopTenShare)} />
+          <Stat label="Top 10 HP" value={String(metrics.hpTopTen)} hint={`of ${metrics.hpOutstanding}`} />
+        </dl>
       </Panel>
 
       <Panel>
-        <PanelHeader label="Seed Research Post" />
-        <p className="border-b border-border px-2.5 py-1.5 text-[12px] text-muted-foreground">
-          Inserts a post in one sub-topic and a matching HP transaction with
-          type <span className="font-data text-foreground">stake</span>.
-        </p>
-        <SeedResearchForm authors={profiles} />
+        <PanelHeader label="Export" />
+        <div className="flex flex-wrap gap-3 px-3 py-3 text-[14px]">
+          <a href="/admin/export?kind=users" className="underline">
+            User table CSV
+          </a>
+          <a href="/admin/export?kind=invites" className="underline">
+            Invite tree CSV
+          </a>
+        </div>
       </Panel>
     </PageFrame>
+  );
+}
+
+function percent(share: number) {
+  return `${(share * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="px-3 py-3">
+      <dt className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">{label}</dt>
+      <dd className="mt-1 font-data text-[16px] text-foreground">{value}</dd>
+      {hint ? <dd className="mt-1 text-[12px] text-muted-foreground">{hint}</dd> : null}
+    </div>
   );
 }

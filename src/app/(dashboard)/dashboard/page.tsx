@@ -79,7 +79,7 @@ export default async function DashboardPage() {
                 {profile.account_code ? ` · ${profile.account_code}` : ""}
                 {profile.registration_path === "invite"
                   ? " · joined by invite"
-                  : " · public desk"}
+                  : " · public user"}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">

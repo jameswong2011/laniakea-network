@@ -78,7 +78,7 @@ export async function askNote(
     : prepareNoteMarkdown(note.body).slice(0, 16000);
 
   if (!source) {
-    return { error: locked ? "This desk is locked. Open it to ask about the full note." : "This note has no text yet." };
+    return { error: locked ? "This user is locked. Open it to ask about the full note." : "This note has no text yet." };
   }
 
   if (!process.env.OPENROUTER_API_KEY) {
@@ -97,7 +97,8 @@ export async function askNote(
       `Question: ${trimmed}`,
       source,
     ].join("\n\n"),
-    700
+    700,
+    { feature: "ask", userId }
   );
 
   const answer = textField(json?.answer, 800);

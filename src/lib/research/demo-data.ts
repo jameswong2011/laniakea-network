@@ -524,7 +524,7 @@ async function seedOpeningLedger(
       amount: 20,
       type: HP_TRANSACTION_BUY,
       created_at: hoursAgoIso(96),
-      description: "Demo seed: token desk buy",
+      description: "Demo seed: token user buy",
     },
     result
   );

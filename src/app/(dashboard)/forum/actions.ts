@@ -352,7 +352,7 @@ export async function updateAvatar(url: string): Promise<ForumActionState> {
   }
 
   if (!parsed.data.includes(userId) || !parsed.data.includes("research-media")) {
-    return { error: "Picture must be uploaded to your desk folder.", stamp: Date.now() };
+    return { error: "Picture must be uploaded to your user folder.", stamp: Date.now() };
   }
 
   const write = await supabase

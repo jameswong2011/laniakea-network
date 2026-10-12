@@ -1,4 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { completeJson, textField, textList } from "@/lib/ai/openrouter";
 
 export type NoteBrief = {
@@ -7,6 +9,8 @@ export type NoteBrief = {
   conviction: string | null;
   claims: string[];
   risks: string[];
+  agreement: string | null;
+  objection: string | null;
 };
 
 type BriefRow = {
@@ -48,6 +52,8 @@ function asBrief(row: BriefRow): NoteBrief | null {
     conviction: row.ai_conviction?.trim() || null,
     claims: textList(row.ai_claims, 3),
     risks: textList(row.ai_risks, 3),
+    agreement: null,
+    objection: null,
   };
 }
 
@@ -56,7 +62,7 @@ export async function generateNoteBrief(title: string, body: string): Promise<No
   const json = await completeJson(
     [
       "Read this research note and return JSON with keys summary, ticker, conviction, claims, risks.",
-      "summary is three sentences a reader can use on a tape card.",
+      "summary is one paragraph of exactly five long sentences, with no list and no line breaks.",
       "ticker is the equity symbol, or an empty string.",
       "conviction is a short label such as high, medium, or low, or an empty string.",
       "claims is exactly three non-consensus claims from the note.",
@@ -68,14 +74,15 @@ export async function generateNoteBrief(title: string, body: string): Promise<No
     ]
       .filter(Boolean)
       .join("\n\n"),
-    1200
+    1800,
+    { feature: "brief" }
   );
 
   if (!json) {
     return null;
   }
 
-  const summary = textField(json.summary, 600);
+  const summary = textField(json.summary, 1600);
 
   if (!summary) {
     return null;
@@ -87,13 +94,16 @@ export async function generateNoteBrief(title: string, body: string): Promise<No
     conviction: facts.conviction || textField(json.conviction, 40) || null,
     claims: textList(json.claims, 3),
     risks: textList(json.risks, 3),
+    agreement: null,
+    objection: null,
   };
 }
 
 export async function ensureNoteBrief(
   postId: string,
   refresh = false,
-  source?: { title: string; body: string }
+  source?: { title: string; body: string },
+  thread?: { reader?: SupabaseClient }
 ): Promise<NoteBrief | null> {
   const admin = createServiceClient();
 
@@ -102,7 +112,8 @@ export async function ensureNoteBrief(
       return null;
     }
 
-    return generateNoteBrief(source.title, source.body);
+    const generated = await generateNoteBrief(source.title, source.body);
+    return generated ? withComments(postId, generated, thread) : null;
   }
 
   const { data, error } = await admin
@@ -119,13 +130,13 @@ export async function ensureNoteBrief(
   const existing = asBrief(row);
 
   if (existing && !refresh) {
-    return existing;
+    return withComments(postId, existing, thread);
   }
 
   const brief = await generateNoteBrief(row.title, row.body);
 
   if (!brief) {
-    return existing;
+    return existing ? withComments(postId, existing, thread) : null;
   }
 
   await admin
@@ -139,5 +150,49 @@ export async function ensureNoteBrief(
     })
     .eq("id", postId);
 
-  return brief;
+  return withComments(postId, brief, thread);
+}
+
+export function storedNoteBrief(row: {
+  ai_summary?: string | null;
+  ai_ticker?: string | null;
+  ai_conviction?: string | null;
+  ai_claims?: unknown;
+  ai_risks?: unknown;
+  ai_comment_agreement?: string | null;
+  ai_comment_objection?: string | null;
+}): NoteBrief | null {
+  const summary = row.ai_summary?.trim();
+
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    summary,
+    ticker: row.ai_ticker?.trim() || null,
+    conviction: row.ai_conviction?.trim() || null,
+    claims: textList(row.ai_claims, 3),
+    risks: textList(row.ai_risks, 3),
+    agreement: row.ai_comment_agreement?.trim() || null,
+    objection: row.ai_comment_objection?.trim() || null,
+  };
+}
+
+async function withComments(
+  postId: string,
+  brief: NoteBrief,
+  thread?: { reader?: SupabaseClient }
+): Promise<NoteBrief> {
+  if (!thread) {
+    return brief;
+  }
+
+  const comments = await ensureCommentBrief(postId, thread.reader);
+
+  if (!comments) {
+    return brief;
+  }
+
+  return { ...brief, agreement: comments.agreement, objection: comments.objection };
 }

@@ -84,7 +84,7 @@ export function SearchScreen({ navigation }: Props) {
       );
     }
     if (result.desks.length > 0) {
-      next.push({ kind: "label", id: "desks", title: "Desks" });
+      next.push({ kind: "label", id: "desks", title: "Users" });
       next.push(
         ...result.desks.map((desk) => ({
           kind: "desk" as const,
@@ -107,7 +107,7 @@ export function SearchScreen({ navigation }: Props) {
         value={query}
         onChangeText={setQuery}
         onSubmitEditing={() => void run()}
-        placeholder="Notes, comments, desks"
+        placeholder="Notes, comments, users"
         placeholderTextColor={colors.muted}
         style={styles.input}
         autoCapitalize="none"
@@ -157,8 +157,7 @@ export function SearchScreen({ navigation }: Props) {
       />
       <AiButton
         aboveTabs
-        meaning={meaning}
-        onOpenNote={(id) => navigation.navigate("Thread", { postId: id })}
+        onPress={() => navigation.navigate("Assistant", { meaning })}
       />
     </View>
   );

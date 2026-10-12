@@ -38,7 +38,7 @@ export function DeskScreen({
     setError(null);
     const next = await loadDesk(route.params.username, viewer.id);
     setDesk(next);
-    setError(next ? null : "This desk was not found.");
+    setError(next ? null : "This user was not found.");
     if (next) {
       const [posts, comments] = await Promise.all([
         loadReactions("post", next.posts.map((post) => post.id), viewer.id),
@@ -129,7 +129,7 @@ export function DeskScreen({
           ]}
         >
           <Text style={[styles.followLabel, desk.following && styles.followLabelOn]}>
-            {desk.following ? "Following" : "Follow desk"}
+            {desk.following ? "Following user" : "Follow user"}
           </Text>
         </Pressable>
       )}
@@ -166,11 +166,7 @@ export function DeskScreen({
                 {formatWhen(post.createdAt)}
               </Text>
               <Text style={styles.title}>{post.title}</Text>
-              {post.excerpt ? (
-                <Text numberOfLines={2} style={styles.excerpt}>
-                  {post.excerpt}
-                </Text>
-              ) : null}
+              {post.excerpt ? <Text style={styles.excerpt}>{post.excerpt}</Text> : null}
               <ReactionTally counts={postReactions[post.id] ?? []} />
             </Pressable>
           ))

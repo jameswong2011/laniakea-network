@@ -44,7 +44,7 @@ export function FeedTierFilter({
 
   return (
     <FeedFilterGroup
-      label="Desk"
+      label="User"
       hint="Author overall tier."
       tone="desk"
     >

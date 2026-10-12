@@ -59,7 +59,7 @@ export function isMissingUnlockSchema(message: string) {
 }
 
 export function missingUnlockSchemaMessage() {
-  return "Desk unlocks need a one-time schema update. Run the Desk unlock SQL on Admin, then refresh.";
+  return "User unlocks need a one-time schema update. Run the user unlock SQL on Admin, then refresh.";
 }
 
 export async function loadViewerUnlockIds(

@@ -162,7 +162,7 @@ export function AccountScreen({
           Buy an invite code · {INVITE_PURCHASE_UTL} UTL
         </Text>
       </Pressable>
-      {codes.length === 0 ? <Empty label="No invite codes on this desk." /> : null}
+      {codes.length === 0 ? <Empty label="No invite codes on this user." /> : null}
       {codes.map((code) => (
         <View key={code.id} style={styles.row}>
           <Text style={styles.title}>{code.code}</Text>

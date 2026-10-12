@@ -35,7 +35,7 @@ export function LoginScreen({ onSignUp }: { onSignUp?: () => void }) {
       <Text style={styles.kicker}>Laniakea</Text>
       <Text style={styles.title}>Sign in</Text>
       <Text style={styles.copy}>
-        Same desk as the website. Read the tape, unlock a higher room.
+        Same user as the website. Read the tape, unlock a higher room.
       </Text>
       <Text style={styles.label}>Email</Text>
       <TextInput

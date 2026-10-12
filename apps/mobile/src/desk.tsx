@@ -17,7 +17,7 @@ export function useDesk() {
   const profile = useContext(DeskContext);
 
   if (!profile) {
-    throw new Error("Desk missing");
+    throw new Error("User missing");
   }
 
   return profile;

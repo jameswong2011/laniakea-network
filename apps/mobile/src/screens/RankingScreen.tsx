@@ -101,7 +101,7 @@ export function RankingScreen({ navigation }: Props) {
           loading ? (
             <ActivityIndicator color={colors.fg} />
           ) : (
-            <Text style={styles.empty}>{tier ? `No desks in ${tier}.` : "No desks."}</Text>
+            <Text style={styles.empty}>{tier ? `No users in ${tier}.` : "No users."}</Text>
           )
         }
         renderItem={({ item, index }) => (

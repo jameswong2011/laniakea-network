@@ -171,7 +171,7 @@ export function CommentThread({
               : access === "view_only"
                 ? "View only. Unlock this note with UTL to comment."
                 : access === "hidden"
-                  ? "This desk is locked. Unlock it with UTL to engage."
+                  ? "This user is locked. Unlock it with UTL to engage."
                   : undefined
           }
         />
