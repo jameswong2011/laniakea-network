@@ -39,6 +39,7 @@ export type InviteNode = {
 export type AdminMetrics = {
   error: string | null;
   usageMissing: boolean;
+  capped: string[];
   users: number;
   signups7: number;
   signups30: number;
@@ -143,51 +144,152 @@ function usersSince(rows: Stamp[], floor: number) {
   );
 }
 
+const PAGE_ROWS = 1000;
+
+type NewestRows<T> = { data: T[]; error: { message: string } | null; capped: boolean };
+
+async function readNewest<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  cap: number
+): Promise<NewestRows<T>> {
+  const rows: T[] = [];
+
+  for (let from = 0; from < cap; from += PAGE_ROWS) {
+    const size = Math.min(PAGE_ROWS, cap - from);
+    const { data, error } = await page(from, from + size - 1);
+
+    if (error) {
+      return { data: rows, error, capped: false };
+    }
+
+    rows.push(...(data ?? []));
+
+    if ((data ?? []).length < size) {
+      return { data: rows, error: null, capped: false };
+    }
+  }
+
+  return { data: rows, error: null, capped: true };
+}
+
 export async function loadAdminMetrics(supabase: SupabaseClient): Promise<AdminMetrics> {
   const now = Date.now();
   const dayFloor = since(DAY, now);
   const weekFloor = since(WEEK, now);
   const monthFloor = since(MONTH, now);
+  const newest = { ascending: false };
 
   const [profiles, posts, comments, votes, revenue, referrals, usage, invites] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, username, display_name, tier, role, current_hp, utility_tokens, invited_by, created_at")
-      .neq("id", TREASURY_PROFILE_ID),
-    supabase.from("research_posts").select("id, title, author_id, status, created_at").limit(4000),
-    supabase.from("research_comments").select("id, author_id, post_id, body, created_at").limit(8000),
-    supabase.from("votes").select("user_id, created_at").limit(8000),
-    supabase
-      .from("revenue_events")
-      .select("gross, creator_share, platform_burn, dust, referral_pool, created_at")
-      .limit(5000),
-    supabase.from("revenue_distributions").select("beneficiary_id, amount, kind").eq("kind", "referral_keep").limit(8000),
-    supabase
-      .from("ai_usage")
-      .select("user_id, feature, total_tokens, cost_usd, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5000),
-    supabase.from("invite_codes").select("id, status, redeemed_by").limit(8000),
+    readNewest<ProfileRow>(
+      (from, to) =>
+        supabase
+          .from("profiles")
+          .select("id, username, display_name, tier, role, current_hp, utility_tokens, invited_by, created_at")
+          .neq("id", TREASURY_PROFILE_ID)
+          .order("created_at", newest)
+          .range(from, to),
+      20000
+    ),
+    readNewest<{ author_id: string; status: string; created_at: string }>(
+      (from, to) =>
+        supabase
+          .from("research_posts")
+          .select("author_id, status, created_at")
+          .order("created_at", newest)
+          .range(from, to),
+      10000
+    ),
+    readNewest<{ author_id: string; created_at: string }>(
+      (from, to) =>
+        supabase
+          .from("research_comments")
+          .select("author_id, created_at")
+          .order("created_at", newest)
+          .range(from, to),
+      20000
+    ),
+    readNewest<Stamp>(
+      (from, to) =>
+        supabase
+          .from("votes")
+          .select("user_id, created_at")
+          .order("created_at", newest)
+          .range(from, to),
+      20000
+    ),
+    readNewest<{
+      gross: number;
+      creator_share: number;
+      platform_burn: number;
+      dust: number;
+      referral_pool: number;
+      created_at: string;
+    }>(
+      (from, to) =>
+        supabase
+          .from("revenue_events")
+          .select("gross, creator_share, platform_burn, dust, referral_pool, created_at")
+          .order("created_at", newest)
+          .range(from, to),
+      10000
+    ),
+    readNewest<{ beneficiary_id: string | null; amount: number }>(
+      (from, to) =>
+        supabase
+          .from("revenue_distributions")
+          .select("beneficiary_id, amount")
+          .eq("kind", "referral_keep")
+          .order("created_at", newest)
+          .range(from, to),
+      20000
+    ),
+    readNewest<{
+      user_id: string | null;
+      feature: string;
+      total_tokens: number;
+      cost_usd: number;
+      created_at: string;
+    }>(
+      (from, to) =>
+        supabase
+          .from("ai_usage")
+          .select("user_id, feature, total_tokens, cost_usd, created_at")
+          .order("created_at", newest)
+          .range(from, to),
+      20000
+    ),
+    readNewest<{ status?: string; redeemed_by?: string | null }>(
+      (from, to) =>
+        supabase
+          .from("invite_codes")
+          .select("status, redeemed_by")
+          .order("created_at", newest)
+          .range(from, to),
+      20000
+    ),
   ]);
 
   const usageMissing = Boolean(usage.error && missing(usage.error.message));
-  const peopleRows = (profiles.data ?? []) as ProfileRow[];
+  const peopleRows = profiles.data;
 
   if (profiles.error) {
     return emptyMetrics(profiles.error.message, usageMissing);
   }
 
-  const postRows = (posts.error ? [] : posts.data ?? []) as {
-    id: string;
-    author_id: string;
-    status: string;
-    created_at: string;
-  }[];
-  const commentRows = (comments.error ? [] : comments.data ?? []) as {
-    author_id: string;
-    created_at: string;
-  }[];
-  const voteRows = (votes.error ? [] : votes.data ?? []) as Stamp[];
+  const capped = [
+    profiles.capped ? "users" : null,
+    posts.capped ? "notes" : null,
+    comments.capped ? "comments" : null,
+    votes.capped ? "votes" : null,
+    revenue.capped ? "revenue events" : null,
+    referrals.capped ? "referral payouts" : null,
+    usage.capped ? "model calls" : null,
+    invites.capped ? "invite codes" : null,
+  ].filter((label): label is string => Boolean(label));
+
+  const postRows = posts.error ? [] : posts.data;
+  const commentRows = comments.error ? [] : comments.data;
+  const voteRows = votes.error ? [] : votes.data;
   const activity: Stamp[] = [
     ...postRows.map((row) => ({ user_id: row.author_id, created_at: row.created_at })),
     ...commentRows.map((row) => ({ user_id: row.author_id, created_at: row.created_at })),
@@ -214,26 +316,12 @@ export async function loadAdminMetrics(supabase: SupabaseClient): Promise<AdminM
     dayFloor
   ).size;
 
-  const revenueRows = (revenue.error ? [] : revenue.data ?? []) as {
-    gross: number;
-    creator_share: number;
-    platform_burn: number;
-    dust: number;
-    referral_pool: number;
-    created_at: string;
-  }[];
-
-  const usageRows = (usage.error ? [] : usage.data ?? []) as {
-    user_id: string | null;
-    feature: string;
-    total_tokens: number;
-    cost_usd: number;
-    created_at: string;
-  }[];
+  const revenueRows = revenue.error ? [] : revenue.data;
+  const usageRows = usage.error ? [] : usage.data;
 
   const referralByUser = new Map<string, number>();
-  for (const row of referrals.error ? [] : referrals.data ?? []) {
-    const id = row.beneficiary_id as string | null;
+  for (const row of referrals.error ? [] : referrals.data) {
+    const id = row.beneficiary_id;
     if (!id) {
       continue;
     }
@@ -350,6 +438,7 @@ export async function loadAdminMetrics(supabase: SupabaseClient): Promise<AdminM
   return {
     error: posts.error && !missing(posts.error.message) ? posts.error.message : null,
     usageMissing,
+    capped,
     users: people.length,
     signups7: peopleRows.filter((row) => new Date(row.created_at).getTime() >= weekFloor).length,
     signups30: peopleRows.filter((row) => new Date(row.created_at).getTime() >= monthFloor).length,
@@ -574,6 +663,7 @@ function emptyMetrics(error: string, usageMissing: boolean): AdminMetrics {
   return {
     error,
     usageMissing,
+    capped: [],
     users: 0,
     signups7: 0,
     signups30: 0,

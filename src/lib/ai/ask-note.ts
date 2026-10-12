@@ -1,8 +1,7 @@
 import { prepareNoteMarkdown } from "@laniakea/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDeskAccess } from "@/lib/research/access";
-import { withPaidUnlock } from "@/lib/research/unlock";
-import { completeJson, textField, textList } from "@/lib/ai/openrouter";
+import { completeJson, textField } from "@/lib/ai/openrouter";
+import { readerAccess } from "@/lib/ai/viewer";
 
 export type AskResult = {
   answer: string;
@@ -23,7 +22,7 @@ export async function askNote(
 
   const withBrief = await supabase
     .from("research_posts")
-    .select("id, author_id, title, body, ai_summary, ai_claims, ai_risks")
+    .select("id, author_id, title, body, ai_summary")
     .eq("id", postId)
     .maybeSingle();
   const post =
@@ -45,36 +44,12 @@ export async function askNote(
     title: string;
     body: string;
     ai_summary?: string | null;
-    ai_claims?: unknown;
-    ai_risks?: unknown;
   };
 
-  const [viewer, author, unlock] = await Promise.all([
-    supabase.from("profiles").select("tier, role").eq("id", userId).maybeSingle(),
-    supabase.from("profiles").select("tier").eq("id", note.author_id).maybeSingle(),
-    supabase
-      .from("post_unlocks")
-      .select("post_id")
-      .eq("user_id", userId)
-      .eq("post_id", postId)
-      .maybeSingle(),
-  ]);
-  const ownsNote = userId === note.author_id;
-  const access = ownsNote
-    ? "full"
-    : withPaidUnlock(
-        getDeskAccess(viewer.data?.tier, author.data?.tier, viewer.data?.role === "admin"),
-        Boolean(unlock.data)
-      );
+  const { access } = await readerAccess(supabase, userId, note);
   const locked = access === "hidden";
   const source = locked
-    ? [
-        note.ai_summary ?? "",
-        ...textList(note.ai_claims, 3).map((claim) => `Claim: ${claim}`),
-        ...textList(note.ai_risks, 3).map((risk) => `Risk: ${risk}`),
-      ]
-        .filter(Boolean)
-        .join("\n")
+    ? (note.ai_summary ?? "").trim()
     : prepareNoteMarkdown(note.body).slice(0, 16000);
 
   if (!source) {

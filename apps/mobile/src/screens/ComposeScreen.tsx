@@ -20,7 +20,7 @@ import {
   UNLOCK_RATE_MULTIPLE_MAX,
   UNLOCK_RATE_MULTIPLE_MIN,
 } from "../domain";
-import { useDesk } from "../desk";
+import { useDesk, useDeskRefresh } from "../desk";
 import { SUB_TOPICS } from "../feed-query";
 import { pickImage } from "../media";
 import { supabase } from "../supabase";
@@ -34,6 +34,7 @@ export function ComposeScreen({
   route,
 }: NativeStackScreenProps<AppStackParamList, "Compose">) {
   const profile = useDesk();
+  const refreshDesk = useDeskRefresh();
   const insets = useSafeAreaInsets();
   const draftId = route.params?.draftId;
   const [title, setTitle] = useState("");
@@ -130,6 +131,7 @@ export function ComposeScreen({
       unlockRateMultiple: multiple,
       draftId: savedId || undefined,
     });
+    void refreshDesk();
     setPending(false);
     setError(result.error ?? null);
     setNotice(result.message ?? null);

@@ -14,7 +14,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { INVITE_PURCHASE_UTL, inviteSharePath } from "../../../../src/lib/research/referral";
 import { DeskAvatar } from "../avatar";
-import { useDesk } from "../desk";
+import { useDesk, useDeskRefresh } from "../desk";
 import { formatWhen } from "../format";
 import { loadProfile, type DeskProfile } from "../floor";
 import { loadAccountNotes, loadInvites, type AccountNote, type InviteCode } from "../library";
@@ -39,6 +39,7 @@ export function AccountScreen({
   navigation,
 }: NativeStackScreenProps<AppStackParamList, "Account">) {
   const signedIn = useDesk();
+  const refreshDesk = useDeskRefresh();
   const [profile, setProfile] = useState<DeskProfile>(signedIn);
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [notes, setNotes] = useState<AccountNote[]>([]);
@@ -55,18 +56,22 @@ export function AccountScreen({
     setError(null);
 
     try {
-      const [nextProfile, nextCodes, nextNotes] = await Promise.all([
-        loadProfile(signedIn.id),
-        loadInvites(signedIn.id),
-        loadAccountNotes(signedIn.id),
-      ]);
+      const [nextProfile, nextCodes, nextNotes, nextBio, nextInvitees, nextResiduals] =
+        await Promise.all([
+          loadProfile(signedIn.id),
+          loadInvites(signedIn.id),
+          loadAccountNotes(signedIn.id),
+          loadBio(signedIn.id),
+          loadInvitees(signedIn.id),
+          loadReferralLines(signedIn.id),
+        ]);
       setProfile(nextProfile);
       setCodes(nextCodes);
       setNotes(nextNotes);
+      setBio(nextBio);
+      setInvitees(nextInvitees);
+      setResiduals(nextResiduals);
       setNoteReactions(await loadReactions("post", nextNotes.map((note) => note.id), signedIn.id));
-      setBio(await loadBio(signedIn.id));
-      setInvitees(await loadInvitees(signedIn.id));
-      setResiduals(await loadReferralLines(signedIn.id));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load this account.");
     } finally {
@@ -152,6 +157,7 @@ export function AccountScreen({
             setError(result.error ?? null);
             setNotice(result.message ?? null);
             if (!result.error) {
+              void refreshDesk();
               await refresh();
             }
           });

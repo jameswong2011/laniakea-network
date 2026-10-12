@@ -44,8 +44,15 @@ async function postAi<T>(path: string, body: unknown): Promise<T | null> {
   return payload;
 }
 
-export function requestNoteBrief(postId: string, refresh = false, locked = false) {
-  return postAi<{ brief?: NoteBrief }>(`/api/ai/brief`, { postId, refresh, locked });
+export function requestNoteBrief(postId: string, refresh = false) {
+  return postAi<{ brief?: NoteBrief; error?: string }>(`/api/ai/brief`, { postId, refresh });
+}
+
+export function requestCommentBrief(postId: string) {
+  return postAi<{ brief?: { agreement: string; objection: string } | null; error?: string }>(
+    `/api/ai/comments`,
+    { postId }
+  );
 }
 
 export function askNote(postId: string, question: string) {
@@ -56,5 +63,5 @@ export function askNote(postId: string, question: string) {
 }
 
 export function searchByMeaning(query: string) {
-  return postAi<{ hits?: MeaningHit[] }>(`/api/ai/search`, { query });
+  return postAi<{ hits?: MeaningHit[]; error?: string }>(`/api/ai/search`, { query });
 }

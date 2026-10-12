@@ -4,27 +4,82 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AskNote } from "@/components/laniakea/AskNote";
 import { NoteBriefCard } from "@/components/laniakea/NoteBriefCard";
+import { wantsMeaningSearch } from "@/lib/ai/meaning-query";
 import type { MeaningHit } from "@/lib/ai/meaning-search";
 import type { NoteBrief } from "@/lib/ai/note-brief";
 import { researchPostPath } from "@/lib/research/feed";
+
+type MeaningResult = { hits: MeaningHit[]; error: string | null };
+
+const MEANING_TTL_MS = 10 * 60 * 1000;
+const meaningCache = new Map<string, { at: number; hits: MeaningHit[] }>();
+
+async function loadMeaning(query: string): Promise<MeaningResult> {
+  const key = query.toLowerCase();
+  const cached = meaningCache.get(key);
+
+  if (cached && Date.now() - cached.at < MEANING_TTL_MS) {
+    return { hits: cached.hits, error: null };
+  }
+
+  try {
+    const response = await fetch("/api/ai/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { hits?: MeaningHit[]; error?: string }
+      | null;
+
+    if (!response.ok || !payload?.hits) {
+      return { hits: [], error: payload?.error ?? "Search by meaning is unavailable right now." };
+    }
+
+    meaningCache.set(key, { at: Date.now(), hits: payload.hits });
+    return { hits: payload.hits, error: null };
+  } catch {
+    return { hits: [], error: "Search by meaning is unavailable right now." };
+  }
+}
 
 export function AiDock({
   postId,
   locked = false,
   brief = null,
-  meaning = null,
+  meaningQuery = null,
 }: {
   postId?: string;
   locked?: boolean;
   brief?: NoteBrief | null;
-  meaning?: MeaningHit[] | null;
+  meaningQuery?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [lift, setLift] = useState(0);
   const [reply, setReply] = useState<{ text: string; section: string | null } | null>(null);
+  const [found, setFound] = useState<(MeaningResult & { query: string }) | null>(null);
   const askFocused = useRef(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const replyRef = useRef<HTMLDivElement>(null);
+  const query = meaningQuery?.trim() ?? "";
+  const wantsMeaning = wantsMeaningSearch(query);
+  const meaning = found && found.query === query ? found : null;
+
+  useEffect(() => {
+    if (!open || !wantsMeaning) {
+      return;
+    }
+
+    let active = true;
+    void loadMeaning(query).then((result) => {
+      if (active) {
+        setFound({ query, ...result });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [open, query, wantsMeaning]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -82,17 +137,23 @@ export function AiDock({
             </section>
           ) : null}
           {brief ? <NoteBriefCard brief={brief} locked={locked} /> : null}
-          {meaning ? (
+          {meaningQuery != null ? (
             <div className="flex flex-col gap-3">
               <p className="font-data text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
                 By meaning
               </p>
-              {meaning.length === 0 ? (
+              {!wantsMeaning ? (
                 <p className="text-[14px] text-muted-foreground">
                   Ask a question, or use three or more words, to search the summaries.
                 </p>
+              ) : !meaning ? (
+                <p className="text-[14px] text-muted-foreground">Reading the summaries…</p>
+              ) : meaning.error ? (
+                <p className="text-[14px] text-muted-foreground">{meaning.error}</p>
+              ) : meaning.hits.length === 0 ? (
+                <p className="text-[14px] text-muted-foreground">No summaries match this yet.</p>
               ) : (
-                meaning.map((post) => (
+                meaning.hits.map((post) => (
                   <article key={post.id}>
                     <h2 className="text-[16px] font-medium">
                       <Link href={researchPostPath(post.id)} className="hover:underline">

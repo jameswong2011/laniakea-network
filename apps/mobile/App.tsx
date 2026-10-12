@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -191,6 +191,19 @@ export default function App() {
       });
   }, [session]);
 
+  const sessionUserId = session?.user.id;
+  const refreshProfile = useCallback(async () => {
+    if (!sessionUserId) {
+      return;
+    }
+
+    try {
+      setProfile(await loadProfile(sessionUserId));
+    } catch {
+      return;
+    }
+  }, [sessionUserId]);
+
   if (!ready || (session && !profile && !error)) {
     return (
       <SafeAreaProvider>
@@ -254,7 +267,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-    <DeskProvider profile={profile}>
+    <DeskProvider profile={profile} refresh={refreshProfile}>
       <NavigationContainer theme={navTheme}>
         <StatusBar style="light" />
         <AppStack.Navigator initialRouteName="Main" screenOptions={screenOptions}>

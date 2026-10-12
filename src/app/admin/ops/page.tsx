@@ -46,10 +46,31 @@ export const metadata: Metadata = {
 
 export default async function AdminPage() {
   const { supabase } = await requireAdmin();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, role, tier, current_hp")
-    .order("username", { ascending: true });
+  const now = new Date();
+  const [
+    { data, error },
+    weekly,
+    revenue7d,
+    revenue30d,
+    stakeProbe,
+    applyProbe,
+    commentsProbe,
+    { data: livePosts },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, username, display_name, role, tier, current_hp")
+      .order("username", { ascending: true }),
+    getLatestWeeklyRun(supabase),
+    loadRevenueTotals(supabase, subDays(now, 7).toISOString()),
+    loadRevenueTotals(supabase, subDays(now, 30).toISOString()),
+    supabase.from("research_posts").select("original_stake").limit(1),
+    supabase.rpc("settle_hunted_post", {
+      p_post_id: "00000000-0000-4000-8000-000000000000",
+    }),
+    supabase.from("research_comments").select("id").limit(1),
+    supabase.from("research_posts").select("id, title, author_id"),
+  ]);
 
   const profiles = (
     (data ?? []) as Pick<
@@ -77,21 +98,7 @@ export default async function AdminPage() {
       catalogNameByUsername.get(profile.username) !== profile.display_name
   );
 
-  const weekly = await getLatestWeeklyRun(supabase);
-  const now = new Date();
-  const revenue7d = await loadRevenueTotals(supabase, subDays(now, 7).toISOString());
-  const revenue30d = await loadRevenueTotals(
-    supabase,
-    subDays(now, 30).toISOString()
-  );
-  const stakeProbe = await supabase
-    .from("research_posts")
-    .select("original_stake")
-    .limit(1);
   const settlementReady = !stakeProbe.error;
-  const applyProbe = await supabase.rpc("settle_hunted_post", {
-    p_post_id: "00000000-0000-4000-8000-000000000000",
-  });
   const applyReady =
     !applyProbe.error ||
     !(
@@ -99,15 +106,7 @@ export default async function AdminPage() {
       applyProbe.error.message.includes("does not exist") ||
       applyProbe.error.message.includes("schema cache")
     );
-  const commentsProbe = await supabase
-    .from("research_comments")
-    .select("id")
-    .limit(1);
   const commentsReady = !commentsProbe.error;
-
-  const { data: livePosts } = await supabase
-    .from("research_posts")
-    .select("id, title, author_id");
 
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const catalogByTitle = new Map(DEMO_POSTS.map((post) => [post.title, post]));

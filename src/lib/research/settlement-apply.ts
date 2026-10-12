@@ -1,12 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { creditProfileHp } from "@/lib/research/hp";
-import {
-  planAscentSettlement,
-  planHuntSettlement,
-  type SettlementPayout,
-  type SettlementVote,
-} from "@/lib/research/settlement";
+import type { SettlementVote } from "@/lib/research/settlement";
 import { isMissingCommentsSchema } from "@/lib/research/comments";
+import { createServiceClient } from "@/lib/supabase/admin";
 import {
   HP_TRANSACTION_ASCENT,
   HP_TRANSACTION_HUNT,
@@ -28,178 +24,20 @@ function isMissingSettleFn(message: string) {
 
 function settleSqlHint(error: string) {
   if (isMissingSettleFn(error)) {
-    return `Bounty apply SQL is missing. ${error}`;
+    return `Bounty apply SQL is missing. Run supabase/migrations/20260822100000_settlement_apply.sql. ${error}`;
   }
 
   return error;
 }
 
-function formatMultiplier(multiplier: number | null) {
-  if (multiplier == null) {
-    return null;
-  }
-
-  return `${multiplier.toFixed(2)}x`;
-}
-
-function payoutDescription(
-  payout: SettlementPayout,
-  subject: { kind: "post" | "comment"; id: string }
-) {
-  const noun = subject.kind === "comment" ? "comment" : "research post";
-
-  if (payout.role === "ascent_author") {
-    return `Ascent harvest (author) on ${noun} ${subject.id}`;
-  }
-
-  const multiple = formatMultiplier(payout.multiplier);
-
-  if (payout.role === "ascent_up") {
-    return multiple
-      ? `Ascent harvest (${multiple}) on ${noun} ${subject.id}`
-      : `Ascent harvest on ${noun} ${subject.id}`;
-  }
-
-  return multiple
-    ? `Hunt bounty (${multiple}) on ${noun} ${subject.id}`
-    : `Hunt bounty on ${noun} ${subject.id}`;
-}
-
-async function payPayouts(
-  supabase: SupabaseClient,
-  postId: string,
-  payouts: SettlementPayout[],
-  type: typeof HP_TRANSACTION_HUNT | typeof HP_TRANSACTION_ASCENT,
-  subject: { kind: "post" | "comment"; id: string; commentId?: string }
-) {
-  for (const payout of payouts) {
-    const credit = await creditProfileHp(supabase, payout.userId, payout.amount);
-
-    if (!credit.ok) {
-      return { error: credit.error };
-    }
-
-    const withComment = await supabase.from("hp_transactions").insert({
-      user_id: payout.userId,
-      amount: payout.amount,
-      type,
-      post_id: postId,
-      comment_id: subject.commentId ?? null,
-      description: payoutDescription(payout, subject),
-    });
-    const { error } =
-      withComment.error && withComment.error.message.includes("comment_id")
-        ? await supabase.from("hp_transactions").insert({
-            user_id: payout.userId,
-            amount: payout.amount,
-            type,
-            post_id: postId,
-            description: payoutDescription(payout, subject),
-          })
-        : withComment;
-
-    if (error) {
-      return { error: error.message };
-    }
-  }
-
-  return { error: null };
-}
-
-export async function loadSettlementVotes(
-  supabase: SupabaseClient,
-  postId: string
-): Promise<{ votes: SettlementVote[]; error: string | null }> {
-  const withHealth = await supabase
-    .from("votes")
-    .select("user_id, value, health_at_vote")
-    .eq("post_id", postId);
-
-  const rows =
-    withHealth.error && withHealth.error.message.includes("health_at_vote")
-      ? await supabase
-          .from("votes")
-          .select("user_id, value")
-          .eq("post_id", postId)
-      : withHealth;
-
-  if (rows.error) {
-    return { votes: [], error: rows.error.message };
-  }
-
-  return {
-    votes: ((rows.data ?? []) as Array<{
-      user_id: string;
-      value: number;
-      health_at_vote?: number | null;
-    }>).map((row) => ({
-      userId: row.user_id,
-      value: row.value,
-      healthAtVote: row.health_at_vote ?? 0,
-    })),
-    error: null,
-  };
-}
-
-export async function settleHuntedPost(
-  supabase: SupabaseClient,
-  postId: string,
-  originalStake: number
-) {
+export async function settleHuntedPost(supabase: SupabaseClient, postId: string) {
   const rpc = await supabase.rpc("settle_hunted_post", { p_post_id: postId });
-
-  if (!rpc.error) {
-    return { error: null };
-  }
-
-  if (!isMissingSettleFn(rpc.error.message)) {
-    return { error: settleSqlHint(rpc.error.message) };
-  }
-
-  const loaded = await loadSettlementVotes(supabase, postId);
-
-  if (loaded.error) {
-    return { error: loaded.error };
-  }
-
-  return payPayouts(
-    supabase,
-    postId,
-    planHuntSettlement(originalStake, loaded.votes),
-    HP_TRANSACTION_HUNT,
-    { kind: "post", id: postId }
-  );
+  return { error: rpc.error ? settleSqlHint(rpc.error.message) : null };
 }
 
-export async function settleAscendedPost(
-  supabase: SupabaseClient,
-  postId: string,
-  authorId: string,
-  originalStake: number
-) {
+export async function settleAscendedPost(supabase: SupabaseClient, postId: string) {
   const rpc = await supabase.rpc("settle_ascended_post", { p_post_id: postId });
-
-  if (!rpc.error) {
-    return { error: null };
-  }
-
-  if (!isMissingSettleFn(rpc.error.message)) {
-    return { error: settleSqlHint(rpc.error.message) };
-  }
-
-  const loaded = await loadSettlementVotes(supabase, postId);
-
-  if (loaded.error) {
-    return { error: loaded.error };
-  }
-
-  return payPayouts(
-    supabase,
-    postId,
-    planAscentSettlement(authorId, originalStake, loaded.votes),
-    HP_TRANSACTION_ASCENT,
-    { kind: "post", id: postId }
-  );
+  return { error: rpc.error ? settleSqlHint(rpc.error.message) : null };
 }
 
 export async function loadCommentSettlementVotes(
@@ -232,86 +70,57 @@ export async function loadCommentSettlementVotes(
 export async function settleHuntedComment(
   supabase: SupabaseClient,
   commentId: string,
-  postId: string,
-  originalStake: number
+  postId: string
 ) {
   const rpc = await supabase.rpc("settle_hunted_comment", {
     p_comment_id: commentId,
     p_post_id: postId,
   });
-
-  if (!rpc.error) {
-    return { error: null };
-  }
-
-  if (!isMissingSettleFn(rpc.error.message)) {
-    return { error: settleSqlHint(rpc.error.message) };
-  }
-
-  const loaded = await loadCommentSettlementVotes(supabase, commentId);
-
-  if (loaded.error) {
-    return { error: loaded.error };
-  }
-
-  return payPayouts(
-    supabase,
-    postId,
-    planHuntSettlement(originalStake, loaded.votes),
-    HP_TRANSACTION_HUNT,
-    { kind: "comment", id: commentId, commentId }
-  );
+  return { error: rpc.error ? settleSqlHint(rpc.error.message) : null };
 }
 
 export async function settleAscendedComment(
   supabase: SupabaseClient,
   commentId: string,
-  postId: string,
-  authorId: string,
-  originalStake: number
+  postId: string
 ) {
   const rpc = await supabase.rpc("settle_ascended_comment", {
     p_comment_id: commentId,
     p_post_id: postId,
   });
-
-  if (!rpc.error) {
-    return { error: null };
-  }
-
-  if (!isMissingSettleFn(rpc.error.message)) {
-    return { error: settleSqlHint(rpc.error.message) };
-  }
-
-  const loaded = await loadCommentSettlementVotes(supabase, commentId);
-
-  if (loaded.error) {
-    return { error: loaded.error };
-  }
-
-  return payPayouts(
-    supabase,
-    postId,
-    planAscentSettlement(authorId, originalStake, loaded.votes),
-    HP_TRANSACTION_ASCENT,
-    { kind: "comment", id: commentId, commentId }
-  );
+  return { error: rpc.error ? settleSqlHint(rpc.error.message) : null };
 }
 
-async function insertRefund(
-  supabase: SupabaseClient,
-  row: {
-    userId: string;
-    amount: number;
-    postId: string;
-    commentId: string;
-    description: string;
-  }
-) {
-  const credit = await creditProfileHp(supabase, row.userId, row.amount);
+type RefundRow = {
+  userId: string;
+  amount: number;
+  postId: string;
+  commentId: string;
+  description: string;
+};
 
-  if (!credit.ok) {
-    return { error: credit.error };
+async function refundRecorded(supabase: SupabaseClient, row: RefundRow) {
+  const { count, error } = await (createServiceClient() ?? supabase)
+    .from("hp_transactions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", row.userId)
+    .eq("post_id", row.postId)
+    .eq("comment_id", row.commentId)
+    .eq("type", HP_TRANSACTION_REFUND)
+    .eq("description", row.description);
+
+  return !error && (count ?? 0) > 0;
+}
+
+function refundLedgerError(message: string) {
+  return message.includes("hp_transactions_type_check") || message.includes("refund")
+    ? "Comment refunds need the refund ledger type. Run the comment-cascade SQL in Supabase."
+    : message;
+}
+
+async function insertRefund(supabase: SupabaseClient, row: RefundRow) {
+  if (await refundRecorded(supabase, row)) {
+    return { error: null };
   }
 
   const withComment = await supabase.from("hp_transactions").insert({
@@ -322,7 +131,7 @@ async function insertRefund(
     comment_id: row.commentId,
     description: row.description,
   });
-  const { error } =
+  const ledger =
     withComment.error && withComment.error.message.includes("comment_id")
       ? await supabase.from("hp_transactions").insert({
           user_id: row.userId,
@@ -333,14 +142,21 @@ async function insertRefund(
         })
       : withComment;
 
-  if (error) {
-    return {
-      error:
-        error.message.includes("hp_transactions_type_check") ||
-        error.message.includes("refund")
-          ? "Comment refunds need the refund ledger type. Run the comment-cascade SQL in Supabase."
-          : error.message,
-    };
+  if (ledger.error) {
+    return { error: refundLedgerError(ledger.error.message) };
+  }
+
+  const credit = await creditProfileHp(supabase, row.userId, row.amount);
+
+  if (!credit.ok) {
+    await supabase
+      .from("hp_transactions")
+      .delete()
+      .eq("user_id", row.userId)
+      .eq("post_id", row.postId)
+      .eq("type", HP_TRANSACTION_REFUND)
+      .eq("description", row.description);
+    return { error: credit.error };
   }
 
   return { error: null };
@@ -478,12 +294,7 @@ export async function settleCommentsOnHuntedPost(
     }
 
     if (comment.current_health < comment.original_stake) {
-      const hunted = await settleHuntedComment(
-        supabase,
-        comment.id,
-        postId,
-        comment.original_stake
-      );
+      const hunted = await settleHuntedComment(supabase, comment.id, postId);
 
       if (hunted.error) {
         return hunted;
@@ -531,33 +342,60 @@ export async function settleCommentsOnHuntedPost(
   return { error: null };
 }
 
+async function postPayoutRecorded(postId: string, type: string) {
+  const admin = createServiceClient();
+
+  if (!admin) {
+    return false;
+  }
+
+  const { count, error } = await admin
+    .from("hp_transactions")
+    .select("id", { count: "exact", head: true })
+    .eq("post_id", postId)
+    .eq("type", type)
+    .is("comment_id", null);
+
+  return !error && (count ?? 0) > 0;
+}
+
+async function hasLiveComments(supabase: SupabaseClient, postId: string) {
+  const { count, error } = await supabase
+    .from("research_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("post_id", postId)
+    .eq("status", RESEARCH_POST_STATUS_LIVE);
+
+  return Boolean(error) || (count ?? 0) > 0;
+}
+
 export async function resumeFrozenPostSettlement(
   supabase: SupabaseClient,
   post: {
     id: string;
     status: string;
-    author_id: string;
-    original_stake?: number;
-    current_health?: number;
   }
 ) {
-  const stake =
-    typeof post.original_stake === "number"
-      ? post.original_stake
-      : (post.current_health ?? 0);
-
   if (post.status === RESEARCH_POST_STATUS_ARCHIVED) {
-    const hunted = await settleHuntedPost(supabase, post.id, stake);
+    const [paid, liveComments] = await Promise.all([
+      postPayoutRecorded(post.id, HP_TRANSACTION_HUNT),
+      hasLiveComments(supabase, post.id),
+    ]);
 
-    if (hunted.error) {
-      return hunted;
+    if (!paid) {
+      const hunted = await settleHuntedPost(supabase, post.id);
+
+      if (hunted.error) {
+        return hunted;
+      }
     }
 
-    return settleCommentsOnHuntedPost(supabase, post.id);
+    return liveComments ? settleCommentsOnHuntedPost(supabase, post.id) : { error: null };
   }
 
   if (post.status === RESEARCH_POST_STATUS_ASCENDED) {
-    return settleAscendedPost(supabase, post.id, post.author_id, stake);
+    const paid = await postPayoutRecorded(post.id, HP_TRANSACTION_ASCENT);
+    return paid ? { error: null } : settleAscendedPost(supabase, post.id);
   }
 
   return { error: null };

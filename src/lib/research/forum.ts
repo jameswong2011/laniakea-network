@@ -114,6 +114,13 @@ export function tallyReactions(
   return counts;
 }
 
+type ReactionTotal = {
+  target_id: string;
+  reaction: string;
+  total: number | string;
+  mine: boolean | null;
+};
+
 export async function loadReactions(
   supabase: SupabaseClient,
   targetType: ReactionTarget,
@@ -127,6 +134,24 @@ export async function loadReactions(
   }
 
   if (targetIds.length === 0) {
+    return empty;
+  }
+
+  const counted = await supabase.rpc("reaction_counts", {
+    p_target_type: targetType,
+    p_target_ids: targetIds,
+  });
+
+  if (!counted.error) {
+    for (const row of (counted.data ?? []) as ReactionTotal[]) {
+      const slot = empty[row.target_id]?.find((item) => item.key === row.reaction);
+
+      if (slot) {
+        slot.count = Number(row.total) || 0;
+        slot.mine = Boolean(row.mine);
+      }
+    }
+
     return empty;
   }
 
@@ -275,12 +300,19 @@ export async function loadNotifications(
   supabase: SupabaseClient,
   userId: string
 ): Promise<{ items: NotificationRow[]; unread: number }> {
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("id, kind, post_id, comment_id, read_at, created_at, actor_id")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const [{ data, error }, unreadTotal] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("id, kind, post_id, comment_id, read_at, created_at, actor_id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .is("read_at", null),
+  ]);
 
   if (error) {
     return { items: [], unread: 0 };
@@ -304,34 +336,38 @@ export async function loadNotifications(
 
   const actors = new Map<string, { display_name: string; username: string }>();
   const titles = new Map<string, string>();
+  const [profiles, posts] = await Promise.all([
+    actorIds.length > 0
+      ? supabase
+          .from("profiles")
+          .select("id, display_name, username")
+          .in("id", actorIds)
+          .then(({ data: found }) => found ?? [])
+      : [],
+    postIds.length > 0
+      ? supabase
+          .from("research_posts")
+          .select("id, title")
+          .in("id", postIds)
+          .then(({ data: found }) => found ?? [])
+      : [],
+  ]);
 
-  if (actorIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, display_name, username")
-      .in("id", actorIds);
-
-    for (const profile of profiles ?? []) {
-      actors.set(profile.id, {
-        display_name: profile.display_name,
-        username: profile.username,
-      });
-    }
+  for (const profile of profiles) {
+    actors.set(profile.id, {
+      display_name: profile.display_name,
+      username: profile.username,
+    });
   }
 
-  if (postIds.length > 0) {
-    const { data: posts } = await supabase
-      .from("research_posts")
-      .select("id, title")
-      .in("id", postIds);
-
-    for (const post of posts ?? []) {
-      titles.set(post.id, post.title);
-    }
+  for (const post of posts) {
+    titles.set(post.id, post.title);
   }
 
   return {
-    unread: rows.filter((row) => !row.read_at).length,
+    unread: unreadTotal.error
+      ? rows.filter((row) => !row.read_at).length
+      : (unreadTotal.count ?? 0),
     items: rows.map((row) => {
       const actor = row.actor_id ? actors.get(row.actor_id as string) : null;
 

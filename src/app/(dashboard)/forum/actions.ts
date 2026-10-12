@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
+import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { requireUser } from "@/lib/auth/session";
 import { researchPostPath } from "@/lib/research/feed";
@@ -187,9 +188,7 @@ export async function editPostBody(
     return { error: write.error.message, stamp: Date.now() };
   }
 
-  after(() => {
-    void ensureNoteBrief(parsed.data.postId, true);
-  });
+  after(() => ensureNoteBrief(parsed.data.postId, { refresh: true, userId }));
 
   refreshSocial(parsed.data.postId);
   return { message: "Post updated.", stamp: Date.now() };
@@ -226,6 +225,8 @@ export async function editCommentBody(
   if (write.error) {
     return { error: write.error.message, stamp: Date.now() };
   }
+
+  after(() => ensureCommentBrief(parsed.data.postId, undefined, userId));
 
   refreshSocial(parsed.data.postId);
   return { message: "Comment updated.", stamp: Date.now() };

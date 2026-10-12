@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useDesk } from "../desk";
+import { useDesk, useDeskRefresh } from "../desk";
 import { formatWhen } from "../format";
 import { loadProfile } from "../floor";
 import { loadWallet, type WalletEntry } from "../library";
@@ -31,6 +31,7 @@ export function WalletScreen({
   navigation,
 }: NativeStackScreenProps<AppStackParamList, "Wallet">) {
   const profile = useDesk();
+  const refreshDesk = useDeskRefresh();
   const [tier, setTier] = useState(profile.tier);
   const [hp, setHp] = useState(profile.current_hp);
   const [tokens, setTokens] = useState(profile.utility_tokens);
@@ -114,6 +115,7 @@ export function WalletScreen({
                     setError(result.error ?? null);
                     setNotice(result.message ?? null);
                     if (!result.error) {
+                      void refreshDesk();
                       await refresh();
                     }
                   });
@@ -147,6 +149,7 @@ export function WalletScreen({
                     setError(result.error ?? null);
                     setNotice(result.message ?? null);
                     if (!result.error) {
+                      void refreshDesk();
                       await refresh();
                     }
                   });

@@ -75,7 +75,7 @@ export default async function PublicProfilePage({
     notFound();
   }
 
-  const [{ data: posts }, { data: comments }, following, followerCount] =
+  const [{ data: posts }, { data: comments }, following, followerCount, noteTotal, commentTotal] =
     await Promise.all([
     supabase
       .from("research_posts")
@@ -93,10 +93,18 @@ export default async function PublicProfilePage({
       ? Promise.resolve(false)
       : isAuthorFollowed(supabase, userId, profile.id),
     countAuthorFollowers(supabase, profile.id),
+    supabase
+      .from("research_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("author_id", profile.id),
+    supabase
+      .from("research_comments")
+      .select("id", { count: "exact", head: true })
+      .eq("author_id", profile.id),
   ]);
 
-  const noteCount = posts?.length ?? 0;
-  const commentCount = comments?.length ?? 0;
+  const noteCount = noteTotal.count ?? posts?.length ?? 0;
+  const commentCount = commentTotal.count ?? comments?.length ?? 0;
 
   return (
     <PageFrame>

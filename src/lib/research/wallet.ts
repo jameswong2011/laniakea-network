@@ -16,6 +16,8 @@ import {
 const POST_ID_IN_TEXT =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
+const WALLET_LIMIT = 200;
+
 export type WalletEntry = HpTransaction & {
   signedAmount: number;
   relatedPost: Pick<ResearchPost, "id" | "title" | "sub_topic"> | null;
@@ -64,7 +66,8 @@ export async function getWalletLedger(
     .from("hp_transactions")
     .select("id, user_id, amount, type, description, post_id, created_at")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(WALLET_LIMIT);
 
   const legacy =
     withPostId.error && withPostId.error.message.includes("post_id")
@@ -73,6 +76,7 @@ export async function getWalletLedger(
           .select("id, user_id, amount, type, description, created_at")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
+          .limit(WALLET_LIMIT)
       : null;
 
   const { data, error } = legacy ?? withPostId;

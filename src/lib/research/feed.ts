@@ -449,10 +449,16 @@ async function loadAuthorMeta(
     return { authorsById, topicTiers };
   }
 
-  const authorsWithAvatar = await supabase
-    .from("profiles")
-    .select("id, username, display_name, tier, avatar_url")
-    .in("id", authorIds);
+  const [authorsWithAvatar, { data: ranks }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, username, display_name, tier, avatar_url")
+      .in("id", authorIds),
+    supabase
+      .from("subtopic_ranks")
+      .select("user_id, sub_topic, tier")
+      .in("user_id", authorIds),
+  ]);
   const { data: authors } =
     authorsWithAvatar.error &&
     authorsWithAvatar.error.message.includes("avatar_url")
@@ -465,11 +471,6 @@ async function loadAuthorMeta(
   for (const author of (authors ?? []) as ResearchPostAuthor[]) {
     authorsById.set(author.id, author);
   }
-
-  const { data: ranks } = await supabase
-    .from("subtopic_ranks")
-    .select("user_id, sub_topic, tier")
-    .in("user_id", authorIds);
 
   for (const rank of (ranks ?? []) as Pick<
     SubtopicRank,
@@ -508,7 +509,9 @@ function toFeedItem(
 
   return {
     ...post,
-    body: access === "hidden" ? researchExcerpt(post.body) : post.body,
+    ...(access === "hidden"
+      ? { body: researchExcerpt(post.body), ai_claims: [], ai_risks: [] }
+      : {}),
     author,
     authorTopicTier: topic
       ? (topicTiers.get(`${post.author_id}:${topic}`) ?? deskTier)
@@ -576,15 +579,14 @@ export async function getLiveResearchFeed(
   }
 
   const posts = normalizePosts(data as RawPost[] | null);
-  const { authorsById, topicTiers } = await loadAuthorMeta(
-    supabase,
-    [...new Set(posts.map((post) => post.author_id))]
-  );
-  const unlockIds = await loadViewerUnlockIds(
-    supabase,
-    viewer?.userId,
-    posts.map((post) => post.id)
-  );
+  const [{ authorsById, topicTiers }, unlockIds] = await Promise.all([
+    loadAuthorMeta(supabase, [...new Set(posts.map((post) => post.author_id))]),
+    loadViewerUnlockIds(
+      supabase,
+      viewer?.userId,
+      posts.map((post) => post.id)
+    ),
+  ]);
 
   return {
     items: posts.flatMap((post) => {
@@ -656,14 +658,10 @@ export async function getResearchPostById(
     return { item: null, error: null };
   }
 
-  const { authorsById, topicTiers } = await loadAuthorMeta(supabase, [
-    post.author_id,
+  const [{ authorsById, topicTiers }, unlockIds] = await Promise.all([
+    loadAuthorMeta(supabase, [post.author_id]),
+    loadViewerUnlockIds(supabase, viewer?.userId, [post.id]),
   ]);
-  const unlockIds = await loadViewerUnlockIds(
-    supabase,
-    viewer?.userId,
-    [post.id]
-  );
 
   return {
     item: toFeedItem(

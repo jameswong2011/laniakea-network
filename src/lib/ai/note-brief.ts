@@ -57,7 +57,19 @@ function asBrief(row: BriefRow): NoteBrief | null {
   };
 }
 
-export async function generateNoteBrief(title: string, body: string): Promise<NoteBrief | null> {
+export type BriefOptions = {
+  refresh?: boolean;
+  source?: { title: string; body: string };
+  comments?: boolean;
+  reader?: SupabaseClient;
+  userId?: string | null;
+};
+
+export async function generateNoteBrief(
+  title: string,
+  body: string,
+  userId?: string | null
+): Promise<NoteBrief | null> {
   const facts = fileFacts(body);
   const json = await completeJson(
     [
@@ -75,7 +87,7 @@ export async function generateNoteBrief(title: string, body: string): Promise<No
       .filter(Boolean)
       .join("\n\n"),
     1800,
-    { feature: "brief" }
+    { feature: "brief", userId }
   );
 
   if (!json) {
@@ -101,10 +113,9 @@ export async function generateNoteBrief(title: string, body: string): Promise<No
 
 export async function ensureNoteBrief(
   postId: string,
-  refresh = false,
-  source?: { title: string; body: string },
-  thread?: { reader?: SupabaseClient }
+  options: BriefOptions = {}
 ): Promise<NoteBrief | null> {
+  const { refresh = false, source, userId } = options;
   const admin = createServiceClient();
 
   if (!admin) {
@@ -112,8 +123,8 @@ export async function ensureNoteBrief(
       return null;
     }
 
-    const generated = await generateNoteBrief(source.title, source.body);
-    return generated ? withComments(postId, generated, thread) : null;
+    const generated = await generateNoteBrief(source.title, source.body, userId);
+    return generated ? withComments(postId, generated, options) : null;
   }
 
   const { data, error } = await admin
@@ -130,13 +141,13 @@ export async function ensureNoteBrief(
   const existing = asBrief(row);
 
   if (existing && !refresh) {
-    return withComments(postId, existing, thread);
+    return withComments(postId, existing, options);
   }
 
-  const brief = await generateNoteBrief(row.title, row.body);
+  const brief = await generateNoteBrief(row.title, row.body, userId);
 
   if (!brief) {
-    return existing ? withComments(postId, existing, thread) : null;
+    return existing ? withComments(postId, existing, options) : null;
   }
 
   await admin
@@ -150,7 +161,11 @@ export async function ensureNoteBrief(
     })
     .eq("id", postId);
 
-  return withComments(postId, brief, thread);
+  return withComments(postId, brief, options);
+}
+
+export function lockedBrief(brief: NoteBrief | null): NoteBrief | null {
+  return brief ? { ...brief, claims: [], risks: [], agreement: null, objection: null } : null;
 }
 
 export function storedNoteBrief(row: {
@@ -182,13 +197,13 @@ export function storedNoteBrief(row: {
 async function withComments(
   postId: string,
   brief: NoteBrief,
-  thread?: { reader?: SupabaseClient }
+  options: BriefOptions
 ): Promise<NoteBrief> {
-  if (!thread) {
+  if (!options.comments) {
     return brief;
   }
 
-  const comments = await ensureCommentBrief(postId, thread.reader);
+  const comments = await ensureCommentBrief(postId, options.reader, options.userId);
 
   if (!comments) {
     return brief;

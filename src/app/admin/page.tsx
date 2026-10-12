@@ -40,6 +40,11 @@ export default async function AdminOverviewPage() {
       />
       <AdminNav current="/admin" />
       {metrics.error ? <p className="text-[13px] text-loss">{metrics.error}</p> : null}
+      {metrics.capped.length > 0 ? (
+        <p className="text-[13px] text-warning">
+          These figures use the newest rows only for {metrics.capped.join(", ")}. Older rows past the read cap are left out.
+        </p>
+      ) : null}
 
       <Panel>
         <PanelHeader label="Activity" meta="posts, comments, votes" />

@@ -24,7 +24,7 @@ import {
   voteStrength,
   type DeskAccess,
 } from "./domain";
-import { requestNoteBrief } from "./ai";
+import { requestCommentBrief, requestNoteBrief } from "./ai";
 import { supabase } from "./supabase";
 import {
   COMMENT_BODY_MAX,
@@ -196,10 +196,17 @@ async function insertRefund(input: {
   commentId: string;
   description: string;
 }) {
-  const credit = await creditHp(input.userId, input.amount);
+  const existing = await supabase
+    .from("hp_transactions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", input.userId)
+    .eq("post_id", input.postId)
+    .eq("comment_id", input.commentId)
+    .eq("type", HP_TRANSACTION_REFUND)
+    .eq("description", input.description);
 
-  if (credit.error) {
-    return credit;
+  if (!existing.error && (existing.count ?? 0) > 0) {
+    return { error: null };
   }
 
   const { error } = await supabase.from("hp_transactions").insert({
@@ -211,7 +218,25 @@ async function insertRefund(input: {
     description: input.description,
   });
 
-  return { error: error?.message ?? null };
+  if (error) {
+    return { error: error.message };
+  }
+
+  const credit = await creditHp(input.userId, input.amount);
+
+  if (credit.error) {
+    await supabase
+      .from("hp_transactions")
+      .delete()
+      .eq("user_id", input.userId)
+      .eq("post_id", input.postId)
+      .eq("comment_id", input.commentId)
+      .eq("type", HP_TRANSACTION_REFUND)
+      .eq("description", input.description);
+    return credit;
+  }
+
+  return { error: null };
 }
 
 async function recordTopic(userId: string, subTopic: string, hpDelta: number) {
@@ -403,11 +428,11 @@ export async function publishNote(input: {
     );
   }
 
+  void requestNoteBrief(inserted.data.id, true);
+
   if (topicError) {
     return { id: inserted.data.id, error: `Post published, but topic rank failed: ${topicError}` };
   }
-
-  void requestNoteBrief(inserted.data.id);
 
   return { id: inserted.data.id, message: "Note published." };
 }
@@ -813,6 +838,8 @@ export async function publishComment(input: {
     { onConflict: "user_id,post_id" }
   );
 
+  void requestCommentBrief(input.postId);
+
   return { id: inserted.data.id, message: "Comment posted." };
 }
 
@@ -834,6 +861,17 @@ export async function loadCommentVotes(userId: string, commentIds: string[]) {
   }
 
   return votes;
+}
+
+export async function loadNoteVote(userId: string, postId: string) {
+  const { data } = await supabase
+    .from("votes")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("post_id", postId)
+    .maybeSingle();
+
+  return (data?.value as number | undefined) ?? null;
 }
 
 export async function voteOnComment(input: {
@@ -1217,6 +1255,13 @@ export async function isFollowing(userId: string, authorId: string) {
   return Boolean(data);
 }
 
+type ReactionTotal = {
+  target_id: string;
+  reaction: string;
+  total: number | string;
+  mine: boolean | null;
+};
+
 export async function loadReactions(
   targetType: "post" | "comment" | "reply",
   targetIds: string[],
@@ -1229,6 +1274,24 @@ export async function loadReactions(
   }
 
   if (targetIds.length === 0) {
+    return tallies;
+  }
+
+  const counted = await supabase.rpc("reaction_counts", {
+    p_target_type: targetType,
+    p_target_ids: targetIds,
+  });
+
+  if (!counted.error) {
+    for (const row of (counted.data ?? []) as ReactionTotal[]) {
+      const slot = tallies[row.target_id]?.find((item) => item.key === row.reaction);
+
+      if (slot) {
+        slot.count = Number(row.total) || 0;
+        slot.mine = Boolean(row.mine);
+      }
+    }
+
     return tallies;
   }
 
@@ -1489,16 +1552,22 @@ export async function searchFloor(query: string) {
   };
 }
 
+const RANKING_LIMIT = 1000;
+
 export async function loadRanking() {
   const withAvatar = await supabase
     .from("profiles")
     .select("id, username, display_name, tier, current_hp, role, avatar_url")
-    .neq("username", "laniakea_treasury");
+    .neq("username", "laniakea_treasury")
+    .order("current_hp", { ascending: false })
+    .limit(RANKING_LIMIT);
   const { data, error } = withAvatar.error?.message.includes("avatar_url")
     ? await supabase
         .from("profiles")
         .select("id, username, display_name, tier, current_hp, role")
         .neq("username", "laniakea_treasury")
+        .order("current_hp", { ascending: false })
+        .limit(RANKING_LIMIT)
     : withAvatar;
 
   if (error) {
@@ -1542,10 +1611,16 @@ export async function editCommentBody(userId: string, commentId: string, body: s
     .from("research_comments")
     .update({ body: text, edited_at: now, updated_at: now })
     .eq("id", commentId)
-    .eq("author_id", userId);
+    .eq("author_id", userId)
+    .select("post_id")
+    .maybeSingle();
 
   if (write.error) {
     return { error: write.error.message };
+  }
+
+  if (write.data?.post_id) {
+    void requestCommentBrief(write.data.post_id as string);
   }
 
   return { message: "Comment updated." };

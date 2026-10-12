@@ -86,12 +86,12 @@ export function AssistantScreen({
       });
     }
 
-    void requestNoteBrief(postId, false, locked).then((result) => {
+    void requestNoteBrief(postId).then((result) => {
       if (result?.brief) {
         setBrief(result.brief);
       }
     });
-  }, [claims, conviction, locked, postId, risks, summary, ticker]);
+  }, [claims, conviction, postId, risks, summary, ticker]);
 
   useEffect(() => {
     if (!answer) {

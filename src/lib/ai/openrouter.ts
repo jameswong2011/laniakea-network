@@ -1,10 +1,27 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 
 const MODEL = "z-ai/glm-5.3";
+const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+
+export type AiFeature = "ask" | "brief" | "comments" | "search";
 
 export type AiCall = {
-  feature: "ask" | "brief" | "comments" | "search";
+  feature: AiFeature;
   userId?: string | null;
+};
+
+const TIMEOUT_MS: Record<AiFeature, number> = {
+  ask: 30_000,
+  brief: 60_000,
+  comments: 45_000,
+  search: 30_000,
+};
+
+type Usage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  cost?: number;
 };
 
 export async function completeJson(prompt: string, maxTokens = 900, call?: AiCall) {
@@ -14,13 +31,9 @@ export async function completeJson(prompt: string, maxTokens = 900, call?: AiCal
     return null;
   }
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const response = await send(
+    key,
+    JSON.stringify({
       model: MODEL,
       messages: [
         {
@@ -32,36 +45,58 @@ export async function completeJson(prompt: string, maxTokens = 900, call?: AiCal
       reasoning: { effort: "low" },
       max_tokens: maxTokens,
     }),
-  });
+    call ? TIMEOUT_MS[call.feature] : 30_000
+  );
 
-  if (!response.ok) {
+  if (!response?.ok) {
     return null;
   }
 
-  const payload = (await response.json()) as {
+  const payload = (await response.json().catch(() => null)) as {
     choices?: { message?: { content?: string | null; reasoning?: string | null } }[];
-    usage?: {
-      prompt_tokens?: number;
-      completion_tokens?: number;
-      total_tokens?: number;
-      cost?: number;
-    };
-  };
-  void recordUsage(call, payload.usage);
+    usage?: Usage;
+  } | null;
+
+  if (!payload) {
+    return null;
+  }
+
+  await recordUsage(call, payload.usage);
   const message = payload.choices?.[0]?.message;
   const text = message?.content || message?.reasoning || "";
   return readJson(text);
 }
 
-async function recordUsage(
-  call: AiCall | undefined,
-  usage: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-    cost?: number;
-  } | undefined
-) {
+async function send(key: string, body: string, timeoutMs: number) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const retryable = response.status === 429 || response.status >= 500;
+
+      if (!retryable || attempt === 1) {
+        return response;
+      }
+    } catch (cause) {
+      if (attempt === 1 || (cause instanceof Error && cause.name === "TimeoutError")) {
+        return null;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  return null;
+}
+
+async function recordUsage(call: AiCall | undefined, usage: Usage | undefined) {
   if (!call) {
     return;
   }

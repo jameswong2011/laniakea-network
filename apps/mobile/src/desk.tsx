@@ -2,15 +2,22 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { DeskProfile } from "./floor";
 
 const DeskContext = createContext<DeskProfile | null>(null);
+const DeskRefreshContext = createContext<() => Promise<void>>(async () => {});
 
 export function DeskProvider({
   profile,
+  refresh,
   children,
 }: {
   profile: DeskProfile;
+  refresh: () => Promise<void>;
   children: ReactNode;
 }) {
-  return <DeskContext.Provider value={profile}>{children}</DeskContext.Provider>;
+  return (
+    <DeskRefreshContext.Provider value={refresh}>
+      <DeskContext.Provider value={profile}>{children}</DeskContext.Provider>
+    </DeskRefreshContext.Provider>
+  );
 }
 
 export function useDesk() {
@@ -21,4 +28,8 @@ export function useDesk() {
   }
 
   return profile;
+}
+
+export function useDeskRefresh() {
+  return useContext(DeskRefreshContext);
 }

@@ -8,10 +8,12 @@ export type CommentBrief = {
 };
 
 const MIN_COMMENTS = 3;
+const PROMPT_COMMENTS = 40;
 
 export async function ensureCommentBrief(
   postId: string,
-  reader?: SupabaseClient
+  reader?: SupabaseClient,
+  userId?: string | null
 ): Promise<CommentBrief | null> {
   const admin = createServiceClient();
   const db = admin ?? reader;
@@ -28,7 +30,7 @@ export async function ensureCommentBrief(
       .maybeSingle(),
     db
       .from("research_comments")
-      .select("id, body")
+      .select("id, body, updated_at")
       .eq("post_id", postId)
       .order("created_at", { ascending: true }),
   ]);
@@ -37,13 +39,13 @@ export async function ensureCommentBrief(
     return null;
   }
 
-  const rows = (comments.data ?? []) as { id: string; body: string }[];
+  const rows = (comments.data ?? []) as { id: string; body: string; updated_at: string | null }[];
 
   if (rows.length < MIN_COMMENTS) {
     return null;
   }
 
-  const ids = rows.map((row) => row.id).sort();
+  const ids = rows.map((row) => `${row.id}:${row.updated_at ?? ""}`).sort();
   const cached = post.error ? null : post.data;
   const stored = [...((cached?.ai_comment_ids as string[] | null) ?? [])].sort();
   const agreement = textField(cached?.ai_comment_agreement, 400);
@@ -61,11 +63,12 @@ export async function ensureCommentBrief(
       "objection is one or two sentences on what they challenge.",
       "If one side is missing, say that plainly.",
       rows
+        .slice(-PROMPT_COMMENTS)
         .map((row, index) => `${index + 1}. ${row.body.slice(0, 700)}`)
         .join("\n\n"),
     ].join("\n\n"),
     700,
-    { feature: "comments" }
+    { feature: "comments", userId }
   );
 
   if (!json) {

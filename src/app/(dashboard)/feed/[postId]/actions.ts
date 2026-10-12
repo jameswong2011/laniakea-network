@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { requireUser } from "@/lib/auth/session";
 import { canWriteDesk } from "@/lib/research/access";
 import { resolvePostDeskAccess } from "@/lib/research/unlock";
@@ -224,6 +226,8 @@ export async function createComment(
       stamp: Date.now(),
     };
   }
+
+  after(() => ensureCommentBrief(postId, undefined, userId));
 
   const { error: txError } = await insertLedger(supabase, {
     user_id: userId,
@@ -451,12 +455,7 @@ export async function voteOnComment(
   }
 
   if (outcome === "hunt") {
-    const settled = await settleHuntedComment(
-      supabase,
-      commentId,
-      postId,
-      comment.original_stake
-    );
+    const settled = await settleHuntedComment(supabase, commentId, postId);
 
     if (settled.error) {
       return {
@@ -472,13 +471,7 @@ export async function voteOnComment(
   }
 
   if (outcome === "ascent") {
-    const settled = await settleAscendedComment(
-      supabase,
-      commentId,
-      postId,
-      comment.author_id,
-      comment.original_stake
-    );
+    const settled = await settleAscendedComment(supabase, commentId, postId);
 
     if (settled.error) {
       return {

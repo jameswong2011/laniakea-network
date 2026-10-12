@@ -13,7 +13,7 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { requireUser } from "@/lib/auth/session";
 import { researchCommentPath, researchPostPath } from "@/lib/research/feed";
 import { profilePath } from "@/lib/research/forum";
-import { rankNotesByMeaning, wantsMeaningSearch } from "@/lib/ai/meaning-search";
+import { wantsMeaningSearch } from "@/lib/ai/meaning-query";
 import {
   orderSearchPosts,
   searchExcerpt,
@@ -123,7 +123,6 @@ export default async function SearchPage({
       [...(nameHits.data ?? []), ...(userHits.data ?? [])].map((row) => [row.id, row])
     ).values(),
   ];
-  const meaning = wantsMeaningSearch(query) ? await rankNotesByMeaning(query, supabase) : [];
 
   return (
     <PageFrame>
@@ -133,7 +132,7 @@ export default async function SearchPage({
         description="Titles first, then matches inside the note, then a reading of the summaries."
       />
       <SearchBox defaultValue={query} />
-      <AiDock meaning={query.length >= 2 ? meaning : null} />
+      <AiDock meaningQuery={query.length >= 2 ? query : null} />
       {query.length > 0 && query.length < 2 ? (
         <p className="text-[14px] text-muted-foreground">
           Type at least two characters.
@@ -144,9 +143,12 @@ export default async function SearchPage({
           {ordered.titleHits.length === 0 &&
           ordered.bodyHits.length === 0 &&
           commentRows.length === 0 &&
-          desks.length === 0 &&
-          meaning.length === 0 ? (
-            <p className="text-[14px] text-muted-foreground">Nothing matched.</p>
+          desks.length === 0 ? (
+            <p className="text-[14px] text-muted-foreground">
+              {wantsMeaningSearch(query)
+                ? "No text matches. Open the assistant to search the summaries by meaning."
+                : "Nothing matched."}
+            </p>
           ) : null}
           {ordered.titleHits.length > 0 ? (
             <Panel>

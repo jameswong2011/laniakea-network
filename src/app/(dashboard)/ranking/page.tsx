@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   title: "Ranking",
 };
 
+const RANKING_LIMIT = 1000;
+
 function firstSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -38,16 +40,35 @@ export default async function RankingPage({
   const { tier: tierParam } = await searchParams;
   const selectedTier = resolveTier(firstSearchParam(tierParam));
   const { supabase, userId, profile } = await requireUser();
-  const withAvatar = await supabase
-    .from("profiles")
-    .select("id, username, display_name, role, tier, current_hp, avatar_url")
-    .order("username", { ascending: true });
+
+  function tierScoped<Q extends { ilike: (column: string, pattern: string) => Q }>(query: Q) {
+    return selectedTier ? query.ilike("tier", selectedTier) : query;
+  }
+
+  const [withAvatar, { data: logRows }] = await Promise.all([
+    tierScoped(
+      supabase
+        .from("profiles")
+        .select("id, username, display_name, role, tier, current_hp, avatar_url")
+    )
+      .order("current_hp", { ascending: false })
+      .limit(RANKING_LIMIT),
+    supabase
+      .from("hp_transactions")
+      .select("id, user_id, description, created_at, type")
+      .eq("type", HP_TRANSACTION_CALIBRATION)
+      .order("created_at", { ascending: false })
+      .limit(8),
+  ]);
   const listed =
     withAvatar.error && withAvatar.error.message.includes("avatar_url")
-      ? await supabase
-          .from("profiles")
-          .select("id, username, display_name, role, tier, current_hp")
-          .order("username", { ascending: true })
+      ? await tierScoped(
+          supabase
+            .from("profiles")
+            .select("id, username, display_name, role, tier, current_hp")
+        )
+          .order("current_hp", { ascending: false })
+          .limit(RANKING_LIMIT)
       : withAvatar;
   const { data, error } = listed;
 
@@ -67,13 +88,6 @@ export default async function RankingPage({
     : ranked;
   const listError = error?.message ?? null;
   const quartilePct = Math.round(CALIBRATION_QUARTILE * 100);
-
-  const { data: logRows } = await supabase
-    .from("hp_transactions")
-    .select("id, user_id, description, created_at, type")
-    .eq("type", HP_TRANSACTION_CALIBRATION)
-    .order("created_at", { ascending: false })
-    .limit(8);
 
   const calibrationLogs = (logRows ?? []) as Pick<
     HpTransaction,

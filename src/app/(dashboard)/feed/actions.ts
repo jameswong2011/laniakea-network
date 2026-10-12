@@ -198,6 +198,8 @@ export async function createResearchPost(
     };
   }
 
+  after(() => ensureNoteBrief(post.id, { userId }));
+
   const { error: txError } = await supabase.from("hp_transactions").insert({
     user_id: userId,
     amount: stakeHp,
@@ -235,10 +237,6 @@ export async function createResearchPost(
   await notifyAuthorFollowers(supabase, {
     actorId: userId,
     postId: post.id,
-  });
-
-  after(() => {
-    void ensureNoteBrief(post.id);
   });
 
   refreshFeed();
@@ -455,7 +453,7 @@ export async function voteOnPost(
   }
 
   if (outcome === "hunt") {
-    const settled = await settleHuntedPost(supabase, postId, originalStake);
+    const settled = await settleHuntedPost(supabase, postId);
 
     if (settled.error) {
       return {
@@ -481,12 +479,7 @@ export async function voteOnPost(
   }
 
   if (outcome === "ascent") {
-    const settled = await settleAscendedPost(
-      supabase,
-      postId,
-      post.author_id,
-      originalStake
-    );
+    const settled = await settleAscendedPost(supabase, postId);
 
     if (settled.error) {
       return {

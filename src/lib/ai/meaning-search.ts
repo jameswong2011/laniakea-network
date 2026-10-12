@@ -1,18 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { researchExcerpt } from "@laniakea/domain";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { wantsMeaningSearch } from "@/lib/ai/meaning-query";
 import { completeJson, textList } from "@/lib/ai/openrouter";
+
+export { wantsMeaningSearch };
 
 export type MeaningHit = {
   id: string;
   title: string;
   summary: string;
 };
-
-export function wantsMeaningSearch(query: string) {
-  const text = query.trim();
-  return text.includes("?") || text.split(/\s+/).filter(Boolean).length >= 3;
-}
 
 export async function rankNotesByMeaning(
   query: string,

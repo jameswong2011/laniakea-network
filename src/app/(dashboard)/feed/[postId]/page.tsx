@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { format } from "date-fns";
 import { PageFrame, PageHeading } from "@/components/layout/PageFrame";
 import { AuthorLink } from "@/components/laniakea/AuthorLink";
@@ -16,7 +17,7 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
-import { storedNoteBrief } from "@/lib/ai/note-brief";
+import { lockedBrief, storedNoteBrief } from "@/lib/ai/note-brief";
 import { requireUser } from "@/lib/auth/session";
 import { canOpenDesk, deskAccessRailClass } from "@/lib/research/access";
 import {
@@ -44,18 +45,22 @@ import {
   resolveTier,
 } from "@/types";
 
+const loadNote = cache(async (postId: string) => {
+  const { supabase, userId, profile } = await requireUser();
+  return getResearchPostById(supabase, postId, {
+    userId,
+    tier: resolveTier(profile?.tier) ?? "Bronze",
+    isAdmin: profile?.role === "admin",
+  });
+});
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ postId: string }>;
 }): Promise<Metadata> {
   const { postId } = await params;
-  const { supabase, profile } = await requireUser();
-  const deskTier = resolveTier(profile?.tier) ?? "Bronze";
-  const { item } = await getResearchPostById(supabase, postId, {
-    tier: deskTier,
-    isAdmin: profile?.role === "admin",
-  });
+  const { item } = await loadNote(postId);
 
   return { title: item?.title ?? "Research" };
 }
@@ -73,12 +78,7 @@ export default async function ResearchPostPage({
   const focusCommentId = firstParam(query.comment) ?? null;
   const focusReplyId = firstParam(query.reply) ?? null;
   const { supabase, userId, profile } = await requireUser();
-  const deskTier = resolveTier(profile?.tier) ?? "Bronze";
-  const { item, error } = await getResearchPostById(supabase, postId, {
-    userId,
-    tier: deskTier,
-    isAdmin: profile?.role === "admin",
-  });
+  const { item, error } = await loadNote(postId);
   const availableTokens = profile?.utility_tokens ?? 0;
 
   if (error) {
@@ -143,31 +143,16 @@ export default async function ResearchPostPage({
             </p>
           )}
         </article>
-        <AiDock postId={item.id} locked brief={brief} />
+        <AiDock postId={item.id} locked brief={lockedBrief(brief)} />
       </PageFrame>
     );
   }
 
-  const viewerVotes = await getViewerVotes(supabase, userId, [item.id]);
-  const thread = await getCommentThread(supabase, item.id, userId);
-  const commentVotes = await getViewerCommentVotes(
-    supabase,
-    userId,
-    thread.comments.map((comment) => comment.id)
-  );
-  const replyIds = thread.comments.flatMap((comment) =>
-    comment.replies.map((reply) => reply.id)
-  );
-  const [postReactions, commentReactions, replyReactions, savedIds, subscribed, commentDraft, following, followerCount] =
+  const [viewerVotes, thread, postReactions, savedIds, subscribed, commentDraft, following, followerCount, resume] =
     await Promise.all([
+      getViewerVotes(supabase, userId, [item.id]),
+      getCommentThread(supabase, item.id, userId),
       loadReactions(supabase, "post", [item.id], userId),
-      loadReactions(
-        supabase,
-        "comment",
-        thread.comments.map((comment) => comment.id),
-        userId
-      ),
-      loadReactions(supabase, "reply", replyIds, userId),
       loadSavedPostIds(supabase, userId, [item.id]),
       isPostSubscribed(supabase, userId, item.id),
       loadCommentDraft(supabase, userId, item.id),
@@ -175,9 +160,18 @@ export default async function ResearchPostPage({
         ? Promise.resolve(false)
         : isAuthorFollowed(supabase, userId, item.author_id),
       countAuthorFollowers(supabase, item.author_id),
+      resumeFrozenPostSettlement(supabase, item),
     ]);
+  const commentIds = thread.comments.map((comment) => comment.id);
+  const replyIds = thread.comments.flatMap((comment) =>
+    comment.replies.map((reply) => reply.id)
+  );
+  const [commentVotes, commentReactions, replyReactions] = await Promise.all([
+    getViewerCommentVotes(supabase, userId, commentIds),
+    loadReactions(supabase, "comment", commentIds, userId),
+    loadReactions(supabase, "reply", replyIds, userId),
+  ]);
   const availableHp = profile?.current_hp ?? 0;
-  const resume = await resumeFrozenPostSettlement(supabase, item);
 
   return (
     <PageFrame>

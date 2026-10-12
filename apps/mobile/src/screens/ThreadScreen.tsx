@@ -17,7 +17,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ascentLine, canWriteDesk, DEFAULT_COMMENT_STAKE_HP, MAX_STAKE_HP, RESEARCH_POST_STATUS_LIVE, VOTE_STRENGTH_MAX, VOTE_STRENGTH_MIN, voteCostHp, voteStrength } from "../domain";
-import { useDesk } from "../desk";
+import { useDesk, useDeskRefresh } from "../desk";
 import {
   loadThread,
   unlockNote,
@@ -42,6 +42,7 @@ import {
   applyReactionToggle,
   emptyReactionCounts,
   loadCommentVotes,
+  loadNoteVote,
   loadReactions,
   publishComment,
   publishReply,
@@ -351,44 +352,57 @@ export function ThreadScreen({
   const [replyReactions, setReplyReactions] = useState<Record<string, ReactionCount[]>>({});
   const reactionLocks = useRef(new Set<string>());
 
+  const [noteVote, setNoteVote] = useState<number | null>(null);
+  const refreshDesk = useDeskRefresh();
+  const lastLoaded = useRef({ postId: "", at: 0 });
+  const viewerId = profile.id;
+  const viewerTier = profile.tier;
+  const viewerRole = profile.role;
+
   const refresh = useCallback(async () => {
     setError(null);
 
     try {
-      const thread = await loadThread(profile, postId);
+      const thread = await loadThread({ id: viewerId, tier: viewerTier, role: viewerRole }, postId);
       setNote(thread.note);
       setComments(thread.comments);
-      setSaved(await isPostSaved(profile.id, postId));
-      setFollowing(await isFollowing(profile.id, thread.note.authorId));
-      setThreadFollow(await isThreadFollowed(profile.id, postId));
+      const commentIds = thread.comments.map((comment) => comment.id);
       const replyIds = thread.comments.flatMap((comment) => comment.replies.map((reply) => reply.id));
-      const [postMap, commentMap, replyMap] = await Promise.all([
-        loadReactions("post", [postId], profile.id),
-        loadReactions(
-          "comment",
-          thread.comments.map((comment) => comment.id),
-          profile.id
-        ),
-        loadReactions("reply", replyIds, profile.id),
-      ]);
+      const [isSaved, followsAuthor, followsThread, postMap, commentMap, replyMap, votes, vote] =
+        await Promise.all([
+          isPostSaved(viewerId, postId),
+          isFollowing(viewerId, thread.note.authorId),
+          isThreadFollowed(viewerId, postId),
+          loadReactions("post", [postId], viewerId),
+          loadReactions("comment", commentIds, viewerId),
+          loadReactions("reply", replyIds, viewerId),
+          loadCommentVotes(viewerId, commentIds),
+          loadNoteVote(viewerId, postId),
+        ]);
+      setSaved(isSaved);
+      setFollowing(followsAuthor);
+      setThreadFollow(followsThread);
       setPostReactions(postMap[postId] ?? emptyReactionCounts());
       setCommentReactions(commentMap);
       setReplyReactions(replyMap);
-      setCommentVotes(
-        await loadCommentVotes(
-          profile.id,
-          thread.comments.map((comment) => comment.id)
-        )
-      );
+      setCommentVotes(votes);
+      setNoteVote(vote);
+      lastLoaded.current = { postId, at: Date.now() };
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not open this note.");
     }
-  }, [postId, profile]);
+  }, [postId, viewerId, viewerRole, viewerTier]);
 
   useFocusEffect(
     useCallback(() => {
+      const last = lastLoaded.current;
+
+      if (last.postId === postId && Date.now() - last.at < 20_000) {
+        return;
+      }
+
       void refresh();
-    }, [refresh])
+    }, [postId, refresh])
   );
 
   async function react(targetType: "post" | "comment" | "reply", targetId: string, key: ReactionKey) {
@@ -441,6 +455,7 @@ export function ThreadScreen({
 
     try {
       await unlockNote(postId);
+      void refreshDesk();
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unlock failed.");
@@ -477,6 +492,7 @@ export function ThreadScreen({
       strength: Math.min(strength, affordable),
       access: note.access,
     });
+    void refreshDesk();
     setPending(false);
     setError(result.error ?? null);
     setNotice(result.message ?? null);
@@ -502,6 +518,7 @@ export function ThreadScreen({
       postStatus: note.status,
       subTopic: note.subTopic,
     });
+    void refreshDesk();
     setVotingCommentId(null);
     setCommentVoteErrors((current) => ({ ...current, [commentId]: result.error ?? null }));
     setNotice(result.error ? null : (result.message ?? null));
@@ -631,7 +648,7 @@ export function ThreadScreen({
           showVote={canEngage}
           amount={strength}
           maxAmount={Math.min(VOTE_STRENGTH_MAX, Math.max(0, profile.current_hp))}
-          recorded={null}
+          recorded={noteVote}
           pending={pending}
           error={error}
           onAmount={setStrength}
@@ -853,6 +870,7 @@ export function ThreadScreen({
               subTopic: note.subTopic,
               postAuthorId: note.authorId,
             }).then(async (result) => {
+              void refreshDesk();
               setPending(false);
               setError(result.error ?? null);
               setNotice(result.message ?? null);

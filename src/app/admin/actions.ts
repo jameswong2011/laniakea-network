@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { ensureCommentBrief } from "@/lib/ai/comment-brief";
 import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { requireAdmin } from "@/lib/auth/session";
 import { seedDemoData } from "@/lib/research/demo-data";
@@ -202,7 +204,7 @@ export async function seedResearchPost(
     };
   }
 
-  void ensureNoteBrief(post.id);
+  after(() => ensureNoteBrief(post.id));
 
   const { error: txError } = await supabase.from("hp_transactions").insert({
     user_id: authorId,
@@ -401,6 +403,11 @@ export async function updateResearchPost(
     return { error: firstIssue(parsed.error), stamp: Date.now() };
   }
 
+  const { data: before } = await supabase
+    .from("research_posts")
+    .select("title, body")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
   const { error } = await supabase
     .from("research_posts")
     .update({
@@ -416,6 +423,10 @@ export async function updateResearchPost(
 
   if (error) {
     return { error: error.message, stamp: Date.now() };
+  }
+
+  if (before && (before.title !== parsed.data.title || before.body !== parsed.data.body)) {
+    after(() => ensureNoteBrief(parsed.data.id, { refresh: true }));
   }
 
   return { message: "Note updated.", stamp: Date.now() };
@@ -459,16 +470,22 @@ export async function updateResearchComment(
     return { error: firstIssue(parsed.error), stamp: Date.now() };
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("research_comments")
-    .update({ body: parsed.data.body })
-    .eq("id", parsed.data.id);
+    .update({ body: parsed.data.body, updated_at: new Date().toISOString() })
+    .eq("id", parsed.data.id)
+    .select("post_id")
+    .maybeSingle();
 
   revalidatePath("/admin/content");
   revalidatePath("/feed");
 
   if (error) {
     return { error: error.message, stamp: Date.now() };
+  }
+
+  if (updated?.post_id) {
+    after(() => ensureCommentBrief(updated.post_id as string));
   }
 
   return { message: "Comment updated.", stamp: Date.now() };
@@ -485,13 +502,22 @@ export async function deleteResearchComment(
     return { error: "Missing comment.", stamp: Date.now() };
   }
 
-  const { error } = await supabase.from("research_comments").delete().eq("id", id);
+  const { data: removed, error } = await supabase
+    .from("research_comments")
+    .delete()
+    .eq("id", id)
+    .select("post_id")
+    .maybeSingle();
 
   revalidatePath("/admin/content");
   revalidatePath("/feed");
 
   if (error) {
     return { error: error.message, stamp: Date.now() };
+  }
+
+  if (removed?.post_id) {
+    after(() => ensureCommentBrief(removed.post_id as string));
   }
 
   return { message: "Comment deleted.", stamp: Date.now() };

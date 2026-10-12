@@ -286,12 +286,15 @@ export async function toggleSaved(userId: string, postId: string) {
   return true;
 }
 
+const WALLET_LIMIT = 200;
+
 export async function loadWallet(userId: string): Promise<WalletEntry[]> {
   const withPost = await supabase
     .from("hp_transactions")
     .select("id, amount, type, description, post_id, created_at")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(WALLET_LIMIT);
 
   const legacy =
     withPost.error && withPost.error.message.includes("post_id")
@@ -300,6 +303,7 @@ export async function loadWallet(userId: string): Promise<WalletEntry[]> {
           .select("id, amount, type, description, created_at")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
+          .limit(WALLET_LIMIT)
       : null;
 
   const result = legacy ?? withPost;

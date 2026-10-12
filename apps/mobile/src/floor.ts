@@ -163,10 +163,12 @@ async function loadUnlockIds(userId: string, postIds: string[]) {
   return new Set((data ?? []).map((row) => row.post_id as string));
 }
 
+type FloorViewer = Pick<DeskProfile, "id" | "tier" | "role">;
+
 function toNote(
   post: PostRow,
   author: AuthorRow | undefined,
-  viewer: DeskProfile,
+  viewer: FloorViewer,
   unlocked: boolean
 ): FloorNote {
   const stake = post.original_stake ?? post.current_health ?? 0;
@@ -248,20 +250,15 @@ function databaseStatuses(query: FeedQuery) {
   return statuses;
 }
 
-export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
-  const statuses = databaseStatuses(query);
-
-  if (statuses.length === 0 || (query.topics != null && query.topics.length === 0)) {
-    return [];
-  }
-
-  if (query.tiers != null && query.tiers.length === 0) {
-    return [];
-  }
-
+function feedRequest(
+  columns: string,
+  query: FeedQuery,
+  statuses: string[],
+  tierJoin: boolean
+) {
   let request = supabase
     .from("research_posts")
-    .select(POST_COLUMNS_AI)
+    .select(tierJoin ? `${columns}, profiles!inner(tier)` : columns)
     .in("status", statuses)
     .order("created_at", { ascending: false })
     .limit(80);
@@ -274,25 +271,46 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
     request = request.gte("created_at", postedSince(query.posted).toISOString());
   }
 
-  let result = await request;
+  if (tierJoin && query.tiers != null) {
+    request = request.in(
+      "profiles.tier",
+      [...new Set(query.tiers.flatMap((tier) => [tier, tier.toLowerCase()]))]
+    );
+  }
 
-  if (result.error?.message.includes("ai_summary")) {
-    let fallback = supabase
-      .from("research_posts")
-      .select(POST_COLUMNS)
-      .in("status", statuses)
-      .order("created_at", { ascending: false })
-      .limit(80);
+  return request;
+}
 
-    if (query.topics != null) {
-      fallback = fallback.in("sub_topic", query.topics);
+export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
+  const statuses = databaseStatuses(query);
+
+  if (statuses.length === 0 || (query.topics != null && query.topics.length === 0)) {
+    return [];
+  }
+
+  if (query.tiers != null && query.tiers.length === 0) {
+    return [];
+  }
+
+  const tierJoin = query.tiers != null;
+  const attempts: [string, boolean][] = tierJoin
+    ? [
+        [POST_COLUMNS_AI, true],
+        [POST_COLUMNS_AI, false],
+        [POST_COLUMNS, false],
+      ]
+    : [
+        [POST_COLUMNS_AI, false],
+        [POST_COLUMNS, false],
+      ];
+  let result = await feedRequest(attempts[0][0], query, statuses, attempts[0][1]);
+
+  for (const [columns, join] of attempts.slice(1)) {
+    if (!result.error) {
+      break;
     }
 
-    if (query.posted) {
-      fallback = fallback.gte("created_at", postedSince(query.posted).toISOString());
-    }
-
-    result = await fallback;
+    result = await feedRequest(columns, query, statuses, join);
   }
 
   const { data, error } = result;
@@ -301,12 +319,14 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
     throw new Error(error.message);
   }
 
-  const posts = (data ?? []) as PostRow[];
-  const authors = await loadAuthors(posts.map((post) => post.author_id));
-  const unlocks = await loadUnlockIds(
-    viewer.id,
-    posts.map((post) => post.id)
-  );
+  const posts = (data ?? []) as unknown as PostRow[];
+  const [authors, unlocks] = await Promise.all([
+    loadAuthors(posts.map((post) => post.author_id)),
+    loadUnlockIds(
+      viewer.id,
+      posts.map((post) => post.id)
+    ),
+  ]);
 
   return posts
     .filter((post) => {
@@ -319,7 +339,7 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
     );
 }
 
-export async function loadThread(viewer: DeskProfile, postId: string) {
+export async function loadThread(viewer: FloorViewer, postId: string) {
   const withAi = await supabase
     .from("research_posts")
     .select(POST_COLUMNS_AI)
@@ -340,8 +360,10 @@ export async function loadThread(viewer: DeskProfile, postId: string) {
   }
 
   const post = data as PostRow;
-  const authors = await loadAuthors([post.author_id]);
-  const unlocks = await loadUnlockIds(viewer.id, [post.id]);
+  const [authors, unlocks] = await Promise.all([
+    loadAuthors([post.author_id]),
+    loadUnlockIds(viewer.id, [post.id]),
+  ]);
   const note = toNote(post, authors.get(post.author_id), viewer, unlocks.has(post.id));
 
   if (!canOpenDesk(note.access)) {
@@ -359,8 +381,6 @@ export async function loadThread(viewer: DeskProfile, postId: string) {
   }
 
   const rows = commentsRead.data ?? [];
-  const commentAuthors = await loadAuthors(rows.map((row) => row.author_id as string));
-
   const commentIds = rows.map((row) => row.id as string);
   const repliesRead =
     commentIds.length === 0
@@ -371,11 +391,14 @@ export async function loadThread(viewer: DeskProfile, postId: string) {
           .in("comment_id", commentIds)
           .order("created_at", { ascending: true });
   const replyRows = repliesRead.error ? [] : (repliesRead.data ?? []);
-  const replyAuthors = await loadAuthors(replyRows.map((row) => row.author_id as string));
+  const people = await loadAuthors([
+    ...rows.map((row) => row.author_id as string),
+    ...replyRows.map((row) => row.author_id as string),
+  ]);
   const repliesByComment = new Map<string, FloorReply[]>();
 
   for (const row of replyRows) {
-    const author = replyAuthors.get(row.author_id as string);
+    const author = people.get(row.author_id as string);
     const list = repliesByComment.get(row.comment_id as string) ?? [];
     list.push({
       id: row.id as string,
@@ -388,7 +411,7 @@ export async function loadThread(viewer: DeskProfile, postId: string) {
   }
 
   const comments: FloorComment[] = rows.map((row) => {
-    const author = commentAuthors.get(row.author_id as string);
+    const author = people.get(row.author_id as string);
     const stake = (row.original_stake as number | null) ?? (row.current_health as number);
     const health = row.current_health as number;
     const status = row.status as string;

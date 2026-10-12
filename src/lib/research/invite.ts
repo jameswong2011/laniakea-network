@@ -65,13 +65,33 @@ export async function loadInviteDesk(
   referralTotal: number;
   error: string | null;
 }> {
-  const codesRead = await supabase
-    .from("invite_codes")
-    .select(
-      "id, code, owner_id, status, redeemed_by, redeemed_at, minted_how, created_at"
-    )
-    .eq("owner_id", userId)
-    .order("created_at", { ascending: true });
+  const [codesRead, inviteesRead, totalRead, earningsRead] = await Promise.all([
+    supabase
+      .from("invite_codes")
+      .select(
+        "id, code, owner_id, status, redeemed_by, redeemed_at, minted_how, created_at"
+      )
+      .eq("owner_id", userId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("profiles")
+      .select("id, username, display_name, tier, created_at")
+      .eq("invited_by", userId)
+      .neq("id", TREASURY_PROFILE_ID)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("revenue_distributions")
+      .select("amount")
+      .eq("beneficiary_id", userId)
+      .eq("kind", "referral_keep"),
+    supabase
+      .from("revenue_distributions")
+      .select("id, amount, depth, kind, created_at, event_id")
+      .eq("beneficiary_id", userId)
+      .eq("kind", "referral_keep")
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
 
   if (codesRead.error) {
     return {
@@ -84,27 +104,6 @@ export async function loadInviteDesk(
         : codesRead.error.message,
     };
   }
-
-  const inviteesRead = await supabase
-    .from("profiles")
-    .select("id, username, display_name, tier, created_at")
-    .eq("invited_by", userId)
-    .neq("id", TREASURY_PROFILE_ID)
-    .order("created_at", { ascending: false });
-
-  const totalRead = await supabase
-    .from("revenue_distributions")
-    .select("amount")
-    .eq("beneficiary_id", userId)
-    .eq("kind", "referral_keep");
-
-  const earningsRead = await supabase
-    .from("revenue_distributions")
-    .select("id, amount, depth, kind, created_at, event_id")
-    .eq("beneficiary_id", userId)
-    .eq("kind", "referral_keep")
-    .order("created_at", { ascending: false })
-    .limit(20);
 
   const eventIds = [
     ...new Set(

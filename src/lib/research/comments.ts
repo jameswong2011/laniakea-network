@@ -26,6 +26,18 @@ function authorsById(rows: ResearchPostAuthor[] | null) {
   return map;
 }
 
+const COUNT_BATCH = 150;
+
+function batches<T>(items: T[]) {
+  const out: T[][] = [];
+
+  for (let index = 0; index < items.length; index += COUNT_BATCH) {
+    out.push(items.slice(index, index + COUNT_BATCH));
+  }
+
+  return out;
+}
+
 export async function getCommentCounts(
   supabase: SupabaseClient,
   postIds: string[]
@@ -34,19 +46,36 @@ export async function getCommentCounts(
     return {};
   }
 
-  const { data, error } = await supabase
-    .from("research_comments")
-    .select("post_id")
-    .in("post_id", postIds);
+  const counts: Record<string, number> = {};
+  const embedded = await Promise.all(
+    batches(postIds).map((ids) =>
+      supabase.from("research_posts").select("id, research_comments(count)").in("id", ids)
+    )
+  );
 
-  if (error) {
-    return {};
+  if (embedded.every((result) => !result.error)) {
+    for (const result of embedded) {
+      for (const row of (result.data ?? []) as {
+        id: string;
+        research_comments: { count: number }[] | null;
+      }[]) {
+        counts[row.id] = row.research_comments?.[0]?.count ?? 0;
+      }
+    }
+
+    return counts;
   }
 
-  const counts: Record<string, number> = {};
+  const rows = await Promise.all(
+    batches(postIds).map((ids) =>
+      supabase.from("research_comments").select("post_id").in("post_id", ids)
+    )
+  );
 
-  for (const row of data ?? []) {
-    counts[row.post_id] = (counts[row.post_id] ?? 0) + 1;
+  for (const result of rows) {
+    for (const row of (result.data ?? []) as { post_id: string }[]) {
+      counts[row.post_id] = (counts[row.post_id] ?? 0) + 1;
+    }
   }
 
   return counts;

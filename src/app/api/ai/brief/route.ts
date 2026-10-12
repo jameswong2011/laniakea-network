@@ -1,10 +1,11 @@
-import { ensureNoteBrief, storedNoteBrief } from "@/lib/ai/note-brief";
-import { viewerFromRequest } from "@/lib/ai/viewer";
+import { AI_LIMIT_MESSAGE, overAiLimit } from "@/lib/ai/limits";
+import { ensureNoteBrief, lockedBrief, storedNoteBrief } from "@/lib/ai/note-brief";
+import { readerAccess, viewerFromRequest } from "@/lib/ai/viewer";
 
 const STORED_COLUMNS =
-  "title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_comment_agreement, ai_comment_objection";
+  "author_id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks, ai_comment_agreement, ai_comment_objection";
 const STORED_COLUMNS_WITHOUT_COMMENTS =
-  "title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks";
+  "author_id, title, body, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks";
 
 export async function POST(request: Request) {
   const viewer = await viewerFromRequest(request);
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { postId?: string; refresh?: boolean; locked?: boolean }
+    | { postId?: string; refresh?: boolean }
     | null;
   const postId = body?.postId?.trim() ?? "";
 
@@ -36,16 +37,36 @@ export async function POST(request: Request) {
           .maybeSingle()
       : withComments;
 
-  if (!body?.refresh) {
-    return Response.json({ brief: read.data ? storedNoteBrief(read.data) : null });
+  if (!read.data) {
+    return Response.json({ brief: null });
   }
 
-  const brief = await ensureNoteBrief(
-    postId,
-    true,
-    read.data ? { title: read.data.title as string, body: read.data.body as string } : undefined,
-    body.locked ? undefined : { reader: viewer.supabase }
-  );
+  const note = read.data as { author_id: string; title: string; body: string };
+  const { access, isAdmin } = await readerAccess(viewer.supabase, viewer.userId, {
+    id: postId,
+    author_id: note.author_id,
+  });
+
+  if (!body?.refresh) {
+    const stored = storedNoteBrief(read.data);
+    return Response.json({ brief: access === "hidden" ? lockedBrief(stored) : stored });
+  }
+
+  if (note.author_id !== viewer.userId && !isAdmin) {
+    return Response.json({ error: "Only the author can refresh this summary." }, { status: 403 });
+  }
+
+  if (await overAiLimit(viewer.userId, "brief")) {
+    return Response.json({ error: AI_LIMIT_MESSAGE }, { status: 429 });
+  }
+
+  const brief = await ensureNoteBrief(postId, {
+    refresh: true,
+    source: { title: note.title, body: note.body },
+    comments: true,
+    reader: viewer.supabase,
+    userId: viewer.userId,
+  });
 
   if (!brief) {
     return Response.json({ error: "No brief yet. Add OPENROUTER_API_KEY and run the note AI SQL." }, { status: 503 });
