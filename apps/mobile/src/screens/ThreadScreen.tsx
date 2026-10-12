@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -24,6 +25,7 @@ import {
   type FloorNote,
 } from "../floor";
 import { isPostSaved, toggleSaved } from "../library";
+import { NoteAssist, CommentRead } from "../note-ai";
 import { NoteBody } from "../note-body";
 import { DeskAvatar } from "../avatar";
 import { ReactionMark, ReactionTally } from "../reaction-tally";
@@ -138,7 +140,28 @@ function ReactionRow({
   );
 }
 
-function CommentActions({
+const REPLY_MARK = require("../../assets/reply.jpg");
+
+function ReplyButton({ open, onPress }: { open: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityLabel="Reply"
+      onPress={onPress}
+      style={({ pressed }) => [styles.replyButton, open && styles.replyButtonOn, pressed && styles.pressed]}
+    >
+      <Image source={REPLY_MARK} accessibilityIgnoresInvertColors style={styles.replyMark} />
+    </Pressable>
+  );
+}
+
+function ActionBar({
+  onReply,
+  replyOpen = false,
+  onComment,
+  commentOpen = false,
+  onEdit,
+  editOnRight = false,
+  showReact,
   counts,
   onToggle,
   showVote,
@@ -152,6 +175,13 @@ function CommentActions({
   onScaleActive,
   onVoteOpenChange,
 }: {
+  onReply?: () => void;
+  replyOpen?: boolean;
+  onComment?: () => void;
+  commentOpen?: boolean;
+  onEdit?: () => void;
+  editOnRight?: boolean;
+  showReact: boolean;
   counts: ReactionCount[];
   onToggle: (key: ReactionKey) => void;
   showVote: boolean;
@@ -165,55 +195,79 @@ function CommentActions({
   onScaleActive?: (active: boolean) => void;
   onVoteOpenChange?: (open: boolean) => void;
 }) {
-  const [reactOpen, setReactOpen] = useState(false);
-  const [voteOpen, setVoteOpen] = useState(false);
+  const [panel, setPanel] = useState<"react" | "vote" | null>(null);
   const onVoteOpenChangeRef = useRef(onVoteOpenChange);
   onVoteOpenChangeRef.current = onVoteOpenChange;
 
   useEffect(() => {
-    onVoteOpenChangeRef.current?.(voteOpen);
+    onVoteOpenChangeRef.current?.(panel === "vote");
     return () => onVoteOpenChangeRef.current?.(false);
-  }, [voteOpen]);
+  }, [panel]);
+
   const active = counts.some((row) => row.mine);
   const recordedLabel =
     recorded == null ? "Vote" : `${recorded > 0 ? "Up" : "Down"} ${voteCostHp(voteStrength(recorded))} HP`;
 
   return (
-    <View style={styles.disclosure}>
-      <View style={styles.toolRow}>
-        <Pressable
-          onPress={() => setReactOpen((current) => !current)}
-          style={({ pressed }) => [
-            styles.toolButton,
-            styles.toolShare,
-            (reactOpen || active) && styles.actionButtonOn,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={[styles.actionLabel, (reactOpen || active) && styles.actionLabelOn]}>React</Text>
-        </Pressable>
-        {showVote ? (
-          <Pressable
-            onPress={() => {
-              if (recorded == null) {
-                setVoteOpen((current) => !current);
-              }
-            }}
-            style={({ pressed }) => [
-              styles.toolButton,
-              styles.toolShare,
-              (voteOpen || recorded != null) && styles.actionButtonOn,
-              pressed && recorded == null && styles.pressed,
-            ]}
-          >
-            <Text style={[styles.actionLabel, (voteOpen || recorded != null) && styles.actionLabelOn]}>
-              {pending ? "Voting" : recordedLabel}
-            </Text>
+    <View style={styles.actionBlock}>
+      <View style={styles.iconRow}>
+        {onEdit && !editOnRight ? (
+          <Pressable onPress={onEdit} style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
+            <Text style={styles.menuItemLabel}>Edit</Text>
           </Pressable>
         ) : null}
+        <View style={styles.iconCluster}>
+          {onComment ? (
+            <Pressable
+              accessibilityLabel="Comment"
+              onPress={onComment}
+              style={({ pressed }) => [styles.menuItem, commentOpen && styles.actionButtonOn, pressed && styles.pressed]}
+            >
+              <Text style={[styles.menuItemLabel, commentOpen && styles.actionLabelOn]}>Comment</Text>
+            </Pressable>
+          ) : null}
+          {onReply ? <ReplyButton open={replyOpen} onPress={onReply} /> : null}
+          {showReact ? (
+            <Pressable
+              accessibilityLabel="React"
+              onPress={() => setPanel((current) => (current === "react" ? null : "react"))}
+              style={({ pressed }) => [
+                styles.menuItem,
+                (panel === "react" || active) && styles.actionButtonOn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.menuItemLabel, (panel === "react" || active) && styles.actionLabelOn]}>React</Text>
+            </Pressable>
+          ) : null}
+          {showVote ? (
+            <Pressable
+              accessibilityLabel="Vote"
+              onPress={() => {
+                if (recorded == null) {
+                  setPanel((current) => (current === "vote" ? null : "vote"));
+                }
+              }}
+              style={({ pressed }) => [
+                styles.menuItem,
+                (panel === "vote" || recorded != null) && styles.actionButtonOn,
+                pressed && recorded == null && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.menuItemLabel, (panel === "vote" || recorded != null) && styles.actionLabelOn]}>
+                {pending ? "Voting" : recordedLabel}
+              </Text>
+            </Pressable>
+          ) : null}
+          {onEdit && editOnRight ? (
+            <Pressable onPress={onEdit} style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
+              <Text style={styles.menuItemLabel}>Edit</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
-      {reactOpen ? <ReactionRow counts={counts} onToggle={onToggle} /> : null}
-      {voteOpen && recorded == null ? (
+      {panel === "react" ? <ReactionRow counts={counts} onToggle={onToggle} /> : null}
+      {panel === "vote" && recorded == null ? (
         <View style={styles.commentVote}>
           <VoteScale
             value={amount}
@@ -256,9 +310,9 @@ export function ThreadScreen({
   const [draftBody, setDraftBody] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
-  const [direction, setDirection] = useState<VoteDirection>("up");
   const [strength, setStrength] = useState(VOTE_STRENGTH_MIN);
   const [scaleDragging, setScaleDragging] = useState(false);
+  const [postVoteOpen, setPostVoteOpen] = useState(false);
   const [commentVoteOpen, setCommentVoteOpen] = useState(false);
   const openCommentVotes = useRef(new Set<string>());
 
@@ -277,16 +331,17 @@ export function ThreadScreen({
     Math.min(DEFAULT_COMMENT_STAKE_HP, Math.min(MAX_STAKE_HP, Math.max(1, profile.current_hp)))
   );
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyOpen, setReplyOpen] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [dock, setDock] = useState<"vote" | "comment" | null>(null);
+  const [dock, setDock] = useState<"comment" | null>(null);
 
   useLayoutEffect(() => {
     navigation.setOptions({
       fullScreenGestureEnabled: false,
-      gestureEnabled: dock == null && !commentVoteOpen,
+      gestureEnabled: dock == null && !commentVoteOpen && !postVoteOpen,
     });
-  }, [commentVoteOpen, dock, navigation]);
+  }, [commentVoteOpen, dock, navigation, postVoteOpen]);
   const [commentVotes, setCommentVotes] = useState<Record<string, number>>({});
   const [commentAmounts, setCommentAmounts] = useState<Record<string, number>>({});
   const [commentVoteErrors, setCommentVoteErrors] = useState<Record<string, string | null>>({});
@@ -404,7 +459,7 @@ export function ThreadScreen({
 
   const canEngage = note.status === RESEARCH_POST_STATUS_LIVE && canWriteDesk(note.access);
 
-  async function castVote() {
+  async function castVote(voteDirection: VoteDirection) {
     setPending(true);
     setError(null);
     setNotice(null);
@@ -418,7 +473,7 @@ export function ThreadScreen({
     const result = await voteOnNote({
       userId: profile.id,
       postId,
-      direction,
+      direction: voteDirection,
       strength: Math.min(strength, affordable),
       access: note.access,
     });
@@ -427,7 +482,7 @@ export function ThreadScreen({
     setNotice(result.message ?? null);
 
     if (!result.error) {
-      setDock(null);
+      setPostVoteOpen(false);
       await refresh();
     }
   }
@@ -530,6 +585,15 @@ export function ThreadScreen({
       <View style={styles.meter}>
         <View style={[styles.meterFill, { width: `${note.healthPercent}%` }]} />
       </View>
+      <NoteAssist
+        postId={postId}
+        locked={note.access === "hidden"}
+        summary={note.summary}
+        ticker={note.ticker}
+        conviction={note.conviction}
+        claims={note.claims}
+        risks={note.risks}
+      />
       {editingPost ? (
         <View>
           <TextInput value={draftBody} onChangeText={setDraftBody} multiline style={styles.area} />
@@ -552,28 +616,42 @@ export function ThreadScreen({
       ) : (
         <NoteBody body={note.body} />
       )}
-      {note.authorId === profile.id && note.access !== "hidden" ? (
-        <Pressable
-          onPress={() => {
-            setDraftBody(note.body);
-            setEditingPost(true);
-          }}
-          style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
-        >
-          <Text style={styles.inlineActionLabel}>Edit</Text>
-        </Pressable>
+      <ReactionTally counts={postReactions} />
+      {(note.authorId === profile.id && note.access !== "hidden" && !editingPost) || canWriteDesk(note.access) || canEngage ? (
+        <ActionBar
+          onComment={
+            canEngage
+              ? () => setDock((current) => (current === "comment" ? null : "comment"))
+              : undefined
+          }
+          commentOpen={dock === "comment"}
+          onEdit={
+            note.authorId === profile.id && note.access !== "hidden" && !editingPost
+              ? () => {
+                  setDraftBody(note.body);
+                  setEditingPost(true);
+                }
+              : undefined
+          }
+          showReact={canWriteDesk(note.access)}
+          counts={postReactions}
+          onToggle={(key) => void react("post", postId, key)}
+          showVote={canEngage}
+          amount={strength}
+          maxAmount={Math.min(VOTE_STRENGTH_MAX, Math.max(0, profile.current_hp))}
+          recorded={null}
+          pending={pending}
+          error={error}
+          onAmount={setStrength}
+          onCast={(voteDirection) => void castVote(voteDirection)}
+          onScaleActive={setScaleDragging}
+          onVoteOpenChange={setPostVoteOpen}
+        />
       ) : null}
-      {canWriteDesk(note.access) ? (
-        <View>
-          <ReactionTally counts={postReactions} />
-          <ReactMenu counts={postReactions} onToggle={(key) => void react("post", postId, key)} />
-        </View>
-      ) : (
-        <ReactionTally counts={postReactions} />
-      )}
       {dock == null && error ? <Text style={styles.error}>{error}</Text> : null}
       {dock == null && notice ? <Text style={styles.notice}>{notice}</Text> : null}
       {comments.length > 0 ? <Text style={styles.section}>Comments</Text> : null}
+      {note.access !== "hidden" ? <CommentRead postId={postId} count={comments.length} /> : null}
       {comments.map((comment) => (
         <View key={comment.id} style={styles.comment}>
           <View style={styles.byline}>
@@ -615,19 +693,24 @@ export function ThreadScreen({
               </Pressable>
             </View>
           ) : (
-            <Text style={styles.commentBody}>{comment.body}</Text>
+            <NoteBody body={comment.body} />
           )}
-          {comment.authorId === profile.id ? (
-            <Pressable
-              onPress={() => setEdits((current) => ({ ...current, [comment.id]: comment.body }))}
-              style={({ pressed }) => [styles.toolButton, styles.inlineAction, pressed && styles.pressed]}
-            >
-              <Text style={styles.inlineActionLabel}>Edit comment</Text>
-            </Pressable>
-          ) : null}
           <ReactionTally counts={commentReactions[comment.id] ?? []} />
-          {canWriteDesk(note.access) ? (
-            <CommentActions
+          {canEngage || (comment.authorId === profile.id && edits[comment.id] == null) || canWriteDesk(note.access) ? (
+            <ActionBar
+              onReply={
+                canEngage
+                  ? () => setReplyOpen((current) => ({ ...current, [comment.id]: !current[comment.id] }))
+                  : undefined
+              }
+              replyOpen={replyOpen[comment.id] === true}
+              onEdit={
+                comment.authorId === profile.id && edits[comment.id] == null
+                  ? () => setEdits((current) => ({ ...current, [comment.id]: comment.body }))
+                  : undefined
+              }
+              editOnRight
+              showReact={canWriteDesk(note.access)}
               counts={commentReactions[comment.id] ?? emptyReactionCounts()}
               onToggle={(key) => void react("comment", comment.id, key)}
               showVote={(canEngage && comment.status === RESEARCH_POST_STATUS_LIVE) || commentVotes[comment.id] != null}
@@ -647,7 +730,7 @@ export function ThreadScreen({
               onVoteOpenChange={(open) => setCommentVotePanel(comment.id, open)}
             />
           ) : null}
-          {comment.replies.length > 0 || canEngage ? (
+          {comment.replies.length > 0 || (canEngage && replyOpen[comment.id]) ? (
             <View style={styles.replies}>
               {comment.replies.map((reply) => (
                 <View key={reply.id} style={styles.replyItem}>
@@ -663,7 +746,7 @@ export function ThreadScreen({
                       style={styles.replyEdit}
                     />
                   ) : (
-                    <Text style={styles.replyBody}>{reply.body}</Text>
+                    <NoteBody body={reply.body} />
                   )}
                   <ReactionTally counts={replyReactions[reply.id] ?? []} />
                   {canWriteDesk(note.access) || reply.authorId === profile.id ? (
@@ -706,7 +789,7 @@ export function ThreadScreen({
                   ) : null}
                 </View>
               ))}
-              {canEngage ? (
+              {canEngage && replyOpen[comment.id] ? (
                 <View style={styles.replyCompose}>
                   <TextInput
                     value={replyDrafts[comment.id] ?? ""}
@@ -745,45 +828,6 @@ export function ThreadScreen({
         </View>
       ))}
     </ScrollView>
-    {dock === "vote" ? (
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Vote</Text>
-        <VoteScale
-          value={strength}
-          minimum={VOTE_STRENGTH_MIN}
-          maximum={VOTE_STRENGTH_MAX}
-          limit={Math.max(VOTE_STRENGTH_MIN, Math.min(VOTE_STRENGTH_MAX, profile.current_hp))}
-          disabled={pending || profile.current_hp < VOTE_STRENGTH_MIN}
-          onChange={setStrength}
-        />
-        <View style={[styles.row, styles.voteDirections]}>
-          <Pressable
-            onPress={() => setDirection("up")}
-            style={[styles.voteChoice, styles.voteUp, direction !== "up" && styles.voteIdle]}
-          >
-            <Text style={styles.voteOnLabel}>Up</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setDirection("down")}
-            style={[styles.voteChoice, styles.voteDown, direction !== "down" && styles.voteIdle]}
-          >
-            <Text style={styles.voteOnLabel}>Down</Text>
-          </Pressable>
-        </View>
-        <Pressable
-          disabled={pending || profile.current_hp < VOTE_STRENGTH_MIN}
-          onPress={() => void castVote()}
-          style={styles.button}
-        >
-          <Text style={styles.buttonLabel}>{pending ? "Casting" : "Cast vote"}</Text>
-        </Pressable>
-        {profile.current_hp < VOTE_STRENGTH_MIN ? (
-          <Text style={styles.voteHint}>Need 1 HP to vote.</Text>
-        ) : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      </View>
-    ) : null}
     {dock === "comment" ? (
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Comment</Text>
@@ -852,36 +896,19 @@ export function ThreadScreen({
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       </View>
     ) : null}
-    {canEngage || note.unlockQuote ? (
+    {note.unlockQuote ? (
       <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        {note.unlockQuote ? (
-          <Pressable
-            disabled={pending}
-            onPress={unlock}
-            style={({ pressed }) => [styles.dockButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.buttonLabel}>
-              {pending
-                ? "Unlocking"
-                : `${note.access === "hidden" ? "Unlock to read" : "Unlock to engage"} · ${note.unlockQuote.tokens} UTL`}
-            </Text>
-          </Pressable>
-        ) : (
-          <>
-            <Pressable
-              onPress={() => setDock((current) => (current === "vote" ? null : "vote"))}
-              style={[styles.dockButton, dock === "vote" && styles.dockOn]}
-            >
-              <Text style={dock === "vote" ? styles.dockOnLabel : styles.buttonLabel}>Vote</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setDock((current) => (current === "comment" ? null : "comment"))}
-              style={[styles.dockButton, dock === "comment" && styles.dockOn]}
-            >
-              <Text style={dock === "comment" ? styles.dockOnLabel : styles.buttonLabel}>Comment</Text>
-            </Pressable>
-          </>
-        )}
+        <Pressable
+          disabled={pending}
+          onPress={unlock}
+          style={({ pressed }) => [styles.dockButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.buttonLabel}>
+            {pending
+              ? "Unlocking"
+              : `${note.access === "hidden" ? "Unlock to read" : "Unlock to engage"} · ${note.unlockQuote.tokens} UTL`}
+          </Text>
+        </Pressable>
       </View>
     ) : null}
     </KeyboardAvoidingView>
@@ -1075,6 +1102,7 @@ const styles = StyleSheet.create({
   replyActions: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "flex-end",
     alignItems: "center",
     gap: 6,
   },
@@ -1157,6 +1185,71 @@ const styles = StyleSheet.create({
   disclosure: {
     marginTop: 8,
     alignSelf: "stretch",
+  },
+  actionBlock: {
+    marginTop: 8,
+    gap: 8,
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  iconCluster: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginLeft: "auto",
+  },
+  replyButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  replyButtonOn: {
+    borderColor: colors.fg,
+  },
+  replyMark: {
+    width: 28,
+    height: 28,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconGlyph: {
+    color: colors.fg,
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "600",
+  },
+  menuSheet: {
+    width: "100%",
+    gap: 8,
+  },
+  menuItem: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+  },
+  menuItemLabel: {
+    color: colors.fg,
+    fontSize: 14,
+    fontWeight: "600",
   },
   toolButton: {
     alignSelf: "flex-start",

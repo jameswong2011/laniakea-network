@@ -225,6 +225,11 @@ export type ResearchPost = {
   original_stake: number;
   sub_topic: SubTopic | string;
   unlock_rate_multiple: number;
+  ai_summary?: string | null;
+  ai_ticker?: string | null;
+  ai_conviction?: string | null;
+  ai_claims?: string[] | null;
+  ai_risks?: string[] | null;
   created_at: string;
   updated_at: string;
 };

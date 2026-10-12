@@ -12,7 +12,6 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { compareTierThenHp } from "../../../../src/types";
 import { INVITE_PURCHASE_UTL, inviteSharePath } from "../../../../src/lib/research/referral";
 import { DeskAvatar } from "../avatar";
 import { useDesk } from "../desk";
@@ -31,7 +30,6 @@ import {
   loadInvitees,
   loadReactions,
   loadReferralLines,
-  loadTopicRanks,
   saveBio,
   uploadAvatar,
   type ReactionCount,
@@ -47,7 +45,6 @@ export function AccountScreen({
   const [noteReactions, setNoteReactions] = useState<Record<string, ReactionCount[]>>({});
   const [bio, setBio] = useState("");
   const [invitees, setInvitees] = useState<{ id: string; username: string; displayName: string; tier: string }[]>([]);
-  const [books, setBooks] = useState<{ topic: string; rank: number; of: number; hp: number; tier: string }[]>([]);
   const [residuals, setResiduals] = useState<{ id: string; amount: number; depth: number; createdAt: string }[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,35 +65,7 @@ export function AccountScreen({
       setNotes(nextNotes);
       setNoteReactions(await loadReactions("post", nextNotes.map((note) => note.id), signedIn.id));
       setBio(await loadBio(signedIn.id));
-      const [nextInvitees, ranks] = await Promise.all([
-        loadInvitees(signedIn.id),
-        loadTopicRanks(),
-      ]);
-      setInvitees(nextInvitees);
-      const grouped = new Map<string, { user_id: string; tier: string; current_hp: number }[]>();
-      for (const rank of ranks) {
-        const row = rank as { user_id: string; sub_topic: string; tier: string; current_hp: number };
-        const list = grouped.get(row.sub_topic) ?? [];
-        list.push(row);
-        grouped.set(row.sub_topic, list);
-      }
-      const standings: { topic: string; rank: number; of: number; hp: number; tier: string }[] = [];
-      for (const [topic, list] of grouped) {
-        const sorted = [...list].sort((a, b) =>
-          compareTierThenHp({ ...a, user_id: a.user_id }, { ...b, user_id: b.user_id })
-        );
-        const index = sorted.findIndex((row) => row.user_id === signedIn.id);
-        if (index >= 0) {
-          standings.push({
-            topic,
-            rank: index + 1,
-            of: sorted.length,
-            hp: sorted[index].current_hp,
-            tier: sorted[index].tier,
-          });
-        }
-      }
-      setBooks(standings);
+      setInvitees(await loadInvitees(signedIn.id));
       setResiduals(await loadReferralLines(signedIn.id));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load this account.");
@@ -190,7 +159,7 @@ export function AccountScreen({
         style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
       >
         <Text style={styles.primaryLabel}>
-          Buy an invite code · {INVITE_PURCHASE_UTL} UTL, free for elite
+          Buy an invite code · {INVITE_PURCHASE_UTL} UTL
         </Text>
       </Pressable>
       {codes.length === 0 ? <Empty label="No invite codes on this desk." /> : null}
@@ -234,20 +203,6 @@ export function AccountScreen({
           <Text style={styles.meta}>
             Depth {line.depth} · {formatWhen(line.createdAt)}
           </Text>
-        </View>
-      ))}
-      <Text style={styles.heading}>Topic books</Text>
-      {books.length === 0 ? <Empty label="Publish or vote in a sector to open a topic book." /> : null}
-      {books.map((book) => (
-        <View key={book.topic} style={styles.row}>
-          <Text style={styles.title}>{book.topic}</Text>
-          <View style={styles.inline}>
-            <Text style={styles.inlineMeta}>
-              {book.rank}/{book.of}
-            </Text>
-            <TierName tier={book.tier} />
-            <Text style={styles.inlineMeta}>{book.hp} topic HP</Text>
-          </View>
         </View>
       ))}
       <Text style={styles.heading}>Your notes</Text>

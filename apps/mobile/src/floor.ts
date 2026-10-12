@@ -22,6 +22,8 @@ import { supabase } from "./supabase";
 const POST_COLUMNS =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
 
+const POST_COLUMNS_AI = `${POST_COLUMNS}, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks`;
+
 export type DeskProfile = {
   id: string;
   username: string;
@@ -51,6 +53,11 @@ export type FloorNote = {
   unlockQuote: UnlockQuote | null;
   healthLabel: string;
   healthPercent: number;
+  summary: string | null;
+  ticker: string | null;
+  conviction: string | null;
+  claims: string[];
+  risks: string[];
 };
 
 export type FloorReply = {
@@ -86,6 +93,11 @@ type PostRow = {
   sub_topic: string | null;
   unlock_rate_multiple: number | null;
   created_at: string;
+  ai_summary?: string | null;
+  ai_ticker?: string | null;
+  ai_conviction?: string | null;
+  ai_claims?: unknown;
+  ai_risks?: unknown;
 };
 
 type AuthorRow = {
@@ -182,7 +194,18 @@ function toNote(
       access === "full" ? null : quoteDeskUnlock(viewer.tier, author?.tier, multiple),
     healthLabel: healthLabel(post.status, health, stake),
     healthPercent: getPostHealthPercent(health, stake),
+    summary: post.ai_summary?.trim() || null,
+    ticker: post.ai_ticker?.trim() || null,
+    conviction: post.ai_conviction?.trim() || null,
+    claims: access === "hidden" ? [] : textLines(post.ai_claims),
+    risks: access === "hidden" ? [] : textLines(post.ai_risks),
   };
+}
+
+function textLines(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 3)
+    : [];
 }
 
 export async function loadProfile(userId: string): Promise<DeskProfile> {
@@ -236,7 +259,7 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
 
   let request = supabase
     .from("research_posts")
-    .select(POST_COLUMNS)
+    .select(POST_COLUMNS_AI)
     .in("status", statuses)
     .order("created_at", { ascending: false })
     .limit(80);
@@ -245,7 +268,24 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
     request = request.in("sub_topic", query.topics);
   }
 
-  const { data, error } = await request;
+  let result = await request;
+
+  if (result.error?.message.includes("ai_summary")) {
+    let fallback = supabase
+      .from("research_posts")
+      .select(POST_COLUMNS)
+      .in("status", statuses)
+      .order("created_at", { ascending: false })
+      .limit(80);
+
+    if (query.topics != null) {
+      fallback = fallback.in("sub_topic", query.topics);
+    }
+
+    result = await fallback;
+  }
+
+  const { data, error } = result;
 
   if (error) {
     throw new Error(error.message);
@@ -273,11 +313,16 @@ export async function loadFeed(viewer: DeskProfile, query: FeedQuery) {
 }
 
 export async function loadThread(viewer: DeskProfile, postId: string) {
-  const { data, error } = await supabase
+  const withAi = await supabase
     .from("research_posts")
-    .select(POST_COLUMNS)
+    .select(POST_COLUMNS_AI)
     .eq("id", postId)
     .maybeSingle();
+  const loaded =
+    withAi.error?.message.includes("ai_summary")
+      ? await supabase.from("research_posts").select(POST_COLUMNS).eq("id", postId).maybeSingle()
+      : withAi;
+  const { data, error } = loaded;
 
   if (error) {
     throw new Error(error.message);

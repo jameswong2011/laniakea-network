@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { researchExcerpt as excerptNote } from "@laniakea/domain";
 import { getDeskAccess } from "@/lib/research/access";
 import {
   loadViewerUnlockIds,
@@ -43,17 +44,7 @@ export function researchComposePath() {
 }
 
 export function researchExcerpt(body: string, max = 220) {
-  const compact = body
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, " ")
-    .replace(/[#*_`>]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (compact.length <= max) {
-    return compact;
-  }
-
-  return `${compact.slice(0, max).trimEnd()}…`;
+  return excerptNote(body, max);
 }
 
 /** null = every sub-topic (the default). */
@@ -378,6 +369,8 @@ export function itemMatchesFeedStatuses(
 const POST_COLUMNS =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, unlock_rate_multiple, created_at, updated_at";
 
+const POST_COLUMNS_AI = `${POST_COLUMNS}, ai_summary, ai_ticker, ai_conviction, ai_claims, ai_risks`;
+
 const POST_COLUMNS_WITHOUT_UNLOCK =
   "id, author_id, title, body, status, current_health, original_stake, sub_topic, created_at, updated_at";
 
@@ -497,11 +490,20 @@ export async function getLiveResearchFeed(
   supabase: SupabaseClient,
   viewer?: FeedViewer
 ): Promise<{ items: ResearchFeedItem[]; error: string | null }> {
-  const withUnlock = await supabase
+  const withAi = await supabase
     .from("research_posts")
-    .select(POST_COLUMNS)
+    .select(POST_COLUMNS_AI)
     .in("status", FEED_POST_STATUSES)
     .order("created_at", { ascending: false });
+
+  const withUnlock =
+    withAi.error && withAi.error.message.includes("ai_summary")
+      ? await supabase
+          .from("research_posts")
+          .select(POST_COLUMNS)
+          .in("status", FEED_POST_STATUSES)
+          .order("created_at", { ascending: false })
+      : withAi;
 
   const withTopic =
     withUnlock.error && withUnlock.error.message.includes("unlock_rate_multiple")
@@ -571,11 +573,20 @@ export async function getResearchPostById(
   postId: string,
   viewer?: FeedViewer
 ): Promise<{ item: ResearchFeedItem | null; error: string | null }> {
-  const withUnlock = await supabase
+  const withAi = await supabase
     .from("research_posts")
-    .select(POST_COLUMNS)
+    .select(POST_COLUMNS_AI)
     .eq("id", postId)
     .maybeSingle();
+
+  const withUnlock =
+    withAi.error && withAi.error.message.includes("ai_summary")
+      ? await supabase
+          .from("research_posts")
+          .select(POST_COLUMNS)
+          .eq("id", postId)
+          .maybeSingle()
+      : withAi;
 
   const withStake =
     withUnlock.error && withUnlock.error.message.includes("unlock_rate_multiple")

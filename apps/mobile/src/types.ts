@@ -1,4 +1,5 @@
 export type GuestStackParamList = {
+  Landing: undefined;
   Overview: undefined;
   Login: undefined;
   Signup: undefined;
@@ -15,6 +16,7 @@ export type TabParamList = {
 export type AppStackParamList = {
   Main: undefined;
   Overview: undefined;
+  Landing: undefined;
   Compose: { draftId?: string } | undefined;
   Thread: { postId: string };
   Desk: { username: string };

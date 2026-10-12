@@ -14,6 +14,7 @@ import { ComposeScreen } from "./src/screens/ComposeScreen";
 import { DraftsScreen } from "./src/screens/DraftsScreen";
 import { FeedScreen } from "./src/screens/FeedScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
+import { LandingScreen } from "./src/screens/LandingScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { OverviewScreen } from "./src/screens/OverviewScreen";
 import { RankingScreen } from "./src/screens/RankingScreen";
@@ -213,6 +214,14 @@ export default function App() {
             contentStyle: { backgroundColor: colors.bg },
           }}
         >
+          <GuestStack.Screen name="Landing" options={{ headerShown: false }}>
+            {({ navigation }) => (
+              <LandingScreen
+                onSignUp={() => navigation.navigate("Signup")}
+                onHowItWorks={() => navigation.navigate("Overview")}
+              />
+            )}
+          </GuestStack.Screen>
           <GuestStack.Screen name="Overview" options={{ title: "Laniakea" }}>
             {({ navigation }) => (
               <OverviewScreen
@@ -254,6 +263,9 @@ export default function App() {
             component={ComposeScreen}
             options={{ title: "New note", fullScreenGestureEnabled: false }}
           />
+          <AppStack.Screen name="Landing" options={{ headerShown: false }}>
+            {() => <LandingScreen />}
+          </AppStack.Screen>
           <AppStack.Screen name="Overview" options={{ title: "How it works" }}>
             {({ navigation }) => (
               <OverviewScreen onOpenTape={() => navigation.navigate("Main")} />

@@ -24,6 +24,7 @@ import {
   voteStrength,
   type DeskAccess,
 } from "./domain";
+import { requestNoteBrief } from "./ai";
 import { supabase } from "./supabase";
 import {
   COMMENT_BODY_MAX,
@@ -405,6 +406,8 @@ export async function publishNote(input: {
   if (topicError) {
     return { id: inserted.data.id, error: `Post published, but topic rank failed: ${topicError}` };
   }
+
+  void requestNoteBrief(inserted.data.id);
 
   return { id: inserted.data.id, message: "Note published." };
 }
@@ -1523,6 +1526,7 @@ export async function editPostBody(userId: string, postId: string, body: string)
     return { error: write.error.message };
   }
 
+  void requestNoteBrief(postId, true);
   return { message: "Post updated." };
 }
 

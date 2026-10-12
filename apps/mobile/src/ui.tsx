@@ -70,7 +70,8 @@ export function SectionLabel({ label, hint }: { label: string; hint: string }) {
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: 36,
+    height: 36,
+    alignSelf: "flex-start",
     justifyContent: "center",
     paddingHorizontal: 14,
     borderRadius: radius.pill,

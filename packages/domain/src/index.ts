@@ -314,10 +314,43 @@ export function unlockCtaLabel(access: DeskAccess) {
   return null;
 }
 
+/** Turn a vault note into markdown the readers can render. */
+export function prepareNoteMarkdown(source: string) {
+  return renderCallouts(renderWikilinks(stripFrontmatter(source))).trim();
+}
+
+function stripFrontmatter(source: string) {
+  if (!source.startsWith("---")) {
+    return source;
+  }
+
+  const end = source.indexOf("\n---", 3);
+  if (end === -1) {
+    return source;
+  }
+
+  return source.slice(end + 4);
+}
+
+function renderWikilinks(source: string) {
+  return source.replace(/\[\[([^\]\n|]+?)(?:\|([^\]\n]+))?\]\]/g, (_match, target: string, alias?: string) => {
+    const name = (alias ?? target.split("/").pop() ?? target).replace(/\.md$/i, "").trim();
+    return name;
+  });
+}
+
+function renderCallouts(source: string) {
+  return source.replace(/^> \[!([A-Za-z]+)\][ \t]*([^\n]*)$/gm, (_match, kind: string, title: string) => {
+    const label = kind.charAt(0).toUpperCase() + kind.slice(1).toLowerCase();
+    const rest = title.trim();
+    return rest ? `> **${label}** · ${rest}` : `> **${label}**`;
+  });
+}
+
 export function researchExcerpt(body: string, max = 220) {
-  const compact = body
+  const compact = prepareNoteMarkdown(body)
     .replace(/!\[[^\]]*\]\([^)]+\)/g, " ")
-    .replace(/[#*_`>]/g, "")
+    .replace(/[#*_`>|]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 

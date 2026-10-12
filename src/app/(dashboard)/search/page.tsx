@@ -12,6 +12,7 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { requireUser } from "@/lib/auth/session";
 import { researchCommentPath, researchPostPath } from "@/lib/research/feed";
 import { profilePath } from "@/lib/research/forum";
+import { rankNotesByMeaning, wantsMeaningSearch } from "@/lib/ai/meaning-search";
 import {
   orderSearchPosts,
   searchExcerpt,
@@ -121,13 +122,14 @@ export default async function SearchPage({
       [...(nameHits.data ?? []), ...(userHits.data ?? [])].map((row) => [row.id, row])
     ).values(),
   ];
+  const meaning = wantsMeaningSearch(query) ? await rankNotesByMeaning(query) : [];
 
   return (
     <PageFrame>
       <PageHeading
         kicker="Find"
         title="Search"
-        description="Titles first, then matches inside the note, then comments."
+        description="Titles first, then matches inside the note, then a reading of the summaries."
       />
       <SearchBox defaultValue={query} />
       {query.length > 0 && query.length < 2 ? (
@@ -137,10 +139,28 @@ export default async function SearchPage({
       ) : null}
       {query.length >= 2 ? (
         <>
+          {meaning.length > 0 ? (
+            <Panel>
+              <PanelHeader label="By meaning" meta={meaning.length} />
+              <div className="divide-y divide-border">
+                {meaning.map((post) => (
+                  <article key={post.id} className="px-4 py-4">
+                    <h2 className="font-heading text-[20px]">
+                      <Link href={researchPostPath(post.id)} className="hover:underline">
+                        {post.title}
+                      </Link>
+                    </h2>
+                    <p className="mt-1 text-[14px] text-muted-foreground">{post.summary}</p>
+                  </article>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
           {ordered.titleHits.length === 0 &&
           ordered.bodyHits.length === 0 &&
           commentRows.length === 0 &&
-          desks.length === 0 ? (
+          desks.length === 0 &&
+          meaning.length === 0 ? (
             <p className="text-[14px] text-muted-foreground">Nothing matched.</p>
           ) : null}
           {ordered.titleHits.length > 0 ? (

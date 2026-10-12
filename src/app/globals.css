@@ -267,6 +267,28 @@
     border-radius: 0.7rem;
     border: 1px solid var(--border);
   }
+  .forum-prose hr {
+    margin: 1.2em 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+  .forum-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.9em 0;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .forum-prose th,
+  .forum-prose td {
+    border: 1px solid var(--border);
+    padding: 0.45em 0.6em;
+    text-align: left;
+    vertical-align: top;
+  }
+  .forum-prose th {
+    font-weight: 600;
+  }
 
   .tap-scale {
     transition-property: scale, background-color, color, box-shadow, border-color;

@@ -15,7 +15,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TIERS, type Tier } from "../domain";
+import { researchExcerpt, TIERS, type Tier } from "../domain";
 import { useDesk } from "../desk";
 import {
   DEFAULT_FEED_STATUSES,
@@ -164,8 +164,8 @@ export function FeedScreen({ navigation }: Props) {
                 </View>
               </Pressable>
               <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text numberOfLines={12} style={styles.cardBody}>
-                {item.body}
+              <Text numberOfLines={6} style={styles.cardBody}>
+                {item.summary || researchExcerpt(item.body, 360)}
               </Text>
               <ReactionTally counts={reactions[item.id] ?? []} />
             </Pressable>
@@ -209,7 +209,7 @@ export function FeedScreen({ navigation }: Props) {
                   />
                 ))}
               </View>
-              <SectionLabel label="Desk" hint="Author overall tier, not the topic book." />
+              <SectionLabel label="Desk" hint="Author overall tier." />
               <View style={styles.wrap}>
                 <Chip
                   label="All"

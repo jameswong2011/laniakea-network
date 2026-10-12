@@ -73,7 +73,7 @@ export const SEATS = [
 export const FLOOR_RULES = [
   {
     title: "Five rooms, one tape",
-    body: "Bronze through Masters is the wallet. Topic books are participation scores on the same Monday clock. Hidden notes are a locked card with an unlock quote.",
+    body: "Bronze through Masters is the wallet. Hidden notes are a locked card with an unlock quote.",
   },
   {
     title: "HP is inventory, not a score",
@@ -85,7 +85,7 @@ export const FLOOR_RULES = [
   },
   {
     title: "The floor is invite-only",
-    body: `Every desk gets ${SIGNUP_INVITE_GRANT} codes. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Elite desks mint without a cap. Residual on UTL spends walks the invite line. HP spends do not.`,
+    body: `Every desk gets ${SIGNUP_INVITE_GRANT} codes. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Residual on UTL spends walks the invite line. HP spends do not.`,
   },
 ] as const;
 

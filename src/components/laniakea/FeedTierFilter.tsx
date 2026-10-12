@@ -43,7 +43,7 @@ export function FeedTierFilter({
   return (
     <FeedFilterGroup
       label="Desk"
-      hint="Author overall tier, not the topic book."
+      hint="Author overall tier."
       tone="desk"
     >
       <nav aria-label="Research tier" className="flex flex-wrap items-center gap-1.5">

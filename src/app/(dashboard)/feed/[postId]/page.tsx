@@ -8,6 +8,9 @@ import { FollowAuthorButton } from "@/components/laniakea/FollowAuthorButton";
 import { CommentThread } from "@/components/laniakea/CommentThread";
 import { EditBodyForm } from "@/components/laniakea/EditBodyForm";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
+import { AskNote } from "@/components/laniakea/AskNote";
+import { CommentBriefCard } from "@/components/laniakea/CommentBriefCard";
+import { NoteBriefCard } from "@/components/laniakea/NoteBriefCard";
 import { MarkdownBody } from "@/components/laniakea/MarkdownBody";
 import { PostToolbar } from "@/components/laniakea/PostToolbar";
 import { ReactionBar } from "@/components/laniakea/ReactionBar";
@@ -15,6 +18,8 @@ import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { UnlockPostButton } from "@/components/laniakea/UnlockPostButton";
 import { VoteControls } from "@/components/laniakea/VoteControls";
+import { ensureCommentBrief } from "@/lib/ai/comment-brief";
+import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { requireUser } from "@/lib/auth/session";
 import { canOpenDesk, deskAccessRailClass } from "@/lib/research/access";
 import {
@@ -93,6 +98,7 @@ export default async function ResearchPostPage({
     notFound();
   }
 
+  const brief = await ensureNoteBrief(item.id);
   const locked = !canOpenDesk(item.access);
 
   if (locked) {
@@ -120,11 +126,13 @@ export default async function ResearchPostPage({
               <TierBadge tier={item.deskTier} locked />
             ) : null}
           </div>
-          {item.body ? (
+          {brief ? <NoteBriefCard brief={brief} locked /> : null}
+          {!brief && item.body ? (
             <p className="mb-4 text-[15px] leading-relaxed text-muted-foreground">
               {item.body}
             </p>
           ) : null}
+          <AskNote postId={item.id} locked />
           {item.unlockQuote ? (
             <UnlockPostButton
               postId={item.id}
@@ -146,6 +154,8 @@ export default async function ResearchPostPage({
 
   const viewerVotes = await getViewerVotes(supabase, userId, [item.id]);
   const thread = await getCommentThread(supabase, item.id, userId);
+  const commentBrief =
+    thread.comments.length >= 3 ? await ensureCommentBrief(item.id) : null;
   const commentVotes = await getViewerCommentVotes(
     supabase,
     userId,
@@ -249,6 +259,8 @@ export default async function ResearchPostPage({
                 </span>
               ) : null}
             </div>
+            {brief ? <NoteBriefCard brief={brief} /> : null}
+            <AskNote postId={item.id} />
             <MarkdownBody source={item.body} />
             {item.author_id === userId ? (
               <EditBodyForm
@@ -315,6 +327,8 @@ export default async function ResearchPostPage({
           </div>
         </div>
       </article>
+
+      {commentBrief ? <CommentBriefCard brief={commentBrief} /> : null}
 
       <CommentThread
         postId={item.id}

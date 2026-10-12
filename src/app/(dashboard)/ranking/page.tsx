@@ -9,9 +9,7 @@ import {
 } from "@/components/layout/PageFrame";
 import { CalibrationButton } from "@/components/laniakea/CalibrationButton";
 import { DeskAvatar } from "@/components/laniakea/DeskAvatar";
-import { RankingBooks } from "@/components/laniakea/RankingBooks";
-import { RankingTopicNav } from "@/components/laniakea/RankingTopicNav";
-import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
+import { RankingTierNav } from "@/components/laniakea/RankingTierNav";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { profilePath } from "@/lib/research/forum";
 import { requireUser } from "@/lib/auth/session";
@@ -19,13 +17,9 @@ import { formatHp } from "@/lib/format";
 import { CALIBRATION_QUARTILE } from "@/lib/research/calibration";
 import { WEEKLY_CRON_LABEL } from "@/lib/research/economy";
 import {
-  getSubtopicRanks,
-  topicBooksByUser,
-} from "@/lib/research/subtopic-ranks";
-import {
   HP_TRANSACTION_CALIBRATION,
   compareTierThenHp,
-  resolveSubTopic,
+  resolveTier,
   type HpTransaction,
   type Profile,
 } from "@/types";
@@ -41,8 +35,8 @@ function firstSearchParam(value: string | string[] | undefined) {
 export default async function RankingPage({
   searchParams,
 }: PageProps<"/ranking">) {
-  const { topic: topicParam } = await searchParams;
-  const selectedTopic = resolveSubTopic(firstSearchParam(topicParam));
+  const { tier: tierParam } = await searchParams;
+  const selectedTier = resolveTier(firstSearchParam(tierParam));
   const { supabase, userId, profile } = await requireUser();
   const withAvatar = await supabase
     .from("profiles")
@@ -67,40 +61,11 @@ export default async function RankingPage({
   ).filter((row) => row.username !== "laniakea_treasury");
   const profilesById = new Map(profiles.map((row) => [row.id, row]));
   const isAdmin = profile?.role === "admin";
-  const { ranks: allTopicRanks } = await getSubtopicRanks(supabase);
-  const booksByUser = topicBooksByUser(allTopicRanks, 2);
-
-  const topicRanks = selectedTopic
-    ? {
-        ranks: allTopicRanks.filter(
-          (rank) => resolveSubTopic(rank.sub_topic) === selectedTopic
-        ),
-        error: null,
-      }
-    : { ranks: [], error: null };
-
-  const topicRows = topicRanks.ranks
-    .map((rank) => {
-      const identity = profilesById.get(rank.user_id);
-
-      return {
-        id: rank.user_id,
-        username: identity?.username ?? rank.user_id.slice(0, 8),
-        display_name: identity?.display_name ?? "Unknown",
-        role: identity?.role ?? "member",
-        tier: rank.tier,
-        current_hp: rank.current_hp,
-        overallTier: identity?.tier ?? "Bronze",
-        overallHp: identity?.current_hp ?? 0,
-        avatar_url: identity?.avatar_url ?? null,
-      };
-    })
-    .sort(compareTierThenHp);
-
-  const rows = selectedTopic
-    ? topicRows
-    : [...profiles].sort(compareTierThenHp);
-  const listError = selectedTopic ? topicRanks.error : error?.message ?? null;
+  const ranked = [...profiles].sort(compareTierThenHp);
+  const rows = selectedTier
+    ? ranked.filter((row) => resolveTier(row.tier) === selectedTier)
+    : ranked;
+  const listError = error?.message ?? null;
   const quartilePct = Math.round(CALIBRATION_QUARTILE * 100);
 
   const { data: logRows } = await supabase
@@ -119,27 +84,19 @@ export default async function RankingPage({
     <PageFrame>
       <PageHeading
         kicker="Standings"
-        title={selectedTopic ? `${selectedTopic} Ranking` : "Ranking"}
+        title="Ranking"
         description={
-          selectedTopic
-            ? `Topic book by ${selectedTopic} tier, then HP in that desk. Overall desk is shown for context. Calibration moves the top and bottom ${quartilePct}% each week (${WEEKLY_CRON_LABEL}) and resets swept desks to 1000 HP.`
-            : `Overall book by tier, then HP in that desk. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time, and resets swept desks to 1000 HP.`
+          selectedTier
+            ? `${selectedTier} desks, ordered by HP.`
+            : `Overall book by research tier, then HP in that desk. Weekly calibration (${WEEKLY_CRON_LABEL}) promotes the top ${quartilePct}% and demotes the bottom ${quartilePct}%, one tier at a time, and resets swept desks to 1000 HP.`
         }
-        meta={
-          <>
-            {selectedTopic ? <SubTopicBadge topic={selectedTopic} size="md" /> : null}
-            {isAdmin ? <CalibrationButton /> : null}
-          </>
-        }
+        meta={isAdmin ? <CalibrationButton /> : null}
       />
 
-      <RankingTopicNav selected={selectedTopic} />
+      <RankingTierNav selected={selectedTier} />
 
       <Panel>
-        <PanelHeader
-          label={selectedTopic ? `${selectedTopic} book` : "Leaderboard"}
-          meta={rows.length}
-        />
+        <PanelHeader label="Leaderboard" meta={rows.length} />
 
         {listError ? (
           <p className="px-2.5 py-3 font-data text-[12px] text-loss">
@@ -147,9 +104,7 @@ export default async function RankingPage({
           </p>
         ) : rows.length === 0 ? (
           <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
-            {selectedTopic
-              ? "No participants in this sub-topic yet."
-              : "No profiles found."}
+            {selectedTier ? `No desks in ${selectedTier}.` : "No profiles found."}
           </p>
         ) : (
           <table className="w-full text-left">
@@ -161,37 +116,17 @@ export default async function RankingPage({
                 <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
                   Identity
                 </th>
-                {selectedTopic ? (
-                  <>
-                    <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                      Topic tier
-                    </th>
-                    <th className="px-2.5 py-1.5 text-right font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                      Topic HP
-                    </th>
-                    <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                      Overall
-                    </th>
-                  </>
-                ) : (
-                  <>
-                    <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                      Tier
-                    </th>
-                    <th className="px-2.5 py-1.5 text-right font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                      HP
-                    </th>
-                    <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                      Books
-                    </th>
-                  </>
-                )}
+                <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                  Tier
+                </th>
+                <th className="px-2.5 py-1.5 text-right font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                  HP
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => {
                 const isViewer = row.id === userId;
-                const topicRow = "overallTier" in row ? row : null;
 
                 return (
                   <tr
@@ -227,36 +162,12 @@ export default async function RankingPage({
                         </span>
                       </Link>
                     </td>
-                    {topicRow ? (
-                      <>
-                        <td className="px-2.5 py-1.5">
-                          <TierBadge tier={topicRow.tier} size="md" />
-                        </td>
-                        <td className="px-2.5 py-1.5 text-right font-data text-[12px] text-gain">
-                          {formatHp(topicRow.current_hp)}
-                        </td>
-                        <td className="px-2.5 py-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <TierBadge tier={topicRow.overallTier} />
-                            <span className="font-data text-[11px] text-gain">
-                              {formatHp(topicRow.overallHp)}
-                            </span>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-2.5 py-1.5">
-                          <TierBadge tier={row.tier} size="md" />
-                        </td>
-                        <td className="px-2.5 py-1.5 text-right font-data text-[12px] text-gain">
-                          {formatHp(row.current_hp)}
-                        </td>
-                        <td className="px-2.5 py-1.5">
-                          <RankingBooks books={booksByUser.get(row.id) ?? []} />
-                        </td>
-                      </>
-                    )}
+                    <td className="px-2.5 py-1.5">
+                      <TierBadge tier={row.tier} size="md" />
+                    </td>
+                    <td className="px-2.5 py-1.5 text-right font-data text-[12px] text-gain">
+                      {formatHp(row.current_hp)}
+                    </td>
                   </tr>
                 );
               })}

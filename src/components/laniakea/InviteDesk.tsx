@@ -37,9 +37,7 @@ export function InviteDesk({
               Invites
             </p>
             <p className="mt-1 text-[12px] text-muted-foreground">
-              {unlimitedInvites
-                ? "Elite desk. Mint as many codes as you need, at no UTL. Share a link or the code. One redemption each."
-                : `Five grant codes at signup. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Share a link or the code. One redemption each.`}{" "}
+              {`Five grant codes at signup. Extra codes cost ${INVITE_PURCHASE_UTL} UTL. Share a link or the code. One redemption each.`}{" "}
               {available.length} open · {redeemed.length} used.
             </p>
           </div>

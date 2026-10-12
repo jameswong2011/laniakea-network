@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { requireUser } from "@/lib/auth/session";
 import { researchPostPath } from "@/lib/research/feed";
 import {
@@ -184,6 +186,10 @@ export async function editPostBody(
   if (write.error) {
     return { error: write.error.message, stamp: Date.now() };
   }
+
+  after(() => {
+    void ensureNoteBrief(parsed.data.postId, true);
+  });
 
   refreshSocial(parsed.data.postId);
   return { message: "Post updated.", stamp: Date.now() };

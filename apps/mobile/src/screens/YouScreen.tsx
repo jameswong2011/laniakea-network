@@ -11,15 +11,16 @@ import { colors, radius } from "../theme";
 import { TierName } from "../tier-mark";
 import type { AppStackParamList } from "../types";
 
-type HubRoute = "Inbox" | "Drafts" | "Saved" | "Wallet" | "Account" | "Overview";
+type HubRoute = "Inbox" | "Drafts" | "Saved" | "Wallet" | "Account" | "Overview" | "Landing";
 
 const LINKS: { route: HubRoute; label: string; hint: string }[] = [
   { route: "Inbox", label: "Inbox", hint: "Replies and new notes from desks you follow" },
   { route: "Drafts", label: "Drafts", hint: "Unpublished notes and comments" },
   { route: "Saved", label: "Saved", hint: "Notes you marked to come back to" },
   { route: "Wallet", label: "Wallet", hint: "HP, UTL, buy, and cash out" },
-  { route: "Account", label: "Account", hint: "Invites, topic books, picture" },
+  { route: "Account", label: "Account", hint: "Invites and picture" },
   { route: "Overview", label: "How it works", hint: "Seats, rooms, Hunt, and Ascent" },
+  { route: "Landing", label: "Landing", hint: "The picture sign-in page" },
 ];
 
 export function YouScreen() {

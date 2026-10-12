@@ -8,11 +8,12 @@ import { DeskAvatar } from "../avatar";
 import { colors, radius } from "../theme";
 import { TierName } from "../tier-mark";
 import type { AppStackParamList, TabParamList } from "../types";
+import { searchByMeaning } from "../ai";
 import { searchFloor } from "../writes";
 
 type Hit =
   | { kind: "label"; id: string; title: string }
-  | { kind: "post"; id: string; title: string; meta: string; excerpt: string }
+  | { kind: "post"; id: string; postId?: string; title: string; meta: string; excerpt: string }
   | { kind: "comment"; id: string; postId: string; title: string; meta: string; excerpt: string }
   | { kind: "desk"; id: string; username: string; title: string; meta: string; tier: string; avatarUrl: string | null };
 
@@ -36,6 +37,23 @@ export function SearchScreen({ navigation }: Props) {
     setError(null);
     const result = await searchFloor(query);
     const next: Hit[] = [];
+    const words = query.trim().split(/\s+/).filter(Boolean);
+    if (words.length >= 3 || query.includes("?")) {
+      const meaning = await searchByMeaning(query);
+      if (meaning?.hits?.length) {
+        next.push({ kind: "label", id: "meaning", title: "By meaning" });
+        for (const hit of meaning.hits) {
+          next.push({
+            kind: "post",
+            id: `meaning-${hit.id}`,
+            postId: hit.id,
+            title: hit.title,
+            meta: "Summary",
+            excerpt: hit.summary,
+          });
+        }
+      }
+    }
     if (result.titles.length > 0) {
       next.push({ kind: "label", id: "titles", title: "Titles" });
       next.push(
@@ -120,7 +138,7 @@ export function SearchScreen({ navigation }: Props) {
               style={styles.row}
               onPress={() => {
                 if (item.kind === "post") {
-                  navigation.navigate("Thread", { postId: item.id });
+                  navigation.navigate("Thread", { postId: item.postId ?? item.id });
                 }
                 if (item.kind === "comment") {
                   navigation.navigate("Thread", { postId: item.postId });

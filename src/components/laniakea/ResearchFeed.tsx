@@ -118,14 +118,14 @@ export function ResearchFeed({
                     <span>{item.title}</span>
                   )}
                 </h2>
-                {item.body ? (
+                {item.ai_summary || item.body ? (
                   <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
                     {open ? (
                       <Link href={href} className="hover:text-foreground">
-                        {researchExcerpt(item.body, 280)}
+                        {item.ai_summary || researchExcerpt(item.body, 280)}
                       </Link>
                     ) : (
-                      researchExcerpt(item.body, 280)
+                      item.ai_summary || researchExcerpt(item.body, 280)
                     )}
                   </p>
                 ) : null}

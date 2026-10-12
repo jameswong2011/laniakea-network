@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -27,6 +28,7 @@ import {
   settleHuntedPost,
 } from "@/lib/research/settlement-apply";
 import { notifyAuthorFollowers } from "@/lib/research/forum";
+import { ensureNoteBrief } from "@/lib/ai/note-brief";
 import { recordSubtopicParticipation } from "@/lib/research/subtopic-ranks";
 import {
   VOTE_SCALE_BLOCKED_MESSAGE,
@@ -233,6 +235,10 @@ export async function createResearchPost(
   await notifyAuthorFollowers(supabase, {
     actorId: userId,
     postId: post.id,
+  });
+
+  after(() => {
+    void ensureNoteBrief(post.id);
   });
 
   refreshFeed();

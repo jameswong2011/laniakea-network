@@ -1,43 +1,156 @@
-import { Image, Text } from "react-native";
-import { colors } from "./theme";
-
-const IMAGE = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+import { Image, StyleSheet } from "react-native";
+import Markdown from "react-native-markdown-display";
+import { prepareNoteMarkdown } from "./domain";
+import { colors, radius } from "./theme";
 
 export function NoteBody({ body }: { body: string }) {
-  const parts: { kind: "text" | "image"; value: string }[] = [];
-  let last = 0;
+  const source = prepareNoteMarkdown(body);
 
-  for (const match of body.matchAll(IMAGE)) {
-    const index = match.index ?? 0;
-
-    if (index > last) {
-      parts.push({ kind: "text", value: body.slice(last, index) });
-    }
-
-    parts.push({ kind: "image", value: match[2] });
-    last = index + match[0].length;
-  }
-
-  if (last < body.length) {
-    parts.push({ kind: "text", value: body.slice(last) });
+  if (!source) {
+    return null;
   }
 
   return (
-    <>
-      {parts.map((part, index) =>
-        part.kind === "image" ? (
+    <Markdown
+      style={styles}
+      rules={{
+        image: (node) => (
           <Image
-            key={`${part.value}-${index}`}
-            source={{ uri: part.value }}
-            style={{ width: "100%", height: 220, marginTop: 12, backgroundColor: colors.surface }}
+            key={node.key}
+            source={{ uri: node.attributes.src }}
+            accessibilityLabel={node.attributes.alt}
+            accessibilityIgnoresInvertColors
             resizeMode="cover"
+            style={imageStyle}
           />
-        ) : (
-          <Text key={`text-${index}`} style={{ color: colors.fg, fontSize: 16, lineHeight: 24, marginTop: 16 }}>
-            {part.value.trim()}
-          </Text>
-        )
-      )}
-    </>
+        ),
+      }}
+    >
+      {source}
+    </Markdown>
   );
 }
+
+const imageStyle = {
+  width: "100%" as const,
+  height: 220,
+  marginVertical: 12,
+  borderRadius: radius.card,
+  backgroundColor: colors.surface,
+};
+
+const styles = StyleSheet.create({
+  body: {
+    color: colors.fg,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  heading1: {
+    color: colors.fg,
+    fontSize: 28,
+    fontWeight: "700",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  heading2: {
+    color: colors.fg,
+    fontSize: 22,
+    fontWeight: "700",
+    marginTop: 18,
+    marginBottom: 6,
+  },
+  heading3: {
+    color: colors.fg,
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  heading4: {
+    color: colors.fg,
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  paragraph: {
+    marginTop: 0,
+    marginBottom: 10,
+  },
+  strong: {
+    fontWeight: "700",
+  },
+  em: {
+    fontStyle: "italic",
+  },
+  s: {
+    textDecorationLine: "line-through",
+  },
+  link: {
+    color: colors.fg,
+    textDecorationLine: "underline",
+  },
+  blockquote: {
+    backgroundColor: colors.surface,
+    borderLeftColor: colors.border,
+    borderLeftWidth: 3,
+    paddingLeft: 12,
+    marginVertical: 8,
+  },
+  bullet_list: {
+    marginVertical: 6,
+  },
+  ordered_list: {
+    marginVertical: 6,
+  },
+  list_item: {
+    marginVertical: 2,
+  },
+  code_inline: {
+    backgroundColor: colors.surface,
+    color: colors.fg,
+    fontFamily: "Menlo",
+  },
+  fence: {
+    backgroundColor: colors.surface,
+    color: colors.fg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.field,
+    padding: 12,
+  },
+  code_block: {
+    backgroundColor: colors.surface,
+    color: colors.fg,
+    borderColor: colors.border,
+  },
+  hr: {
+    backgroundColor: colors.border,
+    height: 1,
+    marginVertical: 16,
+  },
+  table: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.field,
+  },
+  thead: {},
+  tbody: {},
+  th: {
+    color: colors.fg,
+    fontWeight: "700",
+    padding: 8,
+    borderColor: colors.border,
+  },
+  tr: {
+    borderColor: colors.border,
+  },
+  td: {
+    color: colors.fg,
+    padding: 8,
+    borderColor: colors.border,
+  },
+  image: {
+    borderRadius: radius.card,
+  },
+});

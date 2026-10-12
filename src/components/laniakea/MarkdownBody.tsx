@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { prepareNoteMarkdown } from "@laniakea/domain";
 
 const schema = {
   ...defaultSchema,
@@ -43,9 +44,14 @@ export function MarkdownBody({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={src} alt={alt ?? ""} />
             ) : null,
+          table: ({ children }) => (
+            <div className="overflow-x-auto">
+              <table>{children}</table>
+            </div>
+          ),
         }}
       >
-        {source}
+        {prepareNoteMarkdown(source)}
       </ReactMarkdown>
     </div>
   );

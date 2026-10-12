@@ -7,12 +7,10 @@ import {
   PanelHeader,
 } from "@/components/layout/PageFrame";
 import { HpReadout } from "@/components/laniakea/HpReadout";
-import { SubTopicBadge } from "@/components/laniakea/SubTopicBadge";
 import { TierBadge } from "@/components/laniakea/TierBadge";
 import { TokenReadout } from "@/components/laniakea/TokenReadout";
 import { requireUser } from "@/lib/auth/session";
 import { format } from "date-fns";
-import { formatHp } from "@/lib/format";
 import { HealthMeter } from "@/components/laniakea/HealthMeter";
 import { AvatarUpload } from "@/components/laniakea/AvatarUpload";
 import { BioEditor } from "@/components/laniakea/BioEditor";
@@ -20,19 +18,12 @@ import { PROFILE_AVATAR_SQL } from "@/lib/research/avatar-sql";
 import { InviteDesk } from "@/components/laniakea/InviteDesk";
 import { researchPostPath } from "@/lib/research/feed";
 import { canMintFreeInvites, loadInviteDesk } from "@/lib/research/invite";
-import {
-  getSubtopicRanks,
-  topicStandingsForUser,
-} from "@/lib/research/subtopic-ranks";
-
 export const metadata: Metadata = {
   title: "Dashboard",
 };
 
 export default async function DashboardPage() {
   const { userId, profile, supabase } = await requireUser();
-  const { ranks } = await getSubtopicRanks(supabase);
-  const standings = topicStandingsForUser(ranks, userId);
   const inviteDesk = await loadInviteDesk(supabase, userId);
   const authoredWithStake = await supabase
     .from("research_posts")
@@ -65,7 +56,7 @@ export default async function DashboardPage() {
       <PageHeading
         kicker="Session"
         title="Account"
-        description="Identity, invites, overall tier, and sub-topic books."
+        description="Identity, invites, and overall tier."
         meta={
           <Link
             href="/wallet"
@@ -215,58 +206,6 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
-        )}
-      </Panel>
-
-      <Panel>
-        <PanelHeader label="Sub-topic ranks" meta={standings.length} />
-        {standings.length === 0 ? (
-          <p className="px-2.5 py-3 font-data text-[12px] text-muted-foreground">
-            Publish or vote in a sub-topic to open a topic book.
-          </p>
-        ) : (
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-border bg-surface">
-                <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                  Topic
-                </th>
-                <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                  Rank
-                </th>
-                <th className="px-2.5 py-1.5 font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                  Tier
-                </th>
-                <th className="px-2.5 py-1.5 text-right font-data text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                  Topic HP
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.map((row) => (
-                <tr
-                  key={row.subTopic}
-                  className="border-b border-border last:border-b-0"
-                >
-                  <td className="px-2.5 py-1.5">
-                    <SubTopicBadge topic={row.subTopic} />
-                  </td>
-                  <td className="px-2.5 py-1.5 font-data text-[12px] text-muted-foreground">
-                    {String(row.rank).padStart(2, "0")}
-                    <span className="text-[10px]">
-                      /{String(row.participants).padStart(2, "0")}
-                    </span>
-                  </td>
-                  <td className="px-2.5 py-1.5">
-                    <TierBadge tier={row.tier} />
-                  </td>
-                  <td className="px-2.5 py-1.5 text-right font-data text-[12px] text-gain">
-                    {formatHp(row.currentHp)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         )}
       </Panel>
     </PageFrame>
