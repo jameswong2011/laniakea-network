@@ -214,7 +214,7 @@ export function FeedScreen({ navigation }: Props) {
                   />
                 ))}
               </View>
-              <SectionLabel label="Posted" hint="Today starts at midnight. This week starts Monday." />
+              <SectionLabel label="Posted" hint="Today starts at midnight. This week is the last 7 days. This month is the last 30 days." />
               <View style={styles.wrap}>
                 <Chip
                   label="Any time"

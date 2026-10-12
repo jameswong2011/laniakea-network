@@ -23,7 +23,7 @@ export function FeedPostedFilter({
   onSelect?: (href: string) => void;
 }) {
   return (
-    <FeedFilterGroup label="Posted" hint="When the note was published." tone="outcome">
+    <FeedFilterGroup label="Posted" hint="This week is the last 7 days. This month is the last 30 days." tone="outcome">
       <nav aria-label="Posted" className="flex flex-wrap items-center gap-1.5">
         <FeedFilterChip
           href={feedHref({

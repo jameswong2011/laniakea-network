@@ -395,20 +395,18 @@ export function resolveFeedPosted(value: string | null | undefined): FeedPosted 
   return FEED_POSTED.find((posted) => posted === normalized) ?? null;
 }
 
-/** Local midnight, Monday, or the first of the month. */
+/** Today is local midnight. Week and month roll back from now. */
 export function postedSince(posted: FeedPosted, now = new Date()) {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-
   if (posted === "week") {
-    const mondayOffset = start.getDay() === 0 ? 6 : start.getDay() - 1;
-    start.setDate(start.getDate() - mondayOffset);
+    return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   }
 
   if (posted === "month") {
-    start.setDate(1);
+    return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   }
 
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
   return start;
 }
 
